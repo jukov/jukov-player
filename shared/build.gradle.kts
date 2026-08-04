@@ -62,6 +62,7 @@ kotlin {
             implementation(libs.ktor.serialization.json)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)
+            implementation(libs.navigation3.ui)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

@@ -10,6 +10,7 @@ pluginManagement {
             }
         }
         mavenCentral()
+        maven("https://packages.jetbrains.team/maven/p/cmp/dev")
         gradlePluginPortal()
     }
 }
@@ -24,6 +25,7 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        maven("https://packages.jetbrains.team/maven/p/cmp/dev")
     }
 }
 
