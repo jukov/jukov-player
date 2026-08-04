@@ -13,12 +13,35 @@ import info.jukov.player.auth.domain.LoginUseCase
 import info.jukov.player.auth.domain.LogoutUseCase
 import info.jukov.player.auth.presentation.ui.AuthViewModel
 import io.ktor.client.HttpClient
+import info.jukov.player.artist.data.ArtistsApi
+import info.jukov.player.artist.data.DefaultArtistsRepository
+import info.jukov.player.artist.data.SubsonicArtistsApi
+import info.jukov.player.artist.domain.ArtistsRepository
+import info.jukov.player.artist.domain.GetArtistsUseCase
+import info.jukov.player.artist.presentation.ui.ArtistsViewModel
+import info.jukov.player.subsonic.data.SubsonicApiClient
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
 
 @BindingContainer
 object AppModule {
     @Provides
     @SingleIn(AppScope::class)
-    fun provideHttpClient(): HttpClient = HttpClient()
+    fun provideJson(): Json = Json { ignoreUnknownKeys = true }
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideHttpClient(json: Json): HttpClient = HttpClient {
+        install(ContentNegotiation) {
+            json(json)
+        }
+    }
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideSubsonicApiClient(client: HttpClient, json: Json): SubsonicApiClient =
+        SubsonicApiClient(client, json)
 
     @Provides
     @SingleIn(AppScope::class)
@@ -26,7 +49,7 @@ object AppModule {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideAuthApi(client: HttpClient): AuthApi = SubsonicAuthApi(client)
+    fun provideAuthApi(client: SubsonicApiClient): AuthApi = SubsonicAuthApi(client)
 
     @Provides
     @SingleIn(AppScope::class)
@@ -45,5 +68,26 @@ object AppModule {
         loginUseCase: LoginUseCase,
         logoutUseCase: LogoutUseCase,
     ): AuthViewModel = AuthViewModel(repository, loginUseCase, logoutUseCase)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideArtistsApi(client: SubsonicApiClient): ArtistsApi = SubsonicArtistsApi(client)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideArtistsRepository(
+        api: ArtistsApi,
+        authRepository: AuthRepository,
+    ): ArtistsRepository = DefaultArtistsRepository(api, authRepository)
+
+    @Provides
+    fun provideGetArtistsUseCase(repository: ArtistsRepository): GetArtistsUseCase =
+        GetArtistsUseCase(repository)
+
+    @Provides
+    fun provideArtistsViewModel(
+        getArtistsUseCase: GetArtistsUseCase,
+        authRepository: AuthRepository,
+    ): ArtistsViewModel = ArtistsViewModel(getArtistsUseCase, authRepository)
 
 }

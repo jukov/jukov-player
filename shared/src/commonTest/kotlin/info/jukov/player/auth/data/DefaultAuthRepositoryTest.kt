@@ -53,11 +53,11 @@ class DefaultAuthRepositoryTest {
     }
 
     private object SuccessfulAuthApi : AuthApi {
-        override suspend fun ping(session: AuthSession) = Unit
+        override suspend fun ping(session: AuthSession) = true
     }
 
     private object FailingAuthApi : AuthApi {
-        override suspend fun ping(session: AuthSession) {
+        override suspend fun ping(session: AuthSession): Boolean {
             error("Unauthorized")
         }
     }

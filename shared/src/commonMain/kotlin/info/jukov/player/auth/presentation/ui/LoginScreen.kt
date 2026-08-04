@@ -9,9 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import info.jukov.player.core.presentation.LoadableState
 
 @Composable
 fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
+    val isLoading = state.auth is LoadableState.Loading
     Box(
         modifier = Modifier.fillMaxSize().safeContentPadding().padding(24.dp),
         contentAlignment = Alignment.Center,
@@ -28,7 +30,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 label = { Text("Сервер") },
                 placeholder = { Text("https://example.com") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                enabled = !state.isLoading,
+                enabled = !isLoading,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -36,7 +38,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 value = state.username,
                 onValueChange = viewModel::setUsername,
                 label = { Text("Логин") },
-                enabled = !state.isLoading,
+                enabled = !isLoading,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -46,17 +48,19 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 label = { Text("Пароль") },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                enabled = !state.isLoading,
+                enabled = !isLoading,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            (state.auth as? LoadableState.Failure)?.message?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
             Button(
                 onClick = viewModel::login,
-                enabled = !state.isLoading,
+                enabled = !isLoading,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) {
-                if (state.isLoading) {
+                if (isLoading) {
                     CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                 } else {
                     Text("Войти")

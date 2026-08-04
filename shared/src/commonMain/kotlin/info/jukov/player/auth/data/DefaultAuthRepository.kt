@@ -31,7 +31,7 @@ class DefaultAuthRepository(
             token = md5(password + salt),
             salt = salt,
         )
-        api.ping(session)
+        check(api.ping(session)) { "Сервер отклонил авторизацию" }
         storage.write(session)
         _authState.value = AuthState.LoggedIn(session)
         session
