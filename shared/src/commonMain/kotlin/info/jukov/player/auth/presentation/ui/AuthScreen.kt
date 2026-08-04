@@ -4,15 +4,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import info.jukov.player.auth.domain.AuthRepository
 import info.jukov.player.auth.domain.AuthState
 
 @Composable
-fun AuthScreen(repository: AuthRepository) {
-    val viewModel = remember(repository) { AuthViewModel(repository) }
+fun AuthScreen(viewModel: AuthViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize()) {

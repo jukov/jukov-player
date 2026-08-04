@@ -10,9 +10,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class AuthViewModel(repository: AuthRepository) : ViewModel() {
-    private val loginUseCase = LoginUseCase(repository)
-    private val logoutUseCase = LogoutUseCase(repository)
+class AuthViewModel(
+    repository: AuthRepository,
+    private val loginUseCase: LoginUseCase,
+    private val logoutUseCase: LogoutUseCase,
+) : ViewModel() {
     private val _state = MutableStateFlow(AuthUiState(authState = repository.authState.value))
     val state: StateFlow<AuthUiState> = _state.asStateFlow()
 
