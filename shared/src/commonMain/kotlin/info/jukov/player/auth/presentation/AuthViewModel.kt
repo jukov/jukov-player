@@ -1,11 +1,11 @@
-package info.jukov.player.auth.presentation.ui
+package info.jukov.player.auth.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import info.jukov.player.auth.domain.AuthRepository
+import info.jukov.player.auth.domain.AuthState
 import info.jukov.player.auth.domain.LoginUseCase
 import info.jukov.player.auth.domain.LogoutUseCase
-import info.jukov.player.auth.domain.AuthState
 import info.jukov.player.core.presentation.LoadableState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,24 +25,39 @@ class AuthViewModel(
     init {
         viewModelScope.launch {
             repository.authState.collect { authState ->
-                update { copy(auth = LoadableState.Content(authState)) }
+                update { AuthUiState(auth = LoadableState.Content(authState)) }
             }
         }
     }
 
-    fun setServer(value: String) = update { copy(server = value, auth = auth.withoutFailure()) }
-    fun setUsername(value: String) = update { copy(username = value, auth = auth.withoutFailure()) }
-    fun setPassword(value: String) = update { copy(password = value, auth = auth.withoutFailure()) }
+    fun setServer(value: String) = update {
+        AuthUiState(
+            server = value,
+            auth = auth.withoutFailure()
+        )
+    }
+    fun setUsername(value: String) = update {
+        AuthUiState(
+            username = value,
+            auth = auth.withoutFailure()
+        )
+    }
+    fun setPassword(value: String) = update {
+        AuthUiState(
+            password = value,
+            auth = auth.withoutFailure()
+        )
+    }
 
     fun login() {
         if (_state.value.auth is LoadableState.Loading) return
         viewModelScope.launch {
             val current = _state.value
-            update { copy(auth = LoadableState.Loading(auth.content)) }
+            update { AuthUiState(auth = LoadableState.Loading(auth.content)) }
             loginUseCase(current.server, current.username, current.password)
                 .onSuccess { session ->
                     update {
-                        copy(
+                        AuthUiState(
                             password = "",
                             auth = LoadableState.Content(AuthState.LoggedIn(session)),
                         )
@@ -50,7 +65,7 @@ class AuthViewModel(
                 }
                 .onFailure { error ->
                     update {
-                        copy(
+                        AuthUiState(
                             auth = LoadableState.Failure(
                                 message = error.message ?: "Не удалось войти",
                                 content = auth.content,
@@ -63,9 +78,9 @@ class AuthViewModel(
 
     fun logout() {
         viewModelScope.launch {
-            update { copy(auth = LoadableState.Loading(auth.content)) }
+            update { AuthUiState(auth = LoadableState.Loading(auth.content)) }
             logoutUseCase()
-            update { copy(password = "", auth = LoadableState.Content(AuthState.LoggedOut)) }
+            update { AuthUiState(password = "", auth = LoadableState.Content(AuthState.LoggedOut)) }
         }
     }
 

@@ -12,9 +12,9 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import info.jukov.player.artist.presentation.ui.ArtistsScreen
-import info.jukov.player.artist.presentation.ui.ArtistsViewModel
+import info.jukov.player.artist.presentation.ArtistsViewModel
 import info.jukov.player.auth.domain.AuthState
-import info.jukov.player.auth.presentation.ui.AuthViewModel
+import info.jukov.player.auth.presentation.AuthViewModel
 import info.jukov.player.auth.presentation.ui.LoginScreen
 
 @Composable

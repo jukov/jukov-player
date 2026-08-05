@@ -11,14 +11,14 @@ import info.jukov.player.auth.data.SubsonicAuthApi
 import info.jukov.player.auth.domain.AuthRepository
 import info.jukov.player.auth.domain.LoginUseCase
 import info.jukov.player.auth.domain.LogoutUseCase
-import info.jukov.player.auth.presentation.ui.AuthViewModel
+import info.jukov.player.auth.presentation.AuthViewModel
 import io.ktor.client.HttpClient
 import info.jukov.player.artist.data.ArtistsApi
 import info.jukov.player.artist.data.DefaultArtistsRepository
 import info.jukov.player.artist.data.SubsonicArtistsApi
 import info.jukov.player.artist.domain.ArtistsRepository
 import info.jukov.player.artist.domain.GetArtistsUseCase
-import info.jukov.player.artist.presentation.ui.ArtistsViewModel
+import info.jukov.player.artist.presentation.ArtistsViewModel
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json

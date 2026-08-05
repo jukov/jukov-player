@@ -1,4 +1,4 @@
-package info.jukov.player.auth.presentation.ui
+package info.jukov.player.auth.presentation
 
 import info.jukov.player.auth.domain.AuthState
 import info.jukov.player.core.presentation.LoadableState

@@ -1,11 +1,11 @@
-package info.jukov.player.artist.presentation.ui
+package info.jukov.player.artist.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import info.jukov.player.artist.domain.Artist
 import info.jukov.player.artist.domain.GetArtistsUseCase
 import info.jukov.player.auth.domain.AuthRepository
 import info.jukov.player.auth.domain.AuthState
-import info.jukov.player.artist.domain.Artist
 import info.jukov.player.core.presentation.LoadableState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -2,8 +2,8 @@ package info.jukov.player.di
 
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.createGraph
-import info.jukov.player.auth.presentation.ui.AuthViewModel
-import info.jukov.player.artist.presentation.ui.ArtistsViewModel
+import info.jukov.player.auth.presentation.AuthViewModel
+import info.jukov.player.artist.presentation.ArtistsViewModel
 
 @DependencyGraph(
     scope = AppScope::class,

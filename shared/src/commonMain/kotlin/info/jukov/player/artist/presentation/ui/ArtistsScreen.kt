@@ -4,15 +4,24 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import info.jukov.player.artist.domain.Artist
+import info.jukov.player.artist.presentation.ArtistsViewModel
 import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.presentation.ui.Padding
 
 @Composable
 fun ArtistsScreen(
@@ -21,31 +30,56 @@ fun ArtistsScreen(
     onLogout: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val artists = state.content.orEmpty()
+    var refreshRequested by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().safeContentPadding()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Исполнители", style = MaterialTheme.typography.headlineMedium)
-                Text(username, style = MaterialTheme.typography.bodySmall)
-            }
-            TextButton(onClick = onLogout) { Text("Выйти") }
-        }
+    LaunchedEffect(state) {
+        if (state !is LoadableState.Loading) refreshRequested = false
+    }
 
-        val artists = state.content.orEmpty()
-        when {
-            state is LoadableState.Loading && artists.isEmpty() -> LoadingContent()
-            state is LoadableState.Failure && artists.isEmpty() ->
-                ErrorContent((state as LoadableState.Failure).message, viewModel::retry)
-            artists.isEmpty() -> EmptyContent()
-            else -> ArtistsContent(
-                artists = artists,
-                isLoading = state is LoadableState.Loading,
-                error = (state as? LoadableState.Failure)?.message,
-                onRetry = viewModel::retry,
+    val isRefreshing = refreshRequested && state is LoadableState.Loading
+    val pullToRefreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            refreshRequested = true
+            viewModel.retry()
+        },
+        state = pullToRefreshState,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                modifier = Modifier.align(Alignment.TopCenter),
+                isRefreshing = isRefreshing,
+                state = pullToRefreshState,
+                maxDistance = PullToRefreshDefaults.IndicatorMaxDistance +
+                        WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             )
+        },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        Column(Modifier.fillMaxSize().safeContentPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = Padding.small),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Исполнители", style = MaterialTheme.typography.headlineMedium)
+                    Text(username, style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = onLogout) { Text("Выйти") }
+            }
+
+            when {
+                state is LoadableState.Loading && artists.isEmpty() -> LoadingContent()
+                state is LoadableState.Failure && artists.isEmpty() ->
+                    ErrorContent((state as LoadableState.Failure).message, viewModel::retry)
+                artists.isEmpty() -> EmptyContent()
+                else -> ArtistsContent(
+                    artists = artists,
+                    error = (state as? LoadableState.Failure)?.message,
+                    onRetry = viewModel::retry,
+                )
+            }
         }
     }
 }
@@ -53,12 +87,10 @@ fun ArtistsScreen(
 @Composable
 private fun ArtistsContent(
     artists: List<Artist>,
-    isLoading: Boolean,
     error: String?,
     onRetry: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
-        if (isLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
         error?.let {
             TextButton(onClick = onRetry) {
                 Text(it, color = MaterialTheme.colorScheme.error)
@@ -66,8 +98,8 @@ private fun ArtistsContent(
         }
         LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                contentPadding = PaddingValues(vertical = Padding.small),
+                verticalArrangement = Arrangement.spacedBy(Padding.xSmall),
             ) {
                 items(artists, key = { it.id }) { artist ->
                     ListItem(
@@ -93,10 +125,10 @@ private fun LoadingContent() {
 
 @Composable
 private fun ErrorContent(message: String, onRetry: () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().padding(Padding.large), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(message, color = MaterialTheme.colorScheme.error)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Padding.medium))
             Button(onClick = onRetry) { Text("Повторить") }
         }
     }

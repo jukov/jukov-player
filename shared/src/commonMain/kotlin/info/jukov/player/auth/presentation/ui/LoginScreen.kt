@@ -9,18 +9,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import info.jukov.player.auth.presentation.AuthUiState
+import info.jukov.player.auth.presentation.AuthViewModel
 import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.presentation.ui.Padding
 
 @Composable
 fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
     val isLoading = state.auth is LoadableState.Loading
     Box(
-        modifier = Modifier.fillMaxSize().safeContentPadding().padding(24.dp),
+        modifier = Modifier.fillMaxSize().safeContentPadding().padding(Padding.large),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier.widthIn(max = 440.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(Padding.medium),
         ) {
             Text("Jukov Player", style = MaterialTheme.typography.headlineLarge)
             Text("Подключитесь к своему Subsonic-серверу", style = MaterialTheme.typography.bodyLarge)
