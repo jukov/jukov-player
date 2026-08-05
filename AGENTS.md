@@ -30,6 +30,11 @@
 - Represent a failed request with `LoadableState.Failure(message, content)`. Preserve previously loaded or cached content when it is available so the UI can keep rendering it alongside the error.
 - Reuse this state across features rather than creating feature-specific loading/error state models.
 
+## State Updates
+
+- Prefer `MutableStateFlow.update { ... }` when deriving a new state from the current value.
+- Use direct `.value = ...` assignment only for intentional replacement that does not depend on the previous state.
+
 ## Navigation
 
 - Use Navigation 3 as the application's navigation framework.

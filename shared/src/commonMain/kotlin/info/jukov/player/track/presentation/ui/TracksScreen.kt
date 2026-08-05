@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,7 +39,7 @@ import info.jukov.player.track.domain.TracksFilter
 import info.jukov.player.track.presentation.TracksViewModel
 import jukovplayer.shared.generated.resources.Res
 import jukovplayer.shared.generated.resources.arrow_back
-import jukovplayer.shared.generated.resources.favorite_border
+import jukovplayer.shared.generated.resources.pause
 import jukovplayer.shared.generated.resources.play_arrow
 import org.jetbrains.compose.resources.painterResource
 
@@ -49,8 +49,10 @@ fun TracksScreen(
     filter: TracksFilter,
     viewModel: TracksViewModel,
     onBack: () -> Unit,
-    onFavoriteClick: (Track) -> Unit = {},
-    onPlayClick: (Track) -> Unit = {},
+    onPlayClick: (List<Track>, Int) -> Unit = { _, _ -> },
+    onActiveTrackClick: () -> Unit = {},
+    activeTrackId: String? = null,
+    isPlaying: Boolean = false,
 ) {
     LaunchedEffect(filter) { viewModel.load(filter) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -91,8 +93,10 @@ fun TracksScreen(
             else -> TracksList(
                 tracks = tracks,
                 error = (state as? LoadableState.Failure)?.message,
-                onFavoriteClick = onFavoriteClick,
                 onPlayClick = onPlayClick,
+                onActiveTrackClick = onActiveTrackClick,
+                activeTrackId = activeTrackId,
+                isPlaying = isPlaying,
                 modifier = Modifier.padding(scaffoldPadding),
             )
         }
@@ -103,8 +107,10 @@ fun TracksScreen(
 private fun TracksList(
     tracks: List<Track>,
     error: String?,
-    onFavoriteClick: (Track) -> Unit,
-    onPlayClick: (Track) -> Unit,
+    onPlayClick: (List<Track>, Int) -> Unit,
+    onActiveTrackClick: () -> Unit,
+    activeTrackId: String?,
+    isPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -115,8 +121,15 @@ private fun TracksList(
         error?.let { message ->
             item { Text(message, color = MaterialTheme.colorScheme.error) }
         }
-        items(tracks, key = Track::id) { track ->
-            TrackRow(track, onFavoriteClick, onPlayClick)
+        itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+            TrackRow(
+                track = track,
+                onPlayClick = {
+                    if (track.id == activeTrackId) onActiveTrackClick()
+                    else onPlayClick(tracks, index)
+                },
+                isPlaying = track.id == activeTrackId && isPlaying,
+            )
         }
     }
 }
@@ -124,8 +137,8 @@ private fun TracksList(
 @Composable
 private fun TrackRow(
     track: Track,
-    onFavoriteClick: (Track) -> Unit,
-    onPlayClick: (Track) -> Unit,
+    onPlayClick: () -> Unit,
+    isPlaying: Boolean,
 ) {
     Row(
         modifier = Modifier
@@ -164,16 +177,12 @@ private fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        IconButton(onClick = { onFavoriteClick(track) }) {
+        IconButton(onClick = onPlayClick) {
             Icon(
-                painter = painterResource(Res.drawable.favorite_border),
-                contentDescription = "Добавить в избранное",
-            )
-        }
-        IconButton(onClick = { onPlayClick(track) }) {
-            Icon(
-                painter = painterResource(Res.drawable.play_arrow),
-                contentDescription = "Воспроизвести",
+                painter = painterResource(
+                    if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow,
+                ),
+                contentDescription = if (isPlaying) "Пауза" else "Воспроизвести",
             )
         }
     }

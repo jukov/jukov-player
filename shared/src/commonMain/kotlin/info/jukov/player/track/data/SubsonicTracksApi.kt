@@ -60,12 +60,17 @@ class SubsonicTracksApi(private val client: SubsonicApiClient) : TracksApi {
         id = id,
         title = title,
         artist = artist,
+        album = album,
         albumId = albumId,
         artistId = artistId,
         trackNumber = track,
+        coverArtId = coverArt,
         coverArtUrl = coverArt?.let {
             client.buildUrl("getCoverArt", session, mapOf("id" to it))
         },
+        streamUrl = client.buildUrl("stream", session, mapOf("id" to id)),
+        durationMs = duration?.times(1_000L) ?: 0,
+        contentType = contentType,
         isStarred = starred != null,
     )
 

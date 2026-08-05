@@ -17,16 +17,21 @@ import info.jukov.player.album.presentation.ui.AlbumsScreen
 import info.jukov.player.auth.domain.AuthState
 import info.jukov.player.auth.presentation.AuthViewModel
 import info.jukov.player.auth.presentation.ui.LoginScreen
-import info.jukov.player.di.AppGraphHolder
+import info.jukov.player.di.AppGraph
 import info.jukov.player.library.presentation.ui.LibraryScreen
 import info.jukov.player.track.domain.TracksFilter
 import info.jukov.player.track.presentation.ui.TracksScreen
+import info.jukov.player.playback.presentation.ui.PlayerHost
+import info.jukov.player.playback.presentation.PlayerViewModel
 
 @Composable
 fun AppNavigation(
     authViewModel: AuthViewModel,
+    playerViewModel: PlayerViewModel,
+    graph: AppGraph,
 ) {
     val authUiState by authViewModel.state.collectAsStateWithLifecycle()
+    val playbackState by playerViewModel.state.collectAsStateWithLifecycle()
     val authState = authUiState.auth.content ?: AuthState.LoggedOut
     val destination: NavKey = when (authState) {
         AuthState.LoggedOut -> Routes.Login
@@ -41,10 +46,15 @@ fun AppNavigation(
         }
     }
 
+    LaunchedEffect(authState) {
+        if (authState == AuthState.LoggedOut) playerViewModel.stopAndClear()
+    }
+
     Surface(Modifier.fillMaxSize()) {
-        NavDisplay(
-            backStack = backStack,
-            entryProvider = entryProvider {
+        val navigationContent: @Composable () -> Unit = {
+            NavDisplay(
+                backStack = backStack,
+                entryProvider = entryProvider {
                 entry<Routes.Login> {
                     LoginScreen(authUiState, authViewModel)
                 }
@@ -59,7 +69,7 @@ fun AppNavigation(
                     val session = (authState as? AuthState.LoggedIn)?.session
                     if (session != null) {
                         val artistsViewModel = viewModel {
-                            AppGraphHolder.graph.artistsViewModel
+                            graph.artistsViewModel
                         }
                         ArtistsScreen(
                             viewModel = artistsViewModel,
@@ -72,7 +82,7 @@ fun AppNavigation(
                 }
                 entry<Routes.Albums> { route ->
                     val albumsViewModel = viewModel {
-                        AppGraphHolder.graph.albumsViewModel
+                        graph.albumsViewModel
                     }
                     AlbumsScreen(
                         artistId = route.artistId,
@@ -88,15 +98,25 @@ fun AppNavigation(
                         else -> TracksFilter.All
                     }
                     val tracksViewModel = viewModel {
-                        AppGraphHolder.graph.tracksViewModel
+                        graph.tracksViewModel
                     }
                     TracksScreen(
                         filter = filter,
                         viewModel = tracksViewModel,
                         onBack = { backStack.removeLastOrNull() },
+                        onPlayClick = playerViewModel::play,
+                        onActiveTrackClick = playerViewModel::playPause,
+                        activeTrackId = playbackState.content?.currentTrack?.id,
+                        isPlaying = playbackState.content?.isPlaying == true,
                     )
                 }
-            },
-        )
+                },
+            )
+        }
+        if (authState is AuthState.LoggedIn) {
+            PlayerHost(viewModel = playerViewModel, content = navigationContent)
+        } else {
+            navigationContent()
+        }
     }
 }
