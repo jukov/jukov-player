@@ -9,6 +9,13 @@ internal data class ArtistDto(
     val name: String,
     val coverArt: String? = null,
     val albumCount: Int = 0,
+    val starred: String? = null,
 ) {
-    fun toDomain() = Artist(id, name, albumCount, coverArt)
+    fun toDomain() = Artist(
+        id = id,
+        name = name,
+        albumCount = albumCount,
+        coverArtId = coverArt,
+        isFavorite = starred != null,
+    )
 }

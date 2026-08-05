@@ -20,11 +20,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -39,6 +42,7 @@ import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.track.domain.Track
 import info.jukov.player.track.domain.TracksFilter
 import info.jukov.player.track.presentation.TracksViewModel
+import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import jukovplayer.shared.generated.resources.Res
 import jukovplayer.shared.generated.resources.arrow_back
 import jukovplayer.shared.generated.resources.pause
@@ -58,6 +62,9 @@ fun TracksScreen(
 ) {
     LaunchedEffect(filter) { viewModel.load(filter) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val pending by viewModel.pending.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarHostState.showSnackbar(it) } }
     val tracks = state.content.orEmpty()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -77,6 +84,7 @@ fun TracksScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { scaffoldPadding ->
         when {
             state is LoadableState.Loading && tracks.isEmpty() ->
@@ -102,6 +110,8 @@ fun TracksScreen(
                 onActiveTrackClick = onActiveTrackClick,
                 activeTrackId = activeTrackId,
                 isPlaying = isPlaying,
+                pendingIds = pending,
+                onFavoriteClick = viewModel::toggleFavorite,
                 modifier = Modifier.padding(scaffoldPadding),
             )
         }
@@ -109,13 +119,15 @@ fun TracksScreen(
 }
 
 @Composable
-private fun TracksList(
+fun TracksList(
     tracks: List<Track>,
     error: String?,
     onPlayClick: (List<Track>, Int) -> Unit,
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
     isPlaying: Boolean,
+    pendingIds: Set<String> = emptySet(),
+    onFavoriteClick: (Track) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -134,16 +146,20 @@ private fun TracksList(
                     else onPlayClick(tracks, index)
                 },
                 isPlaying = track.id == activeTrackId && isPlaying,
+                favoriteEnabled = track.id !in pendingIds,
+                onFavoriteClick = { onFavoriteClick(track) },
             )
         }
     }
 }
 
 @Composable
-private fun TrackRow(
+fun TrackRow(
     track: Track,
     onPlayClick: () -> Unit,
     isPlaying: Boolean,
+    favoriteEnabled: Boolean = true,
+    onFavoriteClick: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -182,6 +198,11 @@ private fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        FavoriteToggleButton(
+            isFavorite = track.isFavorite,
+            onClick = onFavoriteClick,
+            enabled = favoriteEnabled,
+        )
         IconButton(onClick = onPlayClick) {
             Icon(
                 painter = painterResource(

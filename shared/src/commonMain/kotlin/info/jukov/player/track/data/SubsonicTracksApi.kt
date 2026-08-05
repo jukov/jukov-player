@@ -71,7 +71,7 @@ class SubsonicTracksApi(private val client: SubsonicApiClient) : TracksApi {
         streamUrl = client.buildUrl("stream", session, mapOf("id" to id)),
         durationMs = duration?.times(1_000L) ?: 0,
         contentType = contentType,
-        isStarred = starred != null,
+        isFavorite = starred != null,
     )
 
     private companion object {

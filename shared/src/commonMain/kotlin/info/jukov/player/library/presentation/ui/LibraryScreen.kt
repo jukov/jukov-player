@@ -23,6 +23,7 @@ import jukovplayer.shared.generated.resources.Res
 import jukovplayer.shared.generated.resources.account_multiple
 import jukovplayer.shared.generated.resources.album
 import jukovplayer.shared.generated.resources.download_circle
+import jukovplayer.shared.generated.resources.heart
 import jukovplayer.shared.generated.resources.music_box_multiple
 import jukovplayer.shared.generated.resources.playlist_music
 import org.jetbrains.compose.resources.DrawableResource
@@ -37,11 +38,13 @@ private data class LibraryItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
+    onFavoritesClick: () -> Unit,
     onTracksClick: () -> Unit,
     onArtistsClick: () -> Unit,
     onAlbumsClick: () -> Unit,
 ) {
     val items = listOf(
+        LibraryItem("Избранное", Res.drawable.heart, onFavoritesClick),
         LibraryItem("Плейлисты", Res.drawable.playlist_music),
         LibraryItem("Треки", Res.drawable.music_box_multiple, onTracksClick),
         LibraryItem("Артисты", Res.drawable.account_multiple, onArtistsClick),

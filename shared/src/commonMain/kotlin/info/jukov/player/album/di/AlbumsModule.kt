@@ -12,6 +12,7 @@ import info.jukov.player.album.presentation.AlbumsViewModel
 import info.jukov.player.auth.domain.AuthRepository
 import info.jukov.player.di.AppScope
 import info.jukov.player.subsonic.data.SubsonicApiClient
+import info.jukov.player.favorite.presentation.FavoriteDelegate
 
 @BindingContainer
 object AlbumsModule {
@@ -31,6 +32,8 @@ object AlbumsModule {
         GetAlbumsUseCase(repository)
 
     @Provides
-    fun provideAlbumsViewModel(getAlbumsUseCase: GetAlbumsUseCase): AlbumsViewModel =
-        AlbumsViewModel(getAlbumsUseCase)
+    fun provideAlbumsViewModel(
+        getAlbumsUseCase: GetAlbumsUseCase,
+        favoriteDelegate: FavoriteDelegate,
+    ): AlbumsViewModel = AlbumsViewModel(getAlbumsUseCase, favoriteDelegate)
 }

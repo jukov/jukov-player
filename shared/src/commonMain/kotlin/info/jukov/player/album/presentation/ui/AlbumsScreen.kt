@@ -26,6 +26,7 @@ import info.jukov.player.album.presentation.AlbumsViewModel
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
+import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import jukovplayer.shared.generated.resources.Res
 import jukovplayer.shared.generated.resources.arrow_back
 import org.jetbrains.compose.resources.painterResource
@@ -41,6 +42,9 @@ fun AlbumsScreen(
     LaunchedEffect(artistId) { viewModel.load(artistId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val albums = state.content.orEmpty()
+    val pending by viewModel.pending.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarHostState.showSnackbar(it) } }
     var refreshRequested by remember { mutableStateOf(false) }
     LaunchedEffect(state) {
         if (state !is LoadableState.Loading) refreshRequested = false
@@ -72,6 +76,7 @@ fun AlbumsScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { scaffoldPadding ->
         PullToRefreshBox(
             isRefreshing = refreshRequested && state is LoadableState.Loading,
@@ -104,6 +109,8 @@ fun AlbumsScreen(
                     error = (state as? LoadableState.Failure)?.message,
                     onRetry = viewModel::retry,
                     onAlbumClick = onAlbumClick,
+                    pendingIds = pending,
+                    onFavoriteClick = viewModel::toggleFavorite,
                 )
             }
         }
@@ -111,15 +118,18 @@ fun AlbumsScreen(
 }
 
 @Composable
-private fun AlbumsGrid(
+fun AlbumsGrid(
     albums: List<Album>,
     error: String?,
     onRetry: () -> Unit,
     onAlbumClick: (String) -> Unit,
+    pendingIds: Set<String> = emptySet(),
+    onFavoriteClick: (Album) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 180.dp),
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Padding.small),
         horizontalArrangement = Arrangement.spacedBy(Padding.small),
         verticalArrangement = Arrangement.spacedBy(Padding.medium),
@@ -130,13 +140,23 @@ private fun AlbumsGrid(
             }
         }
         items(albums, key = { it.id }) { album ->
-            AlbumCard(album, onClick = { onAlbumClick(album.id) })
+            AlbumCard(
+                album = album,
+                onClick = { onAlbumClick(album.id) },
+                onFavoriteClick = { onFavoriteClick(album) },
+                favoriteEnabled = album.id !in pendingIds,
+            )
         }
     }
 }
 
 @Composable
-private fun AlbumCard(album: Album, onClick: () -> Unit) {
+fun AlbumCard(
+    album: Album,
+    onClick: () -> Unit,
+    onFavoriteClick: () -> Unit,
+    favoriteEnabled: Boolean = true,
+) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(1f)
@@ -156,20 +176,25 @@ private fun AlbumCard(album: Album, onClick: () -> Unit) {
             }
         }
         Spacer(Modifier.height(Padding.small))
-        Text(
-            album.name,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            album.artist,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    album.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    album.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            FavoriteToggleButton(album.isFavorite, onFavoriteClick, favoriteEnabled)
+        }
     }
 }
 

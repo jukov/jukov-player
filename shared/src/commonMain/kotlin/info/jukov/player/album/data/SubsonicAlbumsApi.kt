@@ -48,6 +48,7 @@ class SubsonicAlbumsApi(private val client: SubsonicApiClient) : AlbumsApi {
                         parameters = mapOf("id" to it),
                     )
                 },
+                isFavorite = album.starred != null,
             )
         }.sortedBy { it.name.lowercase() }
     }

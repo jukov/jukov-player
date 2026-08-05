@@ -23,6 +23,7 @@ import info.jukov.player.track.domain.TracksFilter
 import info.jukov.player.track.presentation.ui.TracksScreen
 import info.jukov.player.playback.presentation.ui.PlayerHost
 import info.jukov.player.playback.presentation.PlayerViewModel
+import info.jukov.player.favorite.presentation.ui.FavoritesScreen
 
 @Composable
 fun AppNavigation(
@@ -60,9 +61,23 @@ fun AppNavigation(
                 }
                 entry<Routes.Library> {
                     LibraryScreen(
+                        onFavoritesClick = { backStack.add(Routes.Favorites) },
                         onTracksClick = { backStack.add(Routes.Tracks()) },
                         onArtistsClick = { backStack.add(Routes.Artists) },
                         onAlbumsClick = { backStack.add(Routes.Albums()) },
+                    )
+                }
+                entry<Routes.Favorites> {
+                    val favoritesViewModel = viewModel { graph.favoritesViewModel }
+                    FavoritesScreen(
+                        viewModel = favoritesViewModel,
+                        onBack = { backStack.removeLastOrNull() },
+                        onAlbumClick = { backStack.add(Routes.Tracks(albumId = it)) },
+                        onArtistClick = { backStack.add(Routes.Albums(it)) },
+                        onPlayClick = playerViewModel::play,
+                        onActiveTrackClick = playerViewModel::playPause,
+                        activeTrackId = playbackState.content?.currentTrack?.id,
+                        isPlaying = playbackState.content?.isPlaying == true,
                     )
                 }
                 entry<Routes.Artists> {

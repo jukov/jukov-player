@@ -16,6 +16,8 @@ import info.jukov.player.playback.domain.PlaybackController
 import info.jukov.player.playback.domain.PlaybackControllerFactory
 import info.jukov.player.playback.data.PlaybackStore
 import info.jukov.player.playback.presentation.PlayerViewModel
+import info.jukov.player.favorite.di.FavoritesModule
+import info.jukov.player.favorite.presentation.FavoritesViewModel
 
 @DependencyGraph(
     scope = AppScope::class,
@@ -26,6 +28,7 @@ import info.jukov.player.playback.presentation.PlayerViewModel
         AlbumsModule::class,
         TracksModule::class,
         PlaybackModule::class,
+        FavoritesModule::class,
     ],
 )
 interface AppGraph {
@@ -36,6 +39,7 @@ interface AppGraph {
     val playbackController: PlaybackController
     val playbackStore: PlaybackStore
     val playerViewModel: PlayerViewModel
+    val favoritesViewModel: FavoritesViewModel
 
     @DependencyGraph.Factory
     fun interface Factory {

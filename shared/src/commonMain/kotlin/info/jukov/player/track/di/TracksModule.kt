@@ -12,6 +12,7 @@ import info.jukov.player.track.data.TracksApi
 import info.jukov.player.track.domain.GetTracksUseCase
 import info.jukov.player.track.domain.TracksRepository
 import info.jukov.player.track.presentation.TracksViewModel
+import info.jukov.player.favorite.presentation.FavoriteDelegate
 
 @BindingContainer
 object TracksModule {
@@ -31,6 +32,8 @@ object TracksModule {
         GetTracksUseCase(repository)
 
     @Provides
-    fun provideTracksViewModel(getTracksUseCase: GetTracksUseCase): TracksViewModel =
-        TracksViewModel(getTracksUseCase)
+    fun provideTracksViewModel(
+        getTracksUseCase: GetTracksUseCase,
+        favoriteDelegate: FavoriteDelegate,
+    ): TracksViewModel = TracksViewModel(getTracksUseCase, favoriteDelegate)
 }

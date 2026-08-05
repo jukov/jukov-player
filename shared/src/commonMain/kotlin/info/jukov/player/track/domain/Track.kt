@@ -16,5 +16,5 @@ data class Track(
     val streamUrl: String? = null,
     val durationMs: Long = 0,
     val contentType: String? = null,
-    val isStarred: Boolean,
+    val isFavorite: Boolean,
 )

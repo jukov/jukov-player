@@ -9,6 +9,7 @@ import info.jukov.player.artist.data.SubsonicArtistsApi
 import info.jukov.player.artist.domain.ArtistsRepository
 import info.jukov.player.artist.domain.GetArtistsUseCase
 import info.jukov.player.artist.presentation.ArtistsViewModel
+import info.jukov.player.favorite.presentation.FavoriteDelegate
 import info.jukov.player.auth.domain.AuthRepository
 import info.jukov.player.di.AppScope
 import info.jukov.player.subsonic.data.SubsonicApiClient
@@ -34,5 +35,6 @@ object ArtistsModule {
     fun provideArtistsViewModel(
         getArtistsUseCase: GetArtistsUseCase,
         authRepository: AuthRepository,
-    ): ArtistsViewModel = ArtistsViewModel(getArtistsUseCase, authRepository)
+        favoriteDelegate: FavoriteDelegate,
+    ): ArtistsViewModel = ArtistsViewModel(getArtistsUseCase, authRepository, favoriteDelegate)
 }

@@ -11,6 +11,9 @@ object Routes {
     data object Library : NavKey
 
     @Serializable
+    data object Favorites : NavKey
+
+    @Serializable
     data object Artists : NavKey
 
     @Serializable

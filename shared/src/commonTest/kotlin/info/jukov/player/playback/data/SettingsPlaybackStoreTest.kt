@@ -48,7 +48,7 @@ class SettingsPlaybackStoreTest {
             trackNumber = null,
             coverArtUrl = "https://music.example.com/cover/$id",
             streamUrl = "https://music.example.com/stream/$id",
-            isStarred = false,
+            isFavorite = false,
         )
     }
 }

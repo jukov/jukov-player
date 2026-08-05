@@ -25,6 +25,7 @@ import info.jukov.player.artist.presentation.ArtistsViewModel
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
+import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import jukovplayer.shared.generated.resources.Res
 import jukovplayer.shared.generated.resources.arrow_back
 import jukovplayer.shared.generated.resources.more_vert
@@ -41,6 +42,9 @@ fun ArtistsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val artists = state.content.orEmpty()
+    val pending by viewModel.pending.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarHostState.showSnackbar(it) } }
     var refreshRequested by remember { mutableStateOf(false) }
 
     LaunchedEffect(state) {
@@ -66,6 +70,7 @@ fun ArtistsScreen(
         topBar = {
             ArtistsTopAppBar(onLogout, onBack, onAllAlbumsClick, topAppBarScrollBehavior)
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) {
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -75,13 +80,6 @@ fun ArtistsScreen(
             },
             state = pullToRefreshState,
             enabled = isPullToRefreshEnabled,
-            indicator = {
-                PullToRefreshDefaults.Indicator(
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    isRefreshing = isRefreshing,
-                    state = pullToRefreshState,
-                )
-            },
             modifier = Modifier.fillMaxSize().padding(it),
         ) {
             when {
@@ -94,6 +92,8 @@ fun ArtistsScreen(
                     error = (state as? LoadableState.Failure)?.message,
                     onRetry = viewModel::retry,
                     onArtistClick = onArtistClick,
+                    pendingIds = pending,
+                    onFavoriteClick = viewModel::toggleFavorite,
                 )
             }
         }
@@ -154,11 +154,13 @@ private fun ArtistsTopAppBar(
 }
 
 @Composable
-private fun ArtistsContent(
+fun ArtistsContent(
     artists: List<Artist>,
     error: String?,
     onRetry: () -> Unit,
     onArtistClick: (String) -> Unit,
+    pendingIds: Set<String> = emptySet(),
+    onFavoriteClick: (Artist) -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize()) {
         error?.let {
@@ -172,19 +174,33 @@ private fun ArtistsContent(
                 verticalArrangement = Arrangement.spacedBy(Padding.xSmall),
             ) {
                 items(artists, key = { it.id }) { artist ->
-                    ListItem(
-                        modifier = Modifier.clickable { onArtistClick(artist.id) },
-                        headlineContent = {
-                            Text(artist.name, fontWeight = FontWeight.Medium)
-                        },
-                        supportingContent = {
-                            Text("Альбомы: ${artist.albumCount}")
-                        },
+                    ArtistRow(
+                        artist = artist,
+                        onClick = { onArtistClick(artist.id) },
+                        onFavoriteClick = { onFavoriteClick(artist) },
+                        favoriteEnabled = artist.id !in pendingIds,
                     )
                     HorizontalDivider()
                 }
             }
     }
+}
+
+@Composable
+fun ArtistRow(
+    artist: Artist,
+    onClick: () -> Unit,
+    onFavoriteClick: () -> Unit,
+    favoriteEnabled: Boolean = true,
+) {
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        headlineContent = { Text(artist.name, fontWeight = FontWeight.Medium) },
+        supportingContent = { Text("Альбомы: ${artist.albumCount}") },
+        trailingContent = {
+            FavoriteToggleButton(artist.isFavorite, onFavoriteClick, favoriteEnabled)
+        },
+    )
 }
 
 @Composable

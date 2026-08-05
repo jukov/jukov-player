@@ -9,4 +9,5 @@ internal data class AlbumDto(
     val artist: String = "",
     val artistId: String? = null,
     val coverArt: String? = null,
+    val starred: String? = null,
 )
