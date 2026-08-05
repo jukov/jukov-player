@@ -8,6 +8,9 @@ object Routes {
     data object Login : NavKey
 
     @Serializable
+    data object Library : NavKey
+
+    @Serializable
     data object Artists : NavKey
 
     @Serializable

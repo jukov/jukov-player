@@ -26,6 +26,7 @@ import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import jukovplayer.shared.generated.resources.Res
+import jukovplayer.shared.generated.resources.arrow_back
 import jukovplayer.shared.generated.resources.more_vert
 import org.jetbrains.compose.resources.painterResource
 
@@ -34,6 +35,7 @@ import org.jetbrains.compose.resources.painterResource
 fun ArtistsScreen(
     viewModel: ArtistsViewModel,
     onLogout: () -> Unit,
+    onBack: () -> Unit,
     onArtistClick: (String) -> Unit,
     onAllAlbumsClick: () -> Unit,
 ) {
@@ -61,7 +63,9 @@ fun ArtistsScreen(
     }
     Scaffold(
         modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
-        topBar = { ArtistsTopAppBar(onLogout, onAllAlbumsClick, topAppBarScrollBehavior) },
+        topBar = {
+            ArtistsTopAppBar(onLogout, onBack, onAllAlbumsClick, topAppBarScrollBehavior)
+        },
     ) {
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -100,6 +104,7 @@ fun ArtistsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun ArtistsTopAppBar(
     onLogout: () -> Unit,
+    onBack: () -> Unit,
     onAllAlbumsClick: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
@@ -108,6 +113,14 @@ private fun ArtistsTopAppBar(
     AppFlexibleTopAppBar(
         title = "Исполнители",
         scrollBehavior = scrollBehavior,
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    painter = painterResource(Res.drawable.arrow_back),
+                    contentDescription = "Назад",
+                )
+            }
+        },
         actions = {
             IconButton(
                 onClick = { menuExpanded = true },

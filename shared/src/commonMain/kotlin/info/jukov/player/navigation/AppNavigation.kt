@@ -18,6 +18,7 @@ import info.jukov.player.auth.domain.AuthState
 import info.jukov.player.auth.presentation.AuthViewModel
 import info.jukov.player.auth.presentation.ui.LoginScreen
 import info.jukov.player.di.AppGraphHolder
+import info.jukov.player.library.presentation.ui.LibraryScreen
 
 @Composable
 fun AppNavigation(
@@ -27,7 +28,7 @@ fun AppNavigation(
     val authState = authUiState.auth.content ?: AuthState.LoggedOut
     val destination: NavKey = when (authState) {
         AuthState.LoggedOut -> Routes.Login
-        is AuthState.LoggedIn -> Routes.Artists
+        is AuthState.LoggedIn -> Routes.Library
     }
     val backStack = rememberNavBackStack(destination)
 
@@ -45,6 +46,12 @@ fun AppNavigation(
                 entry<Routes.Login> {
                     LoginScreen(authUiState, authViewModel)
                 }
+                entry<Routes.Library> {
+                    LibraryScreen(
+                        onArtistsClick = { backStack.add(Routes.Artists) },
+                        onAlbumsClick = { backStack.add(Routes.Albums()) },
+                    )
+                }
                 entry<Routes.Artists> {
                     val session = (authState as? AuthState.LoggedIn)?.session
                     if (session != null) {
@@ -54,6 +61,7 @@ fun AppNavigation(
                         ArtistsScreen(
                             viewModel = artistsViewModel,
                             onLogout = authViewModel::logout,
+                            onBack = { backStack.removeLastOrNull() },
                             onArtistClick = { backStack.add(Routes.Albums(it)) },
                             onAllAlbumsClick = { backStack.add(Routes.Albums()) },
                         )
