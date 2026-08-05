@@ -15,4 +15,16 @@ object Routes {
 
     @Serializable
     data class Albums(val artistId: String? = null) : NavKey
+
+    @Serializable
+    data class Tracks(
+        val artistId: String? = null,
+        val albumId: String? = null,
+    ) : NavKey {
+        init {
+            require(artistId == null || albumId == null) {
+                "Tracks route cannot contain both artistId and albumId"
+            }
+        }
+    }
 }

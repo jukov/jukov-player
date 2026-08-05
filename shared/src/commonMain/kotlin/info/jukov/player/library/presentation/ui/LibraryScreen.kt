@@ -25,12 +25,13 @@ private data class LibraryItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
+    onTracksClick: () -> Unit,
     onArtistsClick: () -> Unit,
     onAlbumsClick: () -> Unit,
 ) {
     val items = listOf(
         LibraryItem("Плейлисты"),
-        LibraryItem("Треки"),
+        LibraryItem("Треки", onTracksClick),
         LibraryItem("Артисты", onArtistsClick),
         LibraryItem("Альбомы", onAlbumsClick),
     )

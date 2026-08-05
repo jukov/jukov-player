@@ -1,6 +1,7 @@
 package info.jukov.player.album.presentation.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -35,6 +36,7 @@ fun AlbumsScreen(
     artistId: String?,
     viewModel: AlbumsViewModel,
     onBack: () -> Unit,
+    onAlbumClick: (String) -> Unit,
 ) {
     LaunchedEffect(artistId) { viewModel.load(artistId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -101,6 +103,7 @@ fun AlbumsScreen(
                     albums = albums,
                     error = (state as? LoadableState.Failure)?.message,
                     onRetry = viewModel::retry,
+                    onAlbumClick = onAlbumClick,
                 )
             }
         }
@@ -108,7 +111,12 @@ fun AlbumsScreen(
 }
 
 @Composable
-private fun AlbumsGrid(albums: List<Album>, error: String?, onRetry: () -> Unit) {
+private fun AlbumsGrid(
+    albums: List<Album>,
+    error: String?,
+    onRetry: () -> Unit,
+    onAlbumClick: (String) -> Unit,
+) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 180.dp),
         modifier = Modifier.fillMaxSize(),
@@ -121,13 +129,15 @@ private fun AlbumsGrid(albums: List<Album>, error: String?, onRetry: () -> Unit)
                 TextButton(onClick = onRetry) { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         }
-        items(albums, key = { it.id }) { AlbumCard(it) }
+        items(albums, key = { it.id }) { album ->
+            AlbumCard(album, onClick = { onAlbumClick(album.id) })
+        }
     }
 }
 
 @Composable
-private fun AlbumCard(album: Album) {
-    Column(Modifier.fillMaxWidth()) {
+private fun AlbumCard(album: Album, onClick: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(1f)
                 .clip(MaterialTheme.shapes.small)

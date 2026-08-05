@@ -19,6 +19,8 @@ import info.jukov.player.auth.presentation.AuthViewModel
 import info.jukov.player.auth.presentation.ui.LoginScreen
 import info.jukov.player.di.AppGraphHolder
 import info.jukov.player.library.presentation.ui.LibraryScreen
+import info.jukov.player.track.domain.TracksFilter
+import info.jukov.player.track.presentation.ui.TracksScreen
 
 @Composable
 fun AppNavigation(
@@ -48,6 +50,7 @@ fun AppNavigation(
                 }
                 entry<Routes.Library> {
                     LibraryScreen(
+                        onTracksClick = { backStack.add(Routes.Tracks()) },
                         onArtistsClick = { backStack.add(Routes.Artists) },
                         onAlbumsClick = { backStack.add(Routes.Albums()) },
                     )
@@ -74,6 +77,22 @@ fun AppNavigation(
                     AlbumsScreen(
                         artistId = route.artistId,
                         viewModel = albumsViewModel,
+                        onBack = { backStack.removeLastOrNull() },
+                        onAlbumClick = { backStack.add(Routes.Tracks(albumId = it)) },
+                    )
+                }
+                entry<Routes.Tracks> { route ->
+                    val filter = when {
+                        route.albumId != null -> TracksFilter.ByAlbum(route.albumId)
+                        route.artistId != null -> TracksFilter.ByArtist(route.artistId)
+                        else -> TracksFilter.All
+                    }
+                    val tracksViewModel = viewModel {
+                        AppGraphHolder.graph.tracksViewModel
+                    }
+                    TracksScreen(
+                        filter = filter,
+                        viewModel = tracksViewModel,
                         onBack = { backStack.removeLastOrNull() },
                     )
                 }
