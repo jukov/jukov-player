@@ -9,9 +9,8 @@ import info.jukov.player.navigation.AppNavigation
 @Composable
 fun App() {
     val authViewModel = viewModel { AppGraphHolder.graph.authViewModel }
-    val artistsViewModel = viewModel { AppGraphHolder.graph.artistsViewModel }
 
     MaterialTheme {
-        AppNavigation(authViewModel, artistsViewModel)
+        AppNavigation(authViewModel)
     }
 }

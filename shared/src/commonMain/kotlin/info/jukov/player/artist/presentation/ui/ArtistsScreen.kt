@@ -3,6 +3,7 @@ package info.jukov.player.artist.presentation.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -33,6 +34,8 @@ import org.jetbrains.compose.resources.painterResource
 fun ArtistsScreen(
     viewModel: ArtistsViewModel,
     onLogout: () -> Unit,
+    onArtistClick: (String) -> Unit,
+    onAllAlbumsClick: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val artists = state.content.orEmpty()
@@ -58,7 +61,7 @@ fun ArtistsScreen(
     }
     Scaffold(
         modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
-        topBar = { ArtistsTopAppBar(onLogout, topAppBarScrollBehavior) },
+        topBar = { ArtistsTopAppBar(onLogout, onAllAlbumsClick, topAppBarScrollBehavior) },
     ) {
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -86,6 +89,7 @@ fun ArtistsScreen(
                     artists = artists,
                     error = (state as? LoadableState.Failure)?.message,
                     onRetry = viewModel::retry,
+                    onArtistClick = onArtistClick,
                 )
             }
         }
@@ -96,6 +100,7 @@ fun ArtistsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun ArtistsTopAppBar(
     onLogout: () -> Unit,
+    onAllAlbumsClick: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -117,6 +122,13 @@ private fun ArtistsTopAppBar(
                 onDismissRequest = { menuExpanded = false },
             ) {
                 DropdownMenuItem(
+                    text = { Text("Все альбомы") },
+                    onClick = {
+                        menuExpanded = false
+                        onAllAlbumsClick()
+                    },
+                )
+                DropdownMenuItem(
                     text = { Text("Выйти") },
                     onClick = {
                         menuExpanded = false
@@ -133,6 +145,7 @@ private fun ArtistsContent(
     artists: List<Artist>,
     error: String?,
     onRetry: () -> Unit,
+    onArtistClick: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         error?.let {
@@ -147,6 +160,7 @@ private fun ArtistsContent(
             ) {
                 items(artists, key = { it.id }) { artist ->
                     ListItem(
+                        modifier = Modifier.clickable { onArtistClick(artist.id) },
                         headlineContent = {
                             Text(artist.name, fontWeight = FontWeight.Medium)
                         },

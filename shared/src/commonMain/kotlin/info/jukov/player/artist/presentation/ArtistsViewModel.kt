@@ -10,6 +10,7 @@ import info.jukov.player.core.presentation.LoadableState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ArtistsViewModel(
@@ -26,7 +27,9 @@ class ArtistsViewModel(
             authRepository.authState.collect { authState ->
                 when (authState) {
                     is AuthState.LoggedIn -> loadArtists()
-                    AuthState.LoggedOut -> _state.value = LoadableState.Content(emptyList())
+                    AuthState.LoggedOut -> _state.update {
+                        LoadableState.Content(emptyList())
+                    }
                 }
             }
         }
@@ -37,16 +40,18 @@ class ArtistsViewModel(
     private fun loadArtists() {
         if (_state.value is LoadableState.Loading) return
         viewModelScope.launch {
-            _state.value = LoadableState.Loading(_state.value.content)
+            _state.update { LoadableState.Loading(it.content) }
             getArtistsUseCase()
                 .onSuccess { artists ->
-                    _state.value = LoadableState.Content(artists)
+                    _state.update { LoadableState.Content(artists) }
                 }
                 .onFailure { error ->
-                    _state.value = LoadableState.Failure(
-                        message = error.message ?: "Не удалось загрузить исполнителей",
-                        content = _state.value.content,
-                    )
+                    _state.update {
+                        LoadableState.Failure(
+                            message = error.message ?: "Не удалось загрузить исполнителей",
+                            content = it.content,
+                        )
+                    }
                 }
         }
     }

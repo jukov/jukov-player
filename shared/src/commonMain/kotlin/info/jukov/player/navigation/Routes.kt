@@ -9,4 +9,7 @@ object Routes {
 
     @Serializable
     data object Artists : NavKey
+
+    @Serializable
+    data class Albums(val artistId: String? = null) : NavKey
 }

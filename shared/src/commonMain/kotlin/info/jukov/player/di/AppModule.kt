@@ -19,6 +19,12 @@ import info.jukov.player.artist.data.SubsonicArtistsApi
 import info.jukov.player.artist.domain.ArtistsRepository
 import info.jukov.player.artist.domain.GetArtistsUseCase
 import info.jukov.player.artist.presentation.ArtistsViewModel
+import info.jukov.player.album.data.AlbumsApi
+import info.jukov.player.album.data.DefaultAlbumsRepository
+import info.jukov.player.album.data.SubsonicAlbumsApi
+import info.jukov.player.album.domain.AlbumsRepository
+import info.jukov.player.album.domain.GetAlbumsUseCase
+import info.jukov.player.album.presentation.AlbumsViewModel
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
@@ -89,5 +95,24 @@ object AppModule {
         getArtistsUseCase: GetArtistsUseCase,
         authRepository: AuthRepository,
     ): ArtistsViewModel = ArtistsViewModel(getArtistsUseCase, authRepository)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideAlbumsApi(client: SubsonicApiClient): AlbumsApi = SubsonicAlbumsApi(client)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideAlbumsRepository(
+        api: AlbumsApi,
+        authRepository: AuthRepository,
+    ): AlbumsRepository = DefaultAlbumsRepository(api, authRepository)
+
+    @Provides
+    fun provideGetAlbumsUseCase(repository: AlbumsRepository): GetAlbumsUseCase =
+        GetAlbumsUseCase(repository)
+
+    @Provides
+    fun provideAlbumsViewModel(getAlbumsUseCase: GetAlbumsUseCase): AlbumsViewModel =
+        AlbumsViewModel(getAlbumsUseCase)
 
 }
