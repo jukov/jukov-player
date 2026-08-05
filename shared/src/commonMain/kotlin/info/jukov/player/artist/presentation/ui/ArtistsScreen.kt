@@ -9,24 +9,29 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import info.jukov.player.artist.domain.Artist
 import info.jukov.player.artist.presentation.ArtistsViewModel
 import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
+import jukovplayer.shared.generated.resources.Res
+import jukovplayer.shared.generated.resources.more_vert
+import org.jetbrains.compose.resources.painterResource
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArtistsScreen(
     viewModel: ArtistsViewModel,
-    username: String,
     onLogout: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -39,36 +44,39 @@ fun ArtistsScreen(
 
     val isRefreshing = refreshRequested && state is LoadableState.Loading
     val pullToRefreshState = rememberPullToRefreshState()
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            refreshRequested = true
-            viewModel.retry()
-        },
-        state = pullToRefreshState,
-        indicator = {
-            PullToRefreshDefaults.Indicator(
-                modifier = Modifier.align(Alignment.TopCenter),
-                isRefreshing = isRefreshing,
-                state = pullToRefreshState,
-                maxDistance = PullToRefreshDefaults.IndicatorMaxDistance +
-                        WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            )
-        },
-        modifier = Modifier.fillMaxSize(),
+    val canScrollTopAppBar = remember(pullToRefreshState) {
+        { pullToRefreshState.distanceFraction == 0f }
+    }
+    val topAppBarScrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+        canScroll = canScrollTopAppBar,
+    )
+    val isPullToRefreshEnabled by remember(topAppBarScrollBehavior, pullToRefreshState) {
+        derivedStateOf {
+            topAppBarScrollBehavior.state.collapsedFraction == 0f ||
+                    pullToRefreshState.distanceFraction > 0f
+        }
+    }
+    Scaffold(
+        modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+        topBar = { ArtistsTopAppBar(onLogout, topAppBarScrollBehavior) },
     ) {
-        Column(Modifier.fillMaxSize().safeContentPadding()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = Padding.small),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Исполнители", style = MaterialTheme.typography.headlineMedium)
-                    Text(username, style = MaterialTheme.typography.bodySmall)
-                }
-                TextButton(onClick = onLogout) { Text("Выйти") }
-            }
-
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                refreshRequested = true
+                viewModel.retry()
+            },
+            state = pullToRefreshState,
+            enabled = isPullToRefreshEnabled,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    isRefreshing = isRefreshing,
+                    state = pullToRefreshState,
+                )
+            },
+            modifier = Modifier.fillMaxSize().padding(it),
+        ) {
             when {
                 state is LoadableState.Loading && artists.isEmpty() -> LoadingContent()
                 state is LoadableState.Failure && artists.isEmpty() ->
@@ -82,6 +90,42 @@ fun ArtistsScreen(
             }
         }
     }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ArtistsTopAppBar(
+    onLogout: () -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    AppFlexibleTopAppBar(
+        title = "Исполнители",
+        scrollBehavior = scrollBehavior,
+        actions = {
+            IconButton(
+                onClick = { menuExpanded = true },
+            ) {
+                Icon(
+                    painter = painterResource(Res.drawable.more_vert),
+                    contentDescription = "Ещё",
+                )
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Выйти") },
+                    onClick = {
+                        menuExpanded = false
+                        onLogout()
+                    },
+                )
+            }
+        },
+    )
 }
 
 @Composable

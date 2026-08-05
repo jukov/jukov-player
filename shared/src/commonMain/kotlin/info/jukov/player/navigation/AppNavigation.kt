@@ -49,7 +49,6 @@ fun AppNavigation(
                     if (session != null) {
                         ArtistsScreen(
                             viewModel = artistsViewModel,
-                            username = session.username,
                             onLogout = authViewModel::logout,
                         )
                     }
