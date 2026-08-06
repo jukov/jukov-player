@@ -7,6 +7,7 @@ import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
+import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.track.domain.Track
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,7 @@ data class PlayerUiState(
     val isPlaying: Boolean = false,
     val hasPrevious: Boolean = false,
     val hasNext: Boolean = false,
+    val origin: PlaybackOrigin = PlaybackOrigin.TrackList,
 )
 
 class PlayerViewModel(
@@ -55,7 +57,11 @@ class PlayerViewModel(
         }
     }
 
-    fun play(tracks: List<Track>, startIndex: Int) = controller.play(tracks, startIndex)
+    fun play(
+        tracks: List<Track>,
+        startIndex: Int,
+        origin: PlaybackOrigin = PlaybackOrigin.TrackList,
+    ) = controller.play(tracks, startIndex, origin)
     fun playPause() = controller.playPause()
     fun next() = controller.next()
     fun previous() = controller.previous()
@@ -83,6 +89,7 @@ class PlayerViewModel(
         isPlaying = isPlaying,
         hasPrevious = hasPrevious,
         hasNext = hasNext,
+        origin = origin,
     )
 
     private fun <T, R> LoadableState<T>.mapContent(transform: (T) -> R): LoadableState<R> =

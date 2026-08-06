@@ -9,6 +9,11 @@ interface PlaybackController {
     val state: StateFlow<LoadableState<PlaybackSnapshot>>
 
     fun play(tracks: List<Track>, startIndex: Int = 0)
+    fun play(
+        tracks: List<Track>,
+        startIndex: Int,
+        origin: PlaybackOrigin,
+    ) = play(tracks, startIndex)
     fun playPause()
     fun next()
     fun previous()

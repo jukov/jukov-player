@@ -1,6 +1,5 @@
-- Show play indicator on playing artist/album/track
 - Load track on device
 - Queue
 - Playlists
 - History
-- Cross links from album to artist, etc.добавь короче
+- Cross links from album to artist, etc.

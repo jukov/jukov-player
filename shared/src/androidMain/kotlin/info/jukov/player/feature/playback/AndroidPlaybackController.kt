@@ -19,6 +19,7 @@ import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackControllerFactory
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
+import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.track.domain.Track
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +48,7 @@ private class AndroidPlaybackController(
             queue = saved.queue,
             currentIndex = saved.currentIndex,
             durationMs = saved.queue.getOrNull(saved.currentIndex)?.durationMs ?: 0,
+            origin = saved.origin,
         )
     } ?: PlaybackSnapshot()
     private val _state = MutableStateFlow<LoadableState<PlaybackSnapshot>>(
@@ -82,13 +84,17 @@ private class AndroidPlaybackController(
     }
 
     override fun play(tracks: List<Track>, startIndex: Int) {
+        play(tracks, startIndex, PlaybackOrigin.TrackList)
+    }
+
+    override fun play(tracks: List<Track>, startIndex: Int, origin: PlaybackOrigin) {
         if (tracks.isEmpty() || startIndex !in tracks.indices) return
         val queue = tracks.drop(startIndex)
         if (queue.any { it.streamUrl == null }) {
             fail(AppError.MissingTrackStreamUrl)
             return
         }
-        playbackStore.write(queue, 0)
+        playbackStore.write(queue, 0, origin)
         withController { player ->
             player.setMediaItems(queue.map(Track::toMediaItem), 0, 0)
             player.prepare()
@@ -139,6 +145,7 @@ private class AndroidPlaybackController(
                     durationMs = player.duration.validDuration()
                         ?: saved.queue[index].durationMs,
                     isPlaying = player.isPlaying,
+                    origin = saved.origin,
                 ),
             )
         }

@@ -69,6 +69,7 @@ import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.core.presentation.LoadingOrigin
+import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -83,10 +84,11 @@ fun TracksScreen(
     albumIsFavorite: Boolean = false,
     viewModel: TracksViewModel,
     onBack: () -> Unit,
-    onPlayClick: (List<Track>, Int) -> Unit = { _, _ -> },
+    onPlayClick: (List<Track>, Int, PlaybackOrigin) -> Unit = { _, _, _ -> },
     onActiveTrackClick: () -> Unit = {},
     activeTrackId: String? = null,
     isPlaying: Boolean = false,
+    activeOrigin: PlaybackOrigin = PlaybackOrigin.TrackList,
 ) {
     LaunchedEffect(filter, albumIsFavorite) { viewModel.load(filter, albumIsFavorite) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -103,6 +105,19 @@ fun TracksScreen(
         snackbarError = null
     }
     val tracks = state.content.orEmpty()
+    val collectionOrigin = when (filter) {
+        is TracksFilter.ByAlbum -> PlaybackOrigin.Album(filter.albumId)
+        is TracksFilter.ByArtist -> PlaybackOrigin.Artist(filter.artistId)
+        TracksFilter.All -> null
+    }
+    val isCollectionActive = collectionOrigin != null && activeOrigin == collectionOrigin
+    val onCollectionPlayClick: () -> Unit = {
+        if (isCollectionActive) {
+            onActiveTrackClick()
+        } else if (collectionOrigin != null) {
+            onPlayClick(tracks, 0, collectionOrigin)
+        }
+    }
     val albumHeader = if (filter is TracksFilter.ByAlbum && albumName != null) {
         AlbumHeader(albumName, artistName.orEmpty(), coverArtUrl, filter.albumId)
     } else null
@@ -145,11 +160,22 @@ fun TracksScreen(
                         title = artistName ?: stringResource(Res.string.tracks),
                         scrollBehavior = scrollBehavior,
                         navigationIcon = { BackButton(onBack) },
+                        actions = {
+                            if (filter is TracksFilter.ByArtist) {
+                                PlayPauseButton(
+                                    isPlaying = isCollectionActive && isPlaying,
+                                    onClick = onCollectionPlayClick,
+                                    enabled = tracks.isNotEmpty(),
+                                )
+                            }
+                        },
                     )
                 } else {
                     AlbumTracksTopAppBar(
                         header = albumHeader, tracks = tracks, appBarState = albumAppBarState,
-                        onBack = onBack, onPlayClick = { onPlayClick(tracks, 0) },
+                        onBack = onBack,
+                        onPlayClick = onCollectionPlayClick,
+                        isPlaying = isCollectionActive && isPlaying,
                         isFavorite = currentAlbumIsFavorite,
                         favoriteEnabled = albumHeader.albumId !in pending,
                         onFavoriteClick = { viewModel.toggleAlbumFavorite(albumHeader.albumId) },
@@ -196,7 +222,9 @@ fun TracksScreen(
                     showArtwork = filter !is TracksFilter.ByAlbum,
                     showTrackNumber = filter is TracksFilter.ByAlbum,
                     error = (state as? LoadableState.Failure)?.error,
-                    onPlayClick = onPlayClick,
+                    onPlayClick = { queue, index ->
+                        onPlayClick(queue, index, PlaybackOrigin.TrackList)
+                    },
                     onActiveTrackClick = onActiveTrackClick,
                     activeTrackId = activeTrackId,
                     isPlaying = isPlaying,
@@ -219,6 +247,7 @@ private fun AlbumTracksTopAppBar(
     appBarState: AppCollapsingTopAppBarState,
     onBack: () -> Unit,
     onPlayClick: () -> Unit,
+    isPlaying: Boolean,
     isFavorite: Boolean,
     favoriteEnabled: Boolean,
     onFavoriteClick: () -> Unit,
@@ -234,6 +263,7 @@ private fun AlbumTracksTopAppBar(
                     artworkSize = artworkSize,
                     onPlayClick = onPlayClick,
                     playEnabled = tracks.isNotEmpty(),
+                    isPlaying = isPlaying,
                     isFavorite = isFavorite,
                     favoriteEnabled = favoriteEnabled,
                     onFavoriteClick = onFavoriteClick,
@@ -244,6 +274,7 @@ private fun AlbumTracksTopAppBar(
                     header = header,
                     onPlayClick = onPlayClick,
                     playEnabled = tracks.isNotEmpty(),
+                    isPlaying = isPlaying,
                 )
             },
         )
@@ -266,6 +297,7 @@ private fun ExpandedAlbumTracksHeader(
     artworkSize: androidx.compose.ui.unit.Dp,
     onPlayClick: () -> Unit,
     playEnabled: Boolean,
+    isPlaying: Boolean,
     isFavorite: Boolean,
     favoriteEnabled: Boolean,
     onFavoriteClick: () -> Unit,
@@ -335,7 +367,7 @@ private fun ExpandedAlbumTracksHeader(
                 }
                 Spacer(Modifier.width(Padding.small))
                 PlayPauseButton(
-                    isPlaying = false,
+                    isPlaying = isPlaying,
                     onClick = onPlayClick,
                     enabled = playEnabled,
                     modifier = Modifier.size(48.dp),
@@ -357,6 +389,7 @@ private fun CollapsedAlbumTracksHeader(
     header: AlbumHeader,
     onPlayClick: () -> Unit,
     playEnabled: Boolean,
+    isPlaying: Boolean,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -401,7 +434,7 @@ private fun CollapsedAlbumTracksHeader(
             }
         }
         PlayPauseButton(
-            isPlaying = false,
+            isPlaying = isPlaying,
             onClick = onPlayClick,
             enabled = playEnabled,
             modifier = Modifier.size(48.dp),

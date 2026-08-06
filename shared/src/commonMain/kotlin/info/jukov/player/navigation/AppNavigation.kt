@@ -28,6 +28,7 @@ import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.feature.track.presentation.ui.TracksScreen
 import info.jukov.player.feature.playback.presentation.ui.PlayerHost
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
+import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.favorite.presentation.ui.FavoritesScreen
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -87,7 +88,7 @@ fun AppNavigation(
                         onArtistClick = { artist ->
                             backStack.add(Routes.Albums(artist.id, artist.name))
                         },
-                        onPlayClick = playerViewModel::play,
+                        onPlayClick = { tracks, index -> playerViewModel.play(tracks, index) },
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
@@ -153,6 +154,7 @@ fun AppNavigation(
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
+                        activeOrigin = playbackState.content?.origin ?: PlaybackOrigin.TrackList,
                     )
                 }
                 },

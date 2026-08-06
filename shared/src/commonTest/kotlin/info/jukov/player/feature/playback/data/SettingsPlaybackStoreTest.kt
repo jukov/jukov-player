@@ -2,6 +2,7 @@ package info.jukov.player.feature.playback.data
 
 import com.russhwolf.settings.MapSettings
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,11 +23,22 @@ class SettingsPlaybackStoreTest {
     @Test
     fun updatesOnlyCurrentTrackIndex() {
         val queue = listOf(track("one"), track("two"))
-        store.write(queue, 0)
+        val origin = PlaybackOrigin.Album("album-id")
+        store.write(queue, 0, origin)
 
         store.updateCurrentIndex(1)
 
-        assertEquals(PersistedPlaybackState(queue, 1), store.read())
+        assertEquals(PersistedPlaybackState(queue, 1, origin), store.read())
+    }
+
+    @Test
+    fun storesPlaybackOrigin() {
+        val queue = listOf(track("one"))
+        val origin = PlaybackOrigin.Artist("artist-id")
+
+        store.write(queue, 0, origin)
+
+        assertEquals(PersistedPlaybackState(queue, 0, origin), store.read())
     }
 
     @Test
