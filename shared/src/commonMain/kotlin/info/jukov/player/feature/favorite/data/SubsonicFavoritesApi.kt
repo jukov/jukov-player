@@ -8,6 +8,7 @@ import info.jukov.player.feature.favorite.domain.Favorites
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.subsonic.data.SubsonicEnvelopeDto
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.track.data.withSharedAlbumCoverArt
 
 class SubsonicFavoritesApi(private val client: SubsonicApiClient) : FavoritesApi {
     override suspend fun getFavorites(session: AuthSession): Favorites {
@@ -17,7 +18,7 @@ class SubsonicFavoritesApi(private val client: SubsonicApiClient) : FavoritesApi
             deserializer = FavoritesResponseDto.serializer(),
         ).response.starred2 ?: StarredDto()
         return Favorites(
-            tracks = starred.song.map { song ->
+            tracks = starred.song.withSharedAlbumCoverArt().map { song ->
                 Track(
                     id = song.id,
                     title = song.title,

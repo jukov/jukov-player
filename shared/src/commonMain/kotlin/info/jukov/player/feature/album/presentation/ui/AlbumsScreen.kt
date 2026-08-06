@@ -29,6 +29,8 @@ import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import info.jukov.player.core.presentation.ui.localizedMessage
+import info.jukov.player.core.presentation.ui.rememberArtworkRequest
+import info.jukov.player.core.presentation.ui.LARGE_ARTWORK_SIZE
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -176,7 +178,11 @@ fun AlbumCard(
         ) {
             if (album.coverArtUrl != null) {
                 AsyncImage(
-                    model = album.coverArtUrl,
+                    model = rememberArtworkRequest(
+                        url = album.coverArtUrl,
+                        albumId = album.id,
+                        requestedSize = LARGE_ARTWORK_SIZE,
+                    ),
                     contentDescription = stringResource(Res.string.album_cover, album.name),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,

@@ -23,6 +23,7 @@ internal data class SearchResult3Dto(
 
 @Serializable
 internal data class AlbumWithSongsDto(
+    val coverArt: String? = null,
     val song: List<TrackDto> = emptyList(),
 )
 

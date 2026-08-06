@@ -43,6 +43,9 @@ import coil3.compose.AsyncImage
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.localizedMessage
+import info.jukov.player.core.presentation.ui.rememberArtworkRequest
+import info.jukov.player.core.presentation.ui.LARGE_ARTWORK_SIZE
+import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.feature.playback.presentation.PlayerUiState
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
 import jukovplayer.shared.generated.resources.*
@@ -105,6 +108,8 @@ private fun MiniPlayer(
     ) {
         Artwork(
             url = track.coverArtUrl,
+            albumId = track.albumId,
+            requestedSize = SMALL_ARTWORK_SIZE,
             description = stringResource(Res.string.track_cover, track.title),
             modifier = Modifier.size(48.dp),
         )
@@ -148,6 +153,8 @@ private fun FullPlayer(
     ) {
         Artwork(
             url = track.coverArtUrl,
+            albumId = track.albumId,
+            requestedSize = LARGE_ARTWORK_SIZE,
             description = stringResource(Res.string.track_cover, track.title),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).aspectRatio(1f),
         )
@@ -232,11 +239,17 @@ private fun FullPlayer(
 }
 
 @Composable
-private fun Artwork(url: String?, description: String, modifier: Modifier = Modifier) {
+private fun Artwork(
+    url: String?,
+    albumId: String?,
+    requestedSize: Int,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
         if (url != null) {
             AsyncImage(
-                model = url,
+                model = rememberArtworkRequest(url, albumId, requestedSize),
                 contentDescription = description,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,

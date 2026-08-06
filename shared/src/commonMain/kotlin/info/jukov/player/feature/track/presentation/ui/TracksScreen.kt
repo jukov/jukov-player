@@ -47,6 +47,8 @@ import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.feature.track.presentation.TracksViewModel
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import info.jukov.player.core.presentation.ui.localizedMessage
+import info.jukov.player.core.presentation.ui.rememberArtworkRequest
+import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -189,7 +191,11 @@ fun TrackRow(
         ) {
             track.coverArtUrl?.let { url ->
                 AsyncImage(
-                    model = url,
+                    model = rememberArtworkRequest(
+                        url = url,
+                        albumId = track.albumId,
+                        requestedSize = SMALL_ARTWORK_SIZE,
+                    ),
                     contentDescription = stringResource(Res.string.track_cover, track.title),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,

@@ -12,7 +12,7 @@ class SubsonicTracksApi(private val client: SubsonicApiClient) : TracksApi {
             is TracksFilter.ByAlbum -> getAlbumTracks(session, filter.albumId)
             is TracksFilter.ByArtist -> getArtistTracks(session, filter.artistId)
         }
-        return tracks.map { it.toDomain(session) }
+        return tracks.withSharedAlbumCoverArt().map { it.toDomain(session) }
     }
 
     private suspend fun getAllTracks(session: AuthSession): List<TrackDto> = buildList {
@@ -48,13 +48,17 @@ class SubsonicTracksApi(private val client: SubsonicApiClient) : TracksApi {
         return albums.flatMap { getAlbumTracks(session, it.id) }
     }
 
-    private suspend fun getAlbumTracks(session: AuthSession, albumId: String): List<TrackDto> =
-        client.get(
+    private suspend fun getAlbumTracks(session: AuthSession, albumId: String): List<TrackDto> {
+        val album = client.get(
             endpoint = "getAlbum",
             session = session,
             deserializer = TracksResponseDto.serializer(),
             parameters = mapOf("id" to albumId),
-        ).response.album?.song.orEmpty()
+        ).response.album ?: return emptyList()
+        return album.song.map { song ->
+            song.copy(coverArt = album.coverArt ?: song.coverArt)
+        }
+    }
 
     private fun TrackDto.toDomain(session: AuthSession) = Track(
         id = id,
