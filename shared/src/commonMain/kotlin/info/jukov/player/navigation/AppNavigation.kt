@@ -79,8 +79,10 @@ fun AppNavigation(
                     FavoritesScreen(
                         viewModel = favoritesViewModel,
                         onBack = { backStack.removeLastOrNull() },
-                        onAlbumClick = { backStack.add(Routes.Tracks(albumId = it)) },
-                        onArtistClick = { backStack.add(Routes.Albums(it)) },
+                        onAlbumClick = { album -> backStack.add(album.tracksRoute()) },
+                        onArtistClick = { artist ->
+                            backStack.add(Routes.Albums(artist.id, artist.name))
+                        },
                         onPlayClick = playerViewModel::play,
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
@@ -97,7 +99,9 @@ fun AppNavigation(
                             viewModel = artistsViewModel,
                             onLogout = authViewModel::logout,
                             onBack = { backStack.removeLastOrNull() },
-                            onArtistClick = { backStack.add(Routes.Albums(it)) },
+                            onArtistClick = { artist ->
+                                backStack.add(Routes.Albums(artist.id, artist.name))
+                            },
                             onAllAlbumsClick = { backStack.add(Routes.Albums()) },
                         )
                     }
@@ -108,9 +112,10 @@ fun AppNavigation(
                     }
                     AlbumsScreen(
                         artistId = route.artistId,
+                        artistName = route.artistName,
                         viewModel = albumsViewModel,
                         onBack = { backStack.removeLastOrNull() },
-                        onAlbumClick = { backStack.add(Routes.Tracks(albumId = it)) },
+                        onAlbumClick = { album -> backStack.add(album.tracksRoute()) },
                     )
                 }
                 entry<Routes.Tracks> { route ->
@@ -124,6 +129,10 @@ fun AppNavigation(
                     }
                     TracksScreen(
                         filter = filter,
+                        albumName = route.albumName,
+                        artistName = route.artistName,
+                        coverArtUrl = route.coverArtUrl,
+                        albumIsFavorite = route.albumIsFavorite,
                         viewModel = tracksViewModel,
                         onBack = { backStack.removeLastOrNull() },
                         onPlayClick = playerViewModel::play,
@@ -142,6 +151,14 @@ fun AppNavigation(
         }
     }
 }
+
+private fun info.jukov.player.feature.album.domain.Album.tracksRoute() = Routes.Tracks(
+    albumId = id,
+    albumName = name,
+    artistName = artist,
+    coverArtUrl = coverArtUrl,
+    albumIsFavorite = isFavorite,
+)
 
 private const val NAVIGATION_ANIMATION_DURATION_MILLIS = 250
 

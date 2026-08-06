@@ -1,2 +1,2 @@
-- Reuse same artworks
 - Show play indicator on playing artist/album/track
+- Show content under mini player

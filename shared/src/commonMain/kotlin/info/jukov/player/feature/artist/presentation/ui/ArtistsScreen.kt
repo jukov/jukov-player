@@ -38,7 +38,7 @@ fun ArtistsScreen(
     viewModel: ArtistsViewModel,
     onLogout: () -> Unit,
     onBack: () -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (Artist) -> Unit,
     onAllAlbumsClick: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -165,7 +165,7 @@ fun ArtistsContent(
     artists: List<Artist>,
     error: AppError?,
     onRetry: () -> Unit,
-    onArtistClick: (String) -> Unit,
+    onArtistClick: (Artist) -> Unit,
     pendingIds: Set<String> = emptySet(),
     onFavoriteClick: (Artist) -> Unit = {},
 ) {
@@ -183,7 +183,7 @@ fun ArtistsContent(
                 items(artists, key = { it.id }) { artist ->
                     ArtistRow(
                         artist = artist,
-                        onClick = { onArtistClick(artist.id) },
+                        onClick = { onArtistClick(artist) },
                         onFavoriteClick = { onFavoriteClick(artist) },
                         favoriteEnabled = artist.id !in pendingIds,
                     )

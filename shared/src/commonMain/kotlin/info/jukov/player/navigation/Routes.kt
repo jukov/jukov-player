@@ -17,12 +17,19 @@ object Routes {
     data object Artists : NavKey
 
     @Serializable
-    data class Albums(val artistId: String? = null) : NavKey
+    data class Albums(
+        val artistId: String? = null,
+        val artistName: String? = null,
+    ) : NavKey
 
     @Serializable
     data class Tracks(
         val artistId: String? = null,
         val albumId: String? = null,
+        val albumName: String? = null,
+        val artistName: String? = null,
+        val coverArtUrl: String? = null,
+        val albumIsFavorite: Boolean = false,
     ) : NavKey {
         init {
             require(artistId == null || albumId == null) {

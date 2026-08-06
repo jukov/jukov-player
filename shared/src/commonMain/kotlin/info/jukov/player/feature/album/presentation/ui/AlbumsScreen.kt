@@ -39,9 +39,10 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun AlbumsScreen(
     artistId: String?,
+    artistName: String?,
     viewModel: AlbumsViewModel,
     onBack: () -> Unit,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (Album) -> Unit,
 ) {
     LaunchedEffect(artistId) { viewModel.load(artistId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -74,7 +75,7 @@ fun AlbumsScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             AppFlexibleTopAppBar(
-                title = stringResource(Res.string.albums),
+                title = artistName ?: stringResource(Res.string.albums),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -132,7 +133,7 @@ fun AlbumsGrid(
     albums: List<Album>,
     error: AppError?,
     onRetry: () -> Unit,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (Album) -> Unit,
     pendingIds: Set<String> = emptySet(),
     onFavoriteClick: (Album) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -154,7 +155,7 @@ fun AlbumsGrid(
         items(albums, key = { it.id }) { album ->
             AlbumCard(
                 album = album,
-                onClick = { onAlbumClick(album.id) },
+                onClick = { onAlbumClick(album) },
                 onFavoriteClick = { onFavoriteClick(album) },
                 favoriteEnabled = album.id !in pendingIds,
             )

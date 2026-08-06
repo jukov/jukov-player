@@ -3,19 +3,24 @@ package info.jukov.player.feature.track.presentation.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,15 +37,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
+import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBar
+import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBarState
+import info.jukov.player.core.presentation.ui.rememberAppCollapsingTopAppBarState
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
@@ -57,6 +69,10 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun TracksScreen(
     filter: TracksFilter,
+    albumName: String? = null,
+    artistName: String? = null,
+    coverArtUrl: String? = null,
+    albumIsFavorite: Boolean = false,
     viewModel: TracksViewModel,
     onBack: () -> Unit,
     onPlayClick: (List<Track>, Int) -> Unit = { _, _ -> },
@@ -64,8 +80,9 @@ fun TracksScreen(
     activeTrackId: String? = null,
     isPlaying: Boolean = false,
 ) {
-    LaunchedEffect(filter) { viewModel.load(filter) }
+    LaunchedEffect(filter, albumIsFavorite) { viewModel.load(filter, albumIsFavorite) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val currentAlbumIsFavorite by viewModel.albumIsFavorite.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
@@ -76,23 +93,36 @@ fun TracksScreen(
         snackbarError = null
     }
     val tracks = state.content.orEmpty()
+    val albumHeader = if (filter is TracksFilter.ByAlbum && albumName != null) {
+        AlbumHeader(albumName, artistName.orEmpty(), coverArtUrl, filter.albumId)
+    } else null
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val albumAppBarState = rememberAppCollapsingTopAppBarState()
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.nestedScroll(
+            albumHeader?.let { albumAppBarState.nestedScrollConnection }
+                ?: scrollBehavior.nestedScrollConnection,
+        ),
         topBar = {
-            AppFlexibleTopAppBar(
-                title = stringResource(Res.string.tracks),
-                scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painter = painterResource(Res.drawable.arrow_back),
-                            contentDescription = stringResource(Res.string.back),
-                        )
-                    }
-                },
-            )
+            if (albumHeader == null) {
+                AppFlexibleTopAppBar(
+                    title = stringResource(Res.string.tracks),
+                    scrollBehavior = scrollBehavior,
+                    navigationIcon = { BackButton(onBack) },
+                )
+            } else {
+                AlbumTracksTopAppBar(
+                    header = albumHeader,
+                    tracks = tracks,
+                    appBarState = albumAppBarState,
+                    onBack = onBack,
+                    onPlayClick = { onPlayClick(tracks, 0) },
+                    isFavorite = currentAlbumIsFavorite,
+                    favoriteEnabled = albumHeader.albumId !in pending,
+                    onFavoriteClick = { viewModel.toggleAlbumFavorite(albumHeader.albumId) },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { scaffoldPadding ->
@@ -115,6 +145,7 @@ fun TracksScreen(
 
             else -> TracksList(
                 tracks = tracks,
+                showArtwork = filter !is TracksFilter.ByAlbum,
                 error = (state as? LoadableState.Failure)?.error,
                 onPlayClick = onPlayClick,
                 onActiveTrackClick = onActiveTrackClick,
@@ -128,9 +159,219 @@ fun TracksScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AlbumTracksTopAppBar(
+    header: AlbumHeader,
+    tracks: List<Track>,
+    appBarState: AppCollapsingTopAppBarState,
+    onBack: () -> Unit,
+    onPlayClick: () -> Unit,
+    isFavorite: Boolean,
+    favoriteEnabled: Boolean,
+    onFavoriteClick: () -> Unit,
+) {
+    BoxWithConstraints {
+        val artworkSize = (maxWidth * 0.75f).coerceAtMost(400.dp)
+        AppCollapsingTopAppBar(
+            state = appBarState,
+            navigationIcon = { BackButton(onBack) },
+            expandedContent = {
+                ExpandedAlbumTracksHeader(
+                    header = header,
+                    artworkSize = artworkSize,
+                    onPlayClick = onPlayClick,
+                    playEnabled = tracks.isNotEmpty(),
+                    isFavorite = isFavorite,
+                    favoriteEnabled = favoriteEnabled,
+                    onFavoriteClick = onFavoriteClick,
+                )
+            },
+            collapsedContent = {
+                CollapsedAlbumTracksHeader(
+                    header = header,
+                    onPlayClick = onPlayClick,
+                    playEnabled = tracks.isNotEmpty(),
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun BackButton(onBack: () -> Unit) {
+    IconButton(onClick = onBack) {
+        Icon(
+            painter = painterResource(Res.drawable.arrow_back),
+            contentDescription = stringResource(Res.string.back),
+        )
+    }
+}
+
+@Composable
+private fun ExpandedAlbumTracksHeader(
+    header: AlbumHeader,
+    artworkSize: androidx.compose.ui.unit.Dp,
+    onPlayClick: () -> Unit,
+    playEnabled: Boolean,
+    isFavorite: Boolean,
+    favoriteEnabled: Boolean,
+    onFavoriteClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(top = Padding.small, bottom = Padding.medium),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(artworkSize)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            header.coverArtUrl?.let { url ->
+                AsyncImage(
+                    model = rememberArtworkRequest(url, header.albumId, SMALL_ARTWORK_SIZE),
+                    contentDescription = stringResource(Res.string.album_cover, header.name),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
+        }
+        Spacer(Modifier.size(Padding.small))
+        Column(
+            modifier = Modifier.width(artworkSize),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = header.name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (header.artist.isNotBlank()) {
+                Text(
+                    text = header.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.size(Padding.medium))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onFavoriteClick,
+                    enabled = favoriteEnabled,
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            if (isFavorite) Res.drawable.heart else Res.drawable.heart_outline,
+                        ),
+                        contentDescription = stringResource(
+                            if (isFavorite) {
+                                Res.string.remove_from_favorites
+                            } else {
+                                Res.string.add_to_favorites
+                            },
+                        ),
+                    )
+                }
+                Spacer(Modifier.width(Padding.small))
+                FilledIconButton(
+                    onClick = onPlayClick,
+                    enabled = playEnabled,
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.play_arrow),
+                        contentDescription = stringResource(Res.string.play),
+                    )
+                }
+                Spacer(Modifier.width(Padding.small))
+                IconButton(onClick = {}, enabled = false) {
+                    Icon(
+                        painter = painterResource(Res.drawable.download_circle),
+                        contentDescription = stringResource(Res.string.downloads),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollapsedAlbumTracksHeader(
+    header: AlbumHeader,
+    onPlayClick: () -> Unit,
+    playEnabled: Boolean,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            header.coverArtUrl?.let { url ->
+                AsyncImage(
+                    model = rememberArtworkRequest(url, header.albumId, SMALL_ARTWORK_SIZE),
+                    contentDescription = stringResource(Res.string.album_cover, header.name),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
+        }
+        Spacer(Modifier.width(Padding.medium))
+        Column(
+            modifier = Modifier.weight(1f).align(Alignment.CenterVertically),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = header.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (header.artist.isNotBlank()) {
+                Text(
+                    text = header.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        FilledIconButton(
+            onClick = onPlayClick,
+            enabled = playEnabled,
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
+        ) {
+            Icon(
+                painter = painterResource(Res.drawable.play_arrow),
+                contentDescription = stringResource(Res.string.play),
+            )
+        }
+        Spacer(Modifier.width(Padding.small))
+    }
+}
+
 @Composable
 fun TracksList(
     tracks: List<Track>,
+    showArtwork: Boolean = true,
     error: AppError?,
     onPlayClick: (List<Track>, Int) -> Unit,
     onActiveTrackClick: () -> Unit,
@@ -151,6 +392,7 @@ fun TracksList(
         itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
             TrackRow(
                 track = track,
+                showArtwork = showArtwork,
                 onPlayClick = {
                     if (track.id == activeTrackId) onActiveTrackClick()
                     else onPlayClick(tracks, index)
@@ -166,6 +408,7 @@ fun TracksList(
 @Composable
 fun TrackRow(
     track: Track,
+    showArtwork: Boolean = true,
     onPlayClick: () -> Unit,
     isPlaying: Boolean,
     favoriteEnabled: Boolean = true,
@@ -174,7 +417,6 @@ fun TrackRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = Padding.small, vertical = Padding.xSmall),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -183,26 +425,28 @@ fun TrackRow(
             modifier = Modifier.width(28.dp),
             style = MaterialTheme.typography.bodyMedium,
         )
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .background(MaterialTheme.colorScheme.surface),
-            contentAlignment = Alignment.Center,
-        ) {
-            track.coverArtUrl?.let { url ->
-                AsyncImage(
-                    model = rememberArtworkRequest(
-                        url = url,
-                        albumId = track.albumId,
-                        requestedSize = SMALL_ARTWORK_SIZE,
-                    ),
-                    contentDescription = stringResource(Res.string.track_cover, track.title),
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
+        if (showArtwork) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(MaterialTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center,
+            ) {
+                track.coverArtUrl?.let { url ->
+                    AsyncImage(
+                        model = rememberArtworkRequest(
+                            url = url,
+                            albumId = track.albumId,
+                            requestedSize = SMALL_ARTWORK_SIZE,
+                        ),
+                        contentDescription = stringResource(Res.string.track_cover, track.title),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
             }
+            Spacer(Modifier.width(Padding.medium))
         }
-        Spacer(Modifier.width(Padding.medium))
         Column(Modifier.weight(1f)) {
             Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
@@ -250,3 +494,10 @@ private fun CenteredError(
         }
     }
 }
+
+data class AlbumHeader(
+    val name: String,
+    val artist: String,
+    val coverArtUrl: String?,
+    val albumId: String,
+)

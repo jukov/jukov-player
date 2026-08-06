@@ -40,7 +40,9 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.album.presentation.ui.AlbumsGrid
+import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.artist.presentation.ui.ArtistRow
+import info.jukov.player.feature.artist.domain.Artist
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
@@ -59,8 +61,8 @@ import org.jetbrains.compose.resources.stringResource
 fun FavoritesScreen(
     viewModel: FavoritesViewModel,
     onBack: () -> Unit,
-    onAlbumClick: (String) -> Unit,
-    onArtistClick: (String) -> Unit,
+    onAlbumClick: (Album) -> Unit,
+    onArtistClick: (Artist) -> Unit,
     onPlayClick: (List<Track>, Int) -> Unit,
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
@@ -222,7 +224,7 @@ fun FavoritesScreen(
                             items(content.artists, key = { it.id }) { artist ->
                                 ArtistRow(
                                     artist = artist,
-                                    onClick = { onArtistClick(artist.id) },
+                                    onClick = { onArtistClick(artist) },
                                     onFavoriteClick = {
                                         viewModel.toggleFavorite(
                                             FavoriteTarget.Artist(artist.id),

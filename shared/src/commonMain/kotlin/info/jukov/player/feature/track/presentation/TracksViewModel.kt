@@ -26,6 +26,8 @@ class TracksViewModel(
         LoadableState.Content(emptyList()),
     )
     val state: StateFlow<LoadableState<List<Track>>> = _state.asStateFlow()
+    private val _albumIsFavorite = MutableStateFlow(false)
+    val albumIsFavorite: StateFlow<Boolean> = _albumIsFavorite.asStateFlow()
     val pending = favoriteDelegate.pending
     val messages = favoriteDelegate.messages
 
@@ -35,16 +37,24 @@ class TracksViewModel(
     init {
         viewModelScope.launch {
             favoriteDelegate.changes.collect { change ->
-                val target = change.target as? FavoriteTarget.Track ?: return@collect
-                updateFavorite(target.id, change.isFavorite)
+                when (val target = change.target) {
+                    is FavoriteTarget.Track -> updateFavorite(target.id, change.isFavorite)
+                    is FavoriteTarget.Album -> if (
+                        (filter as? TracksFilter.ByAlbum)?.albumId == target.id
+                    ) {
+                        _albumIsFavorite.value = change.isFavorite
+                    }
+                    is FavoriteTarget.Artist -> Unit
+                }
             }
         }
     }
 
-    fun load(filter: TracksFilter) {
+    fun load(filter: TracksFilter, albumIsFavorite: Boolean = false) {
         if (this.filter == filter) return
         loadJob?.cancel()
         this.filter = filter
+        _albumIsFavorite.value = albumIsFavorite
         _state.value = LoadableState.Content(emptyList())
         loadTracks()
     }
@@ -55,6 +65,14 @@ class TracksViewModel(
         viewModelScope.launch {
             favoriteDelegate.toggle(FavoriteTarget.Track(track.id), track.isFavorite) {
                 updateFavorite(track.id, it)
+            }
+        }
+    }
+
+    fun toggleAlbumFavorite(albumId: String) {
+        viewModelScope.launch {
+            favoriteDelegate.toggle(FavoriteTarget.Album(albumId), _albumIsFavorite.value) {
+                _albumIsFavorite.value = it
             }
         }
     }
