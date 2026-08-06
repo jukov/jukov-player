@@ -1,5 +1,8 @@
 package info.jukov.player.feature.auth.data
 
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.AppException
+
 import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.feature.auth.domain.AuthSession
 import info.jukov.player.feature.auth.domain.AuthState
@@ -31,7 +34,7 @@ class DefaultAuthRepository(
             token = md5(password + salt),
             salt = salt,
         )
-        check(api.ping(session)) { "Сервер отклонил авторизацию" }
+        if (!api.ping(session)) throw AppException(AppError.AuthenticationRejected)
         storage.write(session)
         _authState.value = AuthState.LoggedIn(session)
         session

@@ -1,5 +1,8 @@
 package info.jukov.player.feature.album.data
 
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.AppException
+
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.album.domain.AlbumsRepository
 import info.jukov.player.feature.auth.domain.AuthRepository
@@ -11,7 +14,7 @@ class DefaultAlbumsRepository(
 ) : AlbumsRepository {
     override suspend fun getAlbums(artistId: String?): Result<List<Album>> = runCatching {
         val session = (authRepository.authState.value as? AuthState.LoggedIn)?.session
-            ?: error("Сначала войдите в систему")
+            ?: throw AppException(AppError.AuthenticationRequired)
         api.getAlbums(session, artistId)
     }
 }

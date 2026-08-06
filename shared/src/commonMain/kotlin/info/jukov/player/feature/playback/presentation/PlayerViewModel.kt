@@ -51,6 +51,6 @@ class PlayerViewModel(
         when (this) {
             is LoadableState.Content -> LoadableState.Content(transform(content))
             is LoadableState.Loading -> LoadableState.Loading(content?.let(transform))
-            is LoadableState.Failure -> LoadableState.Failure(message, content?.let(transform))
+            is LoadableState.Failure -> LoadableState.Failure(error, content?.let(transform))
         }
 }

@@ -1,3 +1,2 @@
-- Localization
 - Reuse same artworks
 - Show play indicator on playing artist/album/track

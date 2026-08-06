@@ -38,4 +38,23 @@
     <string name="play">Play</string>
     <string name="remove_from_favorites">Remove from favorites</string>
     <string name="add_to_favorites">Add to favorites</string>
+
+    <string name="error_server_address_required">Enter the server address</string>
+    <string name="error_username_required">Enter your username</string>
+    <string name="error_password_required">Enter your password</string>
+    <string name="error_authentication_rejected">The server rejected the credentials</string>
+    <string name="error_authentication_required">Sign in to continue</string>
+    <string name="error_albums_load_failed">Could not load albums</string>
+    <string name="error_artists_load_failed">Could not load artists</string>
+    <string name="error_tracks_load_failed">Could not load tracks</string>
+    <string name="error_favorites_load_failed">Could not load favorites</string>
+    <string name="error_favorite_update_failed">Could not update favorites</string>
+    <string name="error_opensubsonic">OpenSubsonic returned error %1$d</string>
+    <string name="error_http">The server returned HTTP error %1$d</string>
+    <string name="error_invalid_server_response">The server returned an invalid response</string>
+    <string name="error_unknown_opensubsonic_status">Unknown OpenSubsonic status: %1$s</string>
+    <string name="error_player_connection_failed">Could not connect to the player</string>
+    <string name="error_missing_track_stream_url">The track has no playback URL</string>
+    <string name="error_playback_failed">Could not play the track</string>
+    <string name="error_ios_playback_not_implemented">Playback on iOS is not implemented yet</string>
 </resources>

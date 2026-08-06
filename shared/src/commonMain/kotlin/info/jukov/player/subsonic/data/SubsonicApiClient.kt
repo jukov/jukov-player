@@ -1,5 +1,8 @@
 package info.jukov.player.subsonic.data
 
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.AppException
+
 import info.jukov.player.feature.auth.domain.AuthSession
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -38,20 +41,12 @@ class SubsonicApiClient(
         }.getOrNull()
         val error = subsonicResponse?.error
         if (subsonicResponse?.status == "failed" && error != null) {
-            throw SubsonicApiException(
-                code = error.code,
-                helpUrl = error.helpUrl,
-                message = error.message ?: "OpenSubsonic вернул ошибку ${error.code}",
-            )
+            throw AppException(AppError.OpenSubsonic(error.code))
         }
-        check(response.status.isSuccess()) {
-            "Сервер вернул ошибку ${response.status.value}"
-        }
-        checkNotNull(subsonicResponse) {
-            "Сервер вернул некорректный ответ"
-        }
-        check(subsonicResponse.status == "ok") {
-            "Неизвестный статус OpenSubsonic: ${subsonicResponse.status}"
+        if (!response.status.isSuccess()) throw AppException(AppError.Http(response.status.value))
+        if (subsonicResponse == null) throw AppException(AppError.InvalidServerResponse)
+        if (subsonicResponse.status != "ok") {
+            throw AppException(AppError.UnknownOpenSubsonicStatus(subsonicResponse.status))
         }
     }
 

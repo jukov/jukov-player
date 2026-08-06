@@ -13,6 +13,7 @@ import info.jukov.player.feature.auth.presentation.AuthUiState
 import info.jukov.player.feature.auth.presentation.AuthViewModel
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.Padding
+import info.jukov.player.core.presentation.ui.localizedMessage
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -57,8 +58,8 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            (state.auth as? LoadableState.Failure)?.message?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
+            (state.auth as? LoadableState.Failure)?.error?.let {
+                Text(it.localizedMessage(), color = MaterialTheme.colorScheme.error)
             }
             Button(
                 onClick = viewModel::login,

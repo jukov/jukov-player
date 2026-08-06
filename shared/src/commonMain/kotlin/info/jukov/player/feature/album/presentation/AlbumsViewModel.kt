@@ -2,6 +2,8 @@ package info.jukov.player.feature.album.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.toAppError
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.album.domain.GetAlbumsUseCase
 import info.jukov.player.core.presentation.LoadableState
@@ -70,7 +72,7 @@ class AlbumsViewModel(
                 .onFailure { error ->
                     _state.update {
                         LoadableState.Failure(
-                            message = error.message ?: "Не удалось загрузить альбомы",
+                            error = error.toAppError(AppError.AlbumsLoadFailed),
                             content = it.content,
                         )
                     }

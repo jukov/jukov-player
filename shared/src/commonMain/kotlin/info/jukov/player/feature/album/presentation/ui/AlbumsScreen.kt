@@ -21,12 +21,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.album.presentation.AlbumsViewModel
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
+import info.jukov.player.core.presentation.ui.localizedMessage
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -44,7 +46,13 @@ fun AlbumsScreen(
     val albums = state.content.orEmpty()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarHostState.showSnackbar(it) } }
+    var snackbarError by remember { mutableStateOf<AppError?>(null) }
+    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
+    val snackbarMessage = snackbarError?.localizedMessage()
+    LaunchedEffect(snackbarMessage) {
+        snackbarMessage?.let { snackbarHostState.showSnackbar(it) }
+        snackbarError = null
+    }
     var refreshRequested by remember { mutableStateOf(false) }
     LaunchedEffect(state) {
         if (state !is LoadableState.Loading) refreshRequested = false
@@ -98,7 +106,7 @@ fun AlbumsScreen(
             when {
                 state is LoadableState.Loading && albums.isEmpty() -> CenteredLoading()
                 state is LoadableState.Failure && albums.isEmpty() -> CenteredError(
-                    message = (state as LoadableState.Failure).message,
+                    error = (state as LoadableState.Failure).error,
                     onRetry = viewModel::retry,
                 )
                 albums.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -106,7 +114,7 @@ fun AlbumsScreen(
                 }
                 else -> AlbumsGrid(
                     albums = albums,
-                    error = (state as? LoadableState.Failure)?.message,
+                    error = (state as? LoadableState.Failure)?.error,
                     onRetry = viewModel::retry,
                     onAlbumClick = onAlbumClick,
                     pendingIds = pending,
@@ -120,7 +128,7 @@ fun AlbumsScreen(
 @Composable
 fun AlbumsGrid(
     albums: List<Album>,
-    error: String?,
+    error: AppError?,
     onRetry: () -> Unit,
     onAlbumClick: (String) -> Unit,
     pendingIds: Set<String> = emptySet(),
@@ -136,7 +144,9 @@ fun AlbumsGrid(
     ) {
         error?.let {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                TextButton(onClick = onRetry) { Text(it, color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = onRetry) {
+                    Text(it.localizedMessage(), color = MaterialTheme.colorScheme.error)
+                }
             }
         }
         items(albums, key = { it.id }) { album ->
@@ -204,10 +214,10 @@ private fun CenteredLoading() = Box(Modifier.fillMaxSize(), contentAlignment = A
 }
 
 @Composable
-private fun CenteredError(message: String, onRetry: () -> Unit) {
+private fun CenteredError(error: AppError, onRetry: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(Padding.large), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(message, color = MaterialTheme.colorScheme.error)
+            Text(error.localizedMessage(), color = MaterialTheme.colorScheme.error)
             Spacer(Modifier.height(Padding.medium))
             Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
         }

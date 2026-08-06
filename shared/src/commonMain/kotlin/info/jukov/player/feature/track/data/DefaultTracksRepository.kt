@@ -1,5 +1,8 @@
 package info.jukov.player.feature.track.data
 
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.AppException
+
 import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.feature.auth.domain.AuthState
 import info.jukov.player.feature.track.domain.Track
@@ -12,7 +15,7 @@ class DefaultTracksRepository(
 ) : TracksRepository {
     override suspend fun getTracks(filter: TracksFilter): Result<List<Track>> = runCatching {
         val session = (authRepository.authState.value as? AuthState.LoggedIn)?.session
-            ?: error("Сначала войдите в систему")
+            ?: throw AppException(AppError.AuthenticationRequired)
         api.getTracks(session, filter)
     }
 }

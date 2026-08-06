@@ -1,5 +1,8 @@
 package info.jukov.player.feature.favorite.data
 
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.AppException
+
 import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.feature.auth.domain.AuthSession
 import info.jukov.player.feature.auth.domain.AuthState
@@ -25,7 +28,7 @@ class DefaultFavoritesRepository(
 
     private suspend fun <T> withSession(block: suspend (AuthSession) -> T): Result<T> = runCatching {
         val session = (authRepository.authState.value as? AuthState.LoggedIn)?.session
-            ?: error("Сначала войдите в систему")
+            ?: throw AppException(AppError.AuthenticationRequired)
         block(session)
     }
 }

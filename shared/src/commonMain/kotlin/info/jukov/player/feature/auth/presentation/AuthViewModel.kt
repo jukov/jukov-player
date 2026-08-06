@@ -2,6 +2,8 @@ package info.jukov.player.feature.auth.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.toAppError
 import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.feature.auth.domain.AuthState
 import info.jukov.player.feature.auth.domain.LoginUseCase
@@ -68,7 +70,7 @@ class AuthViewModel(
                     _state.update {
                         it.copy(
                             auth = LoadableState.Failure(
-                                message = error.message ?: "Не удалось войти",
+                                error = error.toAppError(AppError.AuthenticationRejected),
                                 content = it.auth.content,
                             ),
                         )

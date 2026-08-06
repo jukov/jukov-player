@@ -1,5 +1,6 @@
 package info.jukov.player.feature.playback
 
+import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.domain.PlaybackController
@@ -15,7 +16,7 @@ object IosPlaybackControllerFactory : PlaybackControllerFactory {
 
 private object IosPlaybackController : PlaybackController {
     override val state: StateFlow<LoadableState<PlaybackSnapshot>> = MutableStateFlow(
-        LoadableState.Failure("Воспроизведение на iOS пока не реализовано", PlaybackSnapshot()),
+        LoadableState.Failure(AppError.IosPlaybackNotImplemented, PlaybackSnapshot()),
     )
 
     override fun play(tracks: List<Track>, startIndex: Int) = Unit

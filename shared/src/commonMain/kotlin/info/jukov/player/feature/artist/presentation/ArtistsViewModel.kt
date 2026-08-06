@@ -2,6 +2,8 @@ package info.jukov.player.feature.artist.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.toAppError
 import info.jukov.player.feature.artist.domain.Artist
 import info.jukov.player.feature.artist.domain.GetArtistsUseCase
 import info.jukov.player.feature.auth.domain.AuthRepository
@@ -72,7 +74,7 @@ class ArtistsViewModel(
                 .onFailure { error ->
                     _state.update {
                         LoadableState.Failure(
-                            message = error.message ?: "Не удалось загрузить исполнителей",
+                            error = error.toAppError(AppError.ArtistsLoadFailed),
                             content = it.content,
                         )
                     }

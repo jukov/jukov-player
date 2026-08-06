@@ -2,6 +2,8 @@ package info.jukov.player.feature.track.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.toAppError
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.updateItem
 import info.jukov.player.feature.track.domain.GetTracksUseCase
@@ -71,7 +73,7 @@ class TracksViewModel(
                 .onFailure { error ->
                     _state.update {
                         LoadableState.Failure(
-                            message = error.message ?: "Не удалось загрузить треки",
+                            error = error.toAppError(AppError.TracksLoadFailed),
                             content = it.content,
                         )
                     }

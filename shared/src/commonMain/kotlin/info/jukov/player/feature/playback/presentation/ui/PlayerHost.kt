@@ -40,7 +40,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.presentation.ui.localizedMessage
 import info.jukov.player.feature.playback.presentation.PlayerUiState
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
 import jukovplayer.shared.generated.resources.*
@@ -76,7 +78,7 @@ fun PlayerHost(
         ModalBottomSheet(onDismissRequest = { showPlayer = false }) {
             FullPlayer(
                 snapshot = snapshot,
-                error = (loadable as? LoadableState.Failure)?.message,
+                error = (loadable as? LoadableState.Failure)?.error,
                 viewModel = viewModel,
             )
         }
@@ -125,7 +127,7 @@ private fun MiniPlayer(
 @Composable
 private fun FullPlayer(
     snapshot: PlayerUiState,
-    error: String?,
+    error: AppError?,
     viewModel: PlayerViewModel,
 ) {
     val track = snapshot.currentTrack ?: return
@@ -184,7 +186,7 @@ private fun FullPlayer(
         }
         error?.let {
             Text(
-                text = it,
+                text = it.localizedMessage(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,

@@ -38,11 +38,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.album.presentation.ui.AlbumsGrid
 import info.jukov.player.feature.artist.presentation.ui.ArtistRow
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
+import info.jukov.player.core.presentation.ui.localizedMessage
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.presentation.FavoritesTab
 import info.jukov.player.feature.favorite.presentation.FavoritesViewModel
@@ -69,7 +71,13 @@ fun FavoritesScreen(
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarHostState.showSnackbar(it) } }
+    var snackbarError by remember { mutableStateOf<AppError?>(null) }
+    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
+    val snackbarMessage = snackbarError?.localizedMessage()
+    LaunchedEffect(snackbarMessage) {
+        snackbarMessage?.let { snackbarHostState.showSnackbar(it) }
+        snackbarError = null
+    }
     var refreshRequested by remember { mutableStateOf(false) }
     LaunchedEffect(state) {
         if (state !is LoadableState.Loading) refreshRequested = false
@@ -154,7 +162,7 @@ fun FavoritesScreen(
                 Centered {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            (state as LoadableState.Failure).message,
+                            (state as LoadableState.Failure).error.localizedMessage(),
                             color = MaterialTheme.colorScheme.error,
                         )
                         Button(onClick = viewModel::refresh) { Text(stringResource(Res.string.retry)) }
@@ -172,7 +180,7 @@ fun FavoritesScreen(
                             Empty(stringResource(Res.string.no_favorite_tracks))
                         } else TracksList(
                             tracks = content.tracks,
-                            error = (state as? LoadableState.Failure)?.message,
+                            error = (state as? LoadableState.Failure)?.error,
                             onPlayClick = onPlayClick,
                             onActiveTrackClick = onActiveTrackClick,
                             activeTrackId = activeTrackId,
@@ -191,7 +199,7 @@ fun FavoritesScreen(
                             Empty(stringResource(Res.string.no_favorite_albums))
                         } else AlbumsGrid(
                             albums = content.albums,
-                            error = (state as? LoadableState.Failure)?.message,
+                            error = (state as? LoadableState.Failure)?.error,
                             onRetry = viewModel::refresh,
                             onAlbumClick = onAlbumClick,
                             pendingIds = pending.filterIsInstance<FavoriteTarget.Album>()

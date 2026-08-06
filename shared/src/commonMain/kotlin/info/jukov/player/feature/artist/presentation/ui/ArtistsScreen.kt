@@ -20,12 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.artist.domain.Artist
 import info.jukov.player.feature.artist.presentation.ArtistsViewModel
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
+import info.jukov.player.core.presentation.ui.localizedMessage
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -43,7 +45,13 @@ fun ArtistsScreen(
     val artists = state.content.orEmpty()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarHostState.showSnackbar(it) } }
+    var snackbarError by remember { mutableStateOf<AppError?>(null) }
+    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
+    val snackbarMessage = snackbarError?.localizedMessage()
+    LaunchedEffect(snackbarMessage) {
+        snackbarMessage?.let { snackbarHostState.showSnackbar(it) }
+        snackbarError = null
+    }
     var refreshRequested by remember { mutableStateOf(false) }
 
     LaunchedEffect(state) {
@@ -84,11 +92,11 @@ fun ArtistsScreen(
             when {
                 state is LoadableState.Loading && artists.isEmpty() -> LoadingContent()
                 state is LoadableState.Failure && artists.isEmpty() ->
-                    ErrorContent((state as LoadableState.Failure).message, viewModel::retry)
+                    ErrorContent((state as LoadableState.Failure).error, viewModel::retry)
                 artists.isEmpty() -> EmptyContent()
                 else -> ArtistsContent(
                     artists = artists,
-                    error = (state as? LoadableState.Failure)?.message,
+                    error = (state as? LoadableState.Failure)?.error,
                     onRetry = viewModel::retry,
                     onArtistClick = onArtistClick,
                     pendingIds = pending,
@@ -155,7 +163,7 @@ private fun ArtistsTopAppBar(
 @Composable
 fun ArtistsContent(
     artists: List<Artist>,
-    error: String?,
+    error: AppError?,
     onRetry: () -> Unit,
     onArtistClick: (String) -> Unit,
     pendingIds: Set<String> = emptySet(),
@@ -164,7 +172,7 @@ fun ArtistsContent(
     Column(Modifier.fillMaxSize()) {
         error?.let {
             TextButton(onClick = onRetry) {
-                Text(it, color = MaterialTheme.colorScheme.error)
+                Text(it.localizedMessage(), color = MaterialTheme.colorScheme.error)
             }
         }
         LazyColumn(
@@ -210,10 +218,10 @@ private fun LoadingContent() {
 }
 
 @Composable
-private fun ErrorContent(message: String, onRetry: () -> Unit) {
+private fun ErrorContent(error: AppError, onRetry: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(Padding.large), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(message, color = MaterialTheme.colorScheme.error)
+            Text(error.localizedMessage(), color = MaterialTheme.colorScheme.error)
             Spacer(Modifier.height(Padding.medium))
             Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
         }

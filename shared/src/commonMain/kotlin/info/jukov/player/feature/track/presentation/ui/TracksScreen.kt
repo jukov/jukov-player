@@ -27,7 +27,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -36,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
@@ -43,6 +46,7 @@ import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.feature.track.presentation.TracksViewModel
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
+import info.jukov.player.core.presentation.ui.localizedMessage
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -62,7 +66,13 @@ fun TracksScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarHostState.showSnackbar(it) } }
+    var snackbarError by remember { mutableStateOf<AppError?>(null) }
+    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
+    val snackbarMessage = snackbarError?.localizedMessage()
+    LaunchedEffect(snackbarMessage) {
+        snackbarMessage?.let { snackbarHostState.showSnackbar(it) }
+        snackbarError = null
+    }
     val tracks = state.content.orEmpty()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -89,7 +99,7 @@ fun TracksScreen(
                 CenteredLoading(Modifier.padding(scaffoldPadding))
 
             state is LoadableState.Failure && tracks.isEmpty() -> CenteredError(
-                message = (state as LoadableState.Failure).message,
+                error = (state as LoadableState.Failure).error,
                 onRetry = viewModel::retry,
                 modifier = Modifier.padding(scaffoldPadding),
             )
@@ -103,7 +113,7 @@ fun TracksScreen(
 
             else -> TracksList(
                 tracks = tracks,
-                error = (state as? LoadableState.Failure)?.message,
+                error = (state as? LoadableState.Failure)?.error,
                 onPlayClick = onPlayClick,
                 onActiveTrackClick = onActiveTrackClick,
                 activeTrackId = activeTrackId,
@@ -119,7 +129,7 @@ fun TracksScreen(
 @Composable
 fun TracksList(
     tracks: List<Track>,
-    error: String?,
+    error: AppError?,
     onPlayClick: (List<Track>, Int) -> Unit,
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
@@ -134,7 +144,7 @@ fun TracksList(
         verticalArrangement = Arrangement.spacedBy(Padding.small),
     ) {
         error?.let { message ->
-            item { Text(message, color = MaterialTheme.colorScheme.error) }
+            item { Text(message.localizedMessage(), color = MaterialTheme.colorScheme.error) }
         }
         itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
             TrackRow(
@@ -223,13 +233,13 @@ private fun CenteredLoading(modifier: Modifier = Modifier) {
 
 @Composable
 private fun CenteredError(
-    message: String,
+    error: AppError,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(message, color = MaterialTheme.colorScheme.error)
+            Text(error.localizedMessage(), color = MaterialTheme.colorScheme.error)
             Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
         }
     }

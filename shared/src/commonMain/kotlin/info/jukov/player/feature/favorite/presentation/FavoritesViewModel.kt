@@ -2,6 +2,8 @@ package info.jukov.player.feature.favorite.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.toAppError
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.Favorites
@@ -22,7 +24,7 @@ class FavoritesViewModel(private val repository: FavoritesRepository) : ViewMode
     val selectedTab = _selectedTab.asStateFlow()
     private val _pending = MutableStateFlow<Set<FavoriteTarget>>(emptySet())
     val pending = _pending.asStateFlow()
-    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private val _messages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
     val messages = _messages.asSharedFlow()
     private var initialized = false
 
@@ -47,7 +49,7 @@ class FavoritesViewModel(private val repository: FavoritesRepository) : ViewMode
                 .onFailure { error ->
                     _state.update {
                         LoadableState.Failure(
-                            error.message ?: "Не удалось загрузить избранное",
+                            error.toAppError(AppError.FavoritesLoadFailed),
                             it.content,
                         )
                     }
@@ -70,7 +72,7 @@ class FavoritesViewModel(private val repository: FavoritesRepository) : ViewMode
                     }
                 }
                 .onFailure { error ->
-                    _messages.tryEmit(error.message ?: "Не удалось изменить избранное")
+                    _messages.tryEmit(error.toAppError(AppError.FavoriteUpdateFailed))
                 }
             _pending.update { it - target }
         }

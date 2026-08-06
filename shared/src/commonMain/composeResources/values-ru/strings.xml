@@ -38,4 +38,23 @@
     <string name="play">Воспроизвести</string>
     <string name="remove_from_favorites">Удалить из избранного</string>
     <string name="add_to_favorites">Добавить в избранное</string>
+
+    <string name="error_server_address_required">Укажите адрес сервера</string>
+    <string name="error_username_required">Укажите логин</string>
+    <string name="error_password_required">Укажите пароль</string>
+    <string name="error_authentication_rejected">Сервер отклонил авторизацию</string>
+    <string name="error_authentication_required">Войдите в систему, чтобы продолжить</string>
+    <string name="error_albums_load_failed">Не удалось загрузить альбомы</string>
+    <string name="error_artists_load_failed">Не удалось загрузить исполнителей</string>
+    <string name="error_tracks_load_failed">Не удалось загрузить треки</string>
+    <string name="error_favorites_load_failed">Не удалось загрузить избранное</string>
+    <string name="error_favorite_update_failed">Не удалось изменить избранное</string>
+    <string name="error_opensubsonic">OpenSubsonic вернул ошибку %1$d</string>
+    <string name="error_http">Сервер вернул HTTP-ошибку %1$d</string>
+    <string name="error_invalid_server_response">Сервер вернул некорректный ответ</string>
+    <string name="error_unknown_opensubsonic_status">Неизвестный статус OpenSubsonic: %1$s</string>
+    <string name="error_player_connection_failed">Не удалось подключиться к плееру</string>
+    <string name="error_missing_track_stream_url">У трека отсутствует URL воспроизведения</string>
+    <string name="error_playback_failed">Не удалось воспроизвести трек</string>
+    <string name="error_ios_playback_not_implemented">Воспроизведение на iOS пока не реализовано</string>
 </resources>

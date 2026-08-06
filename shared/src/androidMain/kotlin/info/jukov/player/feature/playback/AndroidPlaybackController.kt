@@ -13,6 +13,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.domain.PlaybackController
@@ -74,7 +75,7 @@ private class AndroidPlaybackController(
                         replaceFromPlayer(connected)
                         handler.post(positionTicker)
                     }
-                    .onFailure { error -> fail(error.message ?: "Не удалось подключиться к плееру") }
+                    .onFailure { fail(AppError.PlayerConnectionFailed) }
             },
             appContext.mainExecutor,
         )
@@ -84,7 +85,7 @@ private class AndroidPlaybackController(
         if (tracks.isEmpty() || startIndex !in tracks.indices) return
         val queue = tracks.drop(startIndex)
         if (queue.any { it.streamUrl == null }) {
-            fail("У трека отсутствует URL воспроизведения")
+            fail(AppError.MissingTrackStreamUrl)
             return
         }
         playbackStore.write(queue, 0)
@@ -175,8 +176,8 @@ private class AndroidPlaybackController(
         }
     }
 
-    private fun fail(message: String) {
-        _state.update { LoadableState.Failure(message, it.content) }
+    private fun fail(error: AppError) {
+        _state.update { LoadableState.Failure(error, it.content) }
     }
 
     private inner class PlayerListener : Player.Listener {
@@ -197,7 +198,7 @@ private class AndroidPlaybackController(
         ) = updatePosition()
 
         override fun onPlayerError(error: PlaybackException) {
-            fail(error.localizedMessage ?: "Не удалось воспроизвести трек")
+            fail(AppError.PlaybackFailed)
         }
     }
 
@@ -206,7 +207,7 @@ private class AndroidPlaybackController(
     ): LoadableState<PlaybackSnapshot> = when (this) {
         is LoadableState.Content -> LoadableState.Content(transform(content))
         is LoadableState.Loading -> LoadableState.Loading(content?.let(transform))
-        is LoadableState.Failure -> LoadableState.Failure(message, content?.let(transform))
+        is LoadableState.Failure -> LoadableState.Failure(error, content?.let(transform))
     }
 
     private fun Long.validDuration(): Long? = takeUnless { it == C.TIME_UNSET }?.coerceAtLeast(0)
