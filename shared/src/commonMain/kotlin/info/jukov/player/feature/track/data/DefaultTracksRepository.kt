@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
+import info.jukov.player.core.domain.AppException
+import info.jukov.player.core.domain.Page
 
 class DefaultTracksRepository(
     private val api: TracksApi,
@@ -23,6 +25,30 @@ class DefaultTracksRepository(
     private val policy: LibraryCachePolicy,
     private val client: SubsonicApiClient,
 ) : TracksRepository {
+    override suspend fun getTracksPage(offset: Int, size: Int, forceRefresh: Boolean): Page<Track> {
+        val session = (authRepository.authState.value as? AuthState.LoggedIn)?.session
+            ?: throw AppException(AppError.AuthenticationRequired)
+        val queryKey = CacheKeys.tracksAll()
+        val cacheIsFresh = !forceRefresh && policy.isFresh(session, queryKey)
+        if (cacheIsFresh) {
+            val cached = dao.trackPage(session.accountKey, queryKey, offset, size + 1)
+            return Page(
+                items = cached.take(size).map { it.toDomain(session, client) },
+                hasMore = cached.size > size,
+            )
+        }
+        val page = api.getTracksPage(session, offset, size)
+        dao.storeTrackPage(
+            accountKey = session.accountKey,
+            queryKey = queryKey,
+            items = page.items.map { it.toEntity(session.accountKey) },
+            offset = offset,
+            isLastPage = !page.hasMore,
+            now = Clock.System.now().toEpochMilliseconds(),
+        )
+        return page
+    }
+
     override fun getTracks(filter: TracksFilter, forceRefresh: Boolean): Flow<LoadableState<List<Track>>> {
         val session = (authRepository.authState.value as? AuthState.LoggedIn)?.session
             ?: return flowOf(LoadableState.Failure(AppError.AuthenticationRequired))

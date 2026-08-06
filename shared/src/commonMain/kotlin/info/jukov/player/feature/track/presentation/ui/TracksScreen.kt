@@ -91,6 +91,7 @@ fun TracksScreen(
     LaunchedEffect(filter, albumIsFavorite) { viewModel.load(filter, albumIsFavorite) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
+    val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val currentAlbumIsFavorite by viewModel.albumIsFavorite.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -201,6 +202,9 @@ fun TracksScreen(
                     isPlaying = isPlaying,
                     pendingIds = pending,
                     onFavoriteClick = viewModel::toggleFavorite,
+                    hasMore = hasMore,
+                    isLoadingMore = loadingOrigin == LoadingOrigin.Pagination,
+                    onLoadMore = viewModel::loadMore,
                 )
             }
         }
@@ -418,6 +422,9 @@ fun TracksList(
     isPlaying: Boolean,
     pendingIds: Set<String> = emptySet(),
     onFavoriteClick: (Track) -> Unit = {},
+    hasMore: Boolean = false,
+    isLoadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -430,6 +437,9 @@ fun TracksList(
             item { Text(message.localizedMessage(), color = MaterialTheme.colorScheme.error) }
         }
         itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+            if (hasMore && index >= tracks.lastIndex - LOAD_MORE_THRESHOLD) {
+                LaunchedEffect(tracks.size) { onLoadMore() }
+            }
             TrackRow(
                 track = track,
                 showArtwork = showArtwork,
@@ -443,8 +453,18 @@ fun TracksList(
                 onFavoriteClick = { onFavoriteClick(track) },
             )
         }
+        if (isLoadingMore) {
+            item {
+                Box(
+                    Modifier.fillMaxWidth().padding(Padding.medium),
+                    contentAlignment = Alignment.Center,
+                ) { LoadingIndicator() }
+            }
+        }
     }
 }
+
+private const val LOAD_MORE_THRESHOLD = 12
 
 @Composable
 fun TrackRow(

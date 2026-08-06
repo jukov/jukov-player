@@ -17,6 +17,12 @@ interface CacheDao {
     @Query("SELECT t.* FROM TrackEntity t JOIN CacheMembership m ON t.accountKey=m.accountKey AND t.id=m.itemId WHERE m.accountKey=:accountKey AND m.queryKey=:queryKey AND m.itemType='track' ORDER BY m.position")
     fun observeTracks(accountKey: String, queryKey: String): Flow<List<TrackEntity>>
 
+    @Query("SELECT a.* FROM AlbumEntity a JOIN CacheMembership m ON a.accountKey=m.accountKey AND a.id=m.itemId WHERE m.accountKey=:accountKey AND m.queryKey=:queryKey AND m.itemType='album' ORDER BY m.position LIMIT :limit OFFSET :offset")
+    suspend fun albumPage(accountKey: String, queryKey: String, offset: Int, limit: Int): List<AlbumEntity>
+
+    @Query("SELECT t.* FROM TrackEntity t JOIN CacheMembership m ON t.accountKey=m.accountKey AND t.id=m.itemId WHERE m.accountKey=:accountKey AND m.queryKey=:queryKey AND m.itemType='track' ORDER BY m.position LIMIT :limit OFFSET :offset")
+    suspend fun trackPage(accountKey: String, queryKey: String, offset: Int, limit: Int): List<TrackEntity>
+
     @Query("SELECT * FROM CacheMetadata WHERE accountKey=:accountKey AND queryKey=:queryKey")
     suspend fun metadata(accountKey: String, queryKey: String): CacheMetadata?
 
@@ -28,6 +34,9 @@ interface CacheDao {
 
     @Query("DELETE FROM CacheMembership WHERE accountKey=:accountKey AND queryKey=:queryKey AND itemType=:itemType")
     suspend fun deleteMembership(accountKey: String, queryKey: String, itemType: String)
+
+    @Query("DELETE FROM CacheMetadata WHERE accountKey=:accountKey AND queryKey=:queryKey")
+    suspend fun deleteQueryMetadata(accountKey: String, queryKey: String)
 
     @Query("UPDATE CacheMetadata SET updatedAtMs=0 WHERE accountKey=:accountKey AND queryKey != 'scan'")
     suspend fun invalidate(accountKey: String)
@@ -74,6 +83,46 @@ interface CacheDao {
         upsertMembership(items.mapIndexed { i, it -> CacheMembership(accountKey, queryKey, CacheItemType.TRACK, it.id, i) })
         upsertMetadata(CacheMetadata(accountKey, queryKey, now))
         deleteOrphanTracks(accountKey)
+    }
+
+    @Transaction
+    suspend fun storeAlbumPage(
+        accountKey: String,
+        queryKey: String,
+        items: List<AlbumEntity>,
+        offset: Int,
+        isLastPage: Boolean,
+        now: Long,
+    ) {
+        if (offset == 0) {
+            deleteMembership(accountKey, queryKey, CacheItemType.ALBUM)
+            deleteQueryMetadata(accountKey, queryKey)
+        }
+        upsertAlbums(items)
+        upsertMembership(items.mapIndexed { index, item ->
+            CacheMembership(accountKey, queryKey, CacheItemType.ALBUM, item.id, offset + index)
+        })
+        if (isLastPage) upsertMetadata(CacheMetadata(accountKey, queryKey, now))
+    }
+
+    @Transaction
+    suspend fun storeTrackPage(
+        accountKey: String,
+        queryKey: String,
+        items: List<TrackEntity>,
+        offset: Int,
+        isLastPage: Boolean,
+        now: Long,
+    ) {
+        if (offset == 0) {
+            deleteMembership(accountKey, queryKey, CacheItemType.TRACK)
+            deleteQueryMetadata(accountKey, queryKey)
+        }
+        upsertTracks(items)
+        upsertMembership(items.mapIndexed { index, item ->
+            CacheMembership(accountKey, queryKey, CacheItemType.TRACK, item.id, offset + index)
+        })
+        if (isLastPage) upsertMetadata(CacheMetadata(accountKey, queryKey, now))
     }
 
     @Transaction

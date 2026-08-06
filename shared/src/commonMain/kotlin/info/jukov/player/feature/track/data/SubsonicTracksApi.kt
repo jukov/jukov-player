@@ -4,8 +4,17 @@ import info.jukov.player.feature.auth.domain.AuthSession
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
+import info.jukov.player.core.domain.Page
 
 class SubsonicTracksApi(private val client: SubsonicApiClient) : TracksApi {
+    override suspend fun getTracksPage(session: AuthSession, offset: Int, size: Int): Page<Track> {
+        val tracks = requestAllTracksPage(session, offset, size)
+        return Page(
+            items = tracks.withSharedAlbumCoverArt().map { it.toDomain(session) },
+            hasMore = tracks.size == size,
+        )
+    }
+
     override suspend fun getTracks(session: AuthSession, filter: TracksFilter): List<Track> {
         val tracks = when (filter) {
             TracksFilter.All -> getAllTracks(session)
@@ -18,22 +27,25 @@ class SubsonicTracksApi(private val client: SubsonicApiClient) : TracksApi {
     private suspend fun getAllTracks(session: AuthSession): List<TrackDto> = buildList {
         var offset = 0
         do {
-            val page = client.get(
-                endpoint = "search3",
-                session = session,
-                deserializer = TracksResponseDto.serializer(),
-                parameters = mapOf(
-                    "query" to "",
-                    "artistCount" to "0",
-                    "albumCount" to "0",
-                    "songCount" to PAGE_SIZE.toString(),
-                    "songOffset" to offset.toString(),
-                ),
-            ).response.searchResult3?.song.orEmpty()
+            val page = requestAllTracksPage(session, offset, PAGE_SIZE)
             addAll(page)
             offset += page.size
         } while (page.size == PAGE_SIZE)
     }
+
+    private suspend fun requestAllTracksPage(session: AuthSession, offset: Int, size: Int) =
+        client.get(
+            endpoint = "search3",
+            session = session,
+            deserializer = TracksResponseDto.serializer(),
+            parameters = mapOf(
+                "query" to "",
+                "artistCount" to "0",
+                "albumCount" to "0",
+                "songCount" to size.toString(),
+                "songOffset" to offset.toString(),
+            ),
+        ).response.searchResult3?.song.orEmpty()
 
     private suspend fun getArtistTracks(
         session: AuthSession,

@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -54,6 +54,7 @@ fun AlbumsScreen(
     LaunchedEffect(artistId) { viewModel.load(artistId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
+    val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val albums = state.content.orEmpty()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -136,6 +137,9 @@ fun AlbumsScreen(
                     onFavoriteClick = viewModel::toggleFavorite,
                     onAllTracksClick = onAllTracksClick.takeIf { artistId != null },
                     showEmptyMessage = albums.isEmpty(),
+                    hasMore = hasMore,
+                    isLoadingMore = loadingOrigin == LoadingOrigin.Pagination,
+                    onLoadMore = viewModel::loadMore,
                 )
             }
         }
@@ -152,6 +156,9 @@ fun AlbumsGrid(
     onFavoriteClick: (Album) -> Unit = {},
     onAllTracksClick: (() -> Unit)? = null,
     showEmptyMessage: Boolean = false,
+    hasMore: Boolean = false,
+    isLoadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyVerticalGrid(
@@ -183,7 +190,10 @@ fun AlbumsGrid(
                 }
             }
         }
-        items(albums, key = { it.id }) { album ->
+        itemsIndexed(albums, key = { _, album -> album.id }) { index, album ->
+            if (hasMore && index >= albums.lastIndex - LOAD_MORE_THRESHOLD) {
+                LaunchedEffect(albums.size) { onLoadMore() }
+            }
             AlbumCard(
                 album = album,
                 onClick = { onAlbumClick(album) },
@@ -191,8 +201,18 @@ fun AlbumsGrid(
                 favoriteEnabled = album.id !in pendingIds,
             )
         }
+        if (isLoadingMore) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(
+                    Modifier.fillMaxWidth().padding(Padding.medium),
+                    contentAlignment = Alignment.Center,
+                ) { LoadingIndicator() }
+            }
+        }
     }
 }
+
+private const val LOAD_MORE_THRESHOLD = 12
 
 @Composable
 private fun AllTracksCard(onClick: () -> Unit) {

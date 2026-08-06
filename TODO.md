@@ -1,6 +1,5 @@
 - Show play indicator on playing artist/album/track
 - Load track on device
-- Paging for data
 - Queue
 - Playlists
 - History

@@ -33,6 +33,8 @@ class TracksViewModel(
     val albumIsFavorite: StateFlow<Boolean> = _albumIsFavorite.asStateFlow()
     val pending = favoriteDelegate.pending
     val messages = favoriteDelegate.messages
+    private val _hasMore = MutableStateFlow(false)
+    val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
 
     private var filter: TracksFilter? = null
     private var loadJob: Job? = null
@@ -57,14 +59,29 @@ class TracksViewModel(
         if (this.filter == filter) return
         loadJob?.cancel()
         this.filter = filter
+        _hasMore.value = false
         _albumIsFavorite.value = albumIsFavorite
         _state.value = LoadableState.Loading(content = null)
         _loadingOrigin.value = LoadingOrigin.Initial
-        loadTracks(forceRefresh = false)
+        if (filter == TracksFilter.All) loadPage(forceRefresh = false) else loadTracks(forceRefresh = false)
     }
 
-    fun retry() = loadTracks(forceRefresh = true)
-    fun refresh() = loadTracks(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
+    fun retry() {
+        if (filter == TracksFilter.All) {
+            if (_state.value.content.isNullOrEmpty()) loadPage(forceRefresh = true) else loadMore()
+        } else loadTracks(forceRefresh = true)
+    }
+
+    fun refresh() {
+        if (filter == TracksFilter.All) loadPage(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
+        else loadTracks(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
+    }
+
+    fun loadMore() {
+        if (filter == TracksFilter.All && _hasMore.value && loadJob?.isActive != true) {
+            loadPage(forceRefresh = false, append = true, requestedOrigin = LoadingOrigin.Pagination)
+        }
+    }
 
     fun toggleFavorite(track: Track) {
         viewModelScope.launch {
@@ -99,5 +116,35 @@ class TracksViewModel(
                 }
             }
         }
+    }
+
+    private fun loadPage(
+        forceRefresh: Boolean,
+        append: Boolean = false,
+        requestedOrigin: LoadingOrigin? = null,
+    ) {
+        loadJob?.cancel()
+        val displayed = _state.value.content.orEmpty()
+        val previous = if (append) displayed else emptyList()
+        loadJob = viewModelScope.launch {
+            _state.value = LoadableState.Loading(displayed.ifEmpty { null })
+            _loadingOrigin.value = requestedOrigin ?: LoadingOrigin.Initial
+            try {
+                val page = getTracksUseCase.page(previous.size, PAGE_SIZE, forceRefresh)
+                _hasMore.value = page.hasMore
+                _state.value = LoadableState.Content(previous + page.items)
+            } catch (error: Throwable) {
+                _state.value = LoadableState.Failure(
+                    error.toAppError(AppError.TracksLoadFailed),
+                    displayed.ifEmpty { null },
+                )
+            } finally {
+                _loadingOrigin.value = null
+            }
+        }
+    }
+
+    private companion object {
+        const val PAGE_SIZE = 100
     }
 }

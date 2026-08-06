@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
+import info.jukov.player.core.domain.AppException
+import info.jukov.player.core.domain.Page
 
 class DefaultAlbumsRepository(
     private val api: AlbumsApi,
@@ -22,6 +24,29 @@ class DefaultAlbumsRepository(
     private val policy: LibraryCachePolicy,
     private val client: SubsonicApiClient,
 ) : AlbumsRepository {
+    override suspend fun getAlbumsPage(offset: Int, size: Int, forceRefresh: Boolean): Page<Album> {
+        val session = (authRepository.authState.value as? AuthState.LoggedIn)?.session
+            ?: throw AppException(AppError.AuthenticationRequired)
+        val cacheIsFresh = !forceRefresh && policy.isFresh(session, CacheKeys.ALBUMS)
+        if (cacheIsFresh) {
+            val cached = dao.albumPage(session.accountKey, CacheKeys.ALBUMS, offset, size + 1)
+            return Page(
+                items = cached.take(size).map { it.toDomain(session, client) },
+                hasMore = cached.size > size,
+            )
+        }
+        val page = api.getAlbumsPage(session, offset, size)
+        dao.storeAlbumPage(
+            accountKey = session.accountKey,
+            queryKey = CacheKeys.ALBUMS,
+            items = page.items.map { it.toEntity(session.accountKey) },
+            offset = offset,
+            isLastPage = !page.hasMore,
+            now = Clock.System.now().toEpochMilliseconds(),
+        )
+        return page
+    }
+
     override fun getAlbums(artistId: String?, forceRefresh: Boolean): Flow<LoadableState<List<Album>>> {
         val session = (authRepository.authState.value as? AuthState.LoggedIn)?.session
             ?: return flowOf(LoadableState.Failure(AppError.AuthenticationRequired))

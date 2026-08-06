@@ -4,4 +4,5 @@ enum class LoadingOrigin {
     Initial,
     Automatic,
     PullToRefresh,
+    Pagination,
 }
