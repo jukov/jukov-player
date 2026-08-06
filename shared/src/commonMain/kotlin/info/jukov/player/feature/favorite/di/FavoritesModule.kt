@@ -12,6 +12,8 @@ import info.jukov.player.feature.favorite.domain.FavoritesRepository
 import info.jukov.player.feature.favorite.presentation.FavoritesViewModel
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.subsonic.data.SubsonicApiClient
+import info.jukov.player.core.data.cache.CacheDao
+import info.jukov.player.core.data.cache.LibraryCachePolicy
 
 @BindingContainer
 object FavoritesModule {
@@ -19,8 +21,13 @@ object FavoritesModule {
     fun provideApi(client: SubsonicApiClient): FavoritesApi = SubsonicFavoritesApi(client)
 
     @Provides @SingleIn(AppScope::class)
-    fun provideRepository(api: FavoritesApi, authRepository: AuthRepository): FavoritesRepository =
-        DefaultFavoritesRepository(api, authRepository)
+    fun provideRepository(
+        api: FavoritesApi,
+        authRepository: AuthRepository,
+        dao: CacheDao,
+        policy: LibraryCachePolicy,
+        client: SubsonicApiClient,
+    ): FavoritesRepository = DefaultFavoritesRepository(api, authRepository, dao, policy, client)
 
     @Provides
     fun provideViewModel(repository: FavoritesRepository): FavoritesViewModel =

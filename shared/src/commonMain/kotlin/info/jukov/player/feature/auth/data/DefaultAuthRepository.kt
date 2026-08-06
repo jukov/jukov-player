@@ -12,10 +12,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlin.random.Random
+import info.jukov.player.core.data.cache.CacheDao
+import info.jukov.player.feature.auth.domain.accountKey
 
 class DefaultAuthRepository(
     private val api: AuthApi,
     private val storage: AuthStorage,
+    private val cacheDao: CacheDao? = null,
 ) : AuthRepository {
     private val _authState = MutableStateFlow(
         storage.read()?.let(AuthState::LoggedIn) ?: AuthState.LoggedOut,
@@ -34,13 +37,15 @@ class DefaultAuthRepository(
             token = md5(password + salt),
             salt = salt,
         )
-        if (!api.ping(session)) throw AppException(AppError.AuthenticationRejected)
-        storage.write(session)
-        _authState.value = AuthState.LoggedIn(session)
-        session
+        val serverInfo = api.ping(session)
+        val enriched = session.copy(serverType = serverInfo.type, serverVersion = serverInfo.version)
+        storage.write(enriched)
+        _authState.value = AuthState.LoggedIn(enriched)
+        enriched
     }
 
     override suspend fun logout() {
+        (authState.value as? AuthState.LoggedIn)?.session?.let { cacheDao?.clearAccount(it.accountKey) }
         storage.clear()
         _authState.value = AuthState.LoggedOut
     }

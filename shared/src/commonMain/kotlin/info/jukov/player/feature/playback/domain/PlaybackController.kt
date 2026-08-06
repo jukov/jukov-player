@@ -1,6 +1,6 @@
 package info.jukov.player.feature.playback.domain
 
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.playback.data.PlaybackStore
 import kotlinx.coroutines.flow.StateFlow

@@ -18,6 +18,8 @@ import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
 import info.jukov.player.feature.favorite.di.FavoritesModule
 import info.jukov.player.feature.favorite.presentation.FavoritesViewModel
+import androidx.room3.RoomDatabase
+import info.jukov.player.core.data.cache.CacheDatabase
 
 @DependencyGraph(
     scope = AppScope::class,
@@ -43,9 +45,14 @@ interface AppGraph {
 
     @DependencyGraph.Factory
     fun interface Factory {
-        fun create(@Provides playbackControllerFactory: PlaybackControllerFactory): AppGraph
+        fun create(
+            @Provides playbackControllerFactory: PlaybackControllerFactory,
+            @Provides cacheDatabaseBuilder: RoomDatabase.Builder<CacheDatabase>,
+        ): AppGraph
     }
 }
 
-fun createAppGraph(playbackControllerFactory: PlaybackControllerFactory): AppGraph =
-    createGraphFactory<AppGraph.Factory>().create(playbackControllerFactory)
+fun createAppGraph(
+    playbackControllerFactory: PlaybackControllerFactory,
+    cacheDatabaseBuilder: RoomDatabase.Builder<CacheDatabase>,
+): AppGraph = createGraphFactory<AppGraph.Factory>().create(playbackControllerFactory, cacheDatabaseBuilder)

@@ -1,7 +1,7 @@
 package info.jukov.player.feature.playback
 
 import info.jukov.player.core.domain.AppError
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackControllerFactory

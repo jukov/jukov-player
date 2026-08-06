@@ -54,7 +54,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import info.jukov.player.core.domain.AppError
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.localizedMessage
 import info.jukov.player.core.presentation.ui.LocalPlayerBottomInset
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton

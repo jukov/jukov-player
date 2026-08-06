@@ -1,0 +1,287 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "771b24e5fbbb2bfe75eaa2635a6133ec",
+    "entities": [
+      {
+        "tableName": "ArtistEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountKey` TEXT NOT NULL, `id` TEXT NOT NULL, `name` TEXT NOT NULL, `albumCount` INTEGER NOT NULL, `coverArtId` TEXT, `isFavorite` INTEGER NOT NULL, PRIMARY KEY(`accountKey`, `id`))",
+        "fields": [
+          {
+            "fieldPath": "accountKey",
+            "columnName": "accountKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "albumCount",
+            "columnName": "albumCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "coverArtId",
+            "columnName": "coverArtId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "isFavorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accountKey",
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "AlbumEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountKey` TEXT NOT NULL, `id` TEXT NOT NULL, `name` TEXT NOT NULL, `artist` TEXT NOT NULL, `artistId` TEXT, `coverArtId` TEXT, `isFavorite` INTEGER NOT NULL, PRIMARY KEY(`accountKey`, `id`))",
+        "fields": [
+          {
+            "fieldPath": "accountKey",
+            "columnName": "accountKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "artist",
+            "columnName": "artist",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "artistId",
+            "columnName": "artistId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "coverArtId",
+            "columnName": "coverArtId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "isFavorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accountKey",
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "TrackEntity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountKey` TEXT NOT NULL, `id` TEXT NOT NULL, `title` TEXT NOT NULL, `artist` TEXT NOT NULL, `album` TEXT, `albumId` TEXT, `artistId` TEXT, `trackNumber` INTEGER, `coverArtId` TEXT, `durationMs` INTEGER NOT NULL, `contentType` TEXT, `isFavorite` INTEGER NOT NULL, PRIMARY KEY(`accountKey`, `id`))",
+        "fields": [
+          {
+            "fieldPath": "accountKey",
+            "columnName": "accountKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "artist",
+            "columnName": "artist",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "album",
+            "columnName": "album",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "albumId",
+            "columnName": "albumId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "artistId",
+            "columnName": "artistId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "trackNumber",
+            "columnName": "trackNumber",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "coverArtId",
+            "columnName": "coverArtId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "durationMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentType",
+            "columnName": "contentType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "isFavorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accountKey",
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "CacheMembership",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountKey` TEXT NOT NULL, `queryKey` TEXT NOT NULL, `itemType` TEXT NOT NULL, `itemId` TEXT NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`accountKey`, `queryKey`, `itemType`, `itemId`))",
+        "fields": [
+          {
+            "fieldPath": "accountKey",
+            "columnName": "accountKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "queryKey",
+            "columnName": "queryKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemType",
+            "columnName": "itemType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "itemId",
+            "columnName": "itemId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accountKey",
+            "queryKey",
+            "itemType",
+            "itemId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_CacheMembership_accountKey_itemType_itemId",
+            "unique": false,
+            "columnNames": [
+              "accountKey",
+              "itemType",
+              "itemId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_CacheMembership_accountKey_itemType_itemId` ON `${TABLE_NAME}` (`accountKey`, `itemType`, `itemId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "CacheMetadata",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountKey` TEXT NOT NULL, `queryKey` TEXT NOT NULL, `updatedAtMs` INTEGER NOT NULL, `lastScan` TEXT, PRIMARY KEY(`accountKey`, `queryKey`))",
+        "fields": [
+          {
+            "fieldPath": "accountKey",
+            "columnName": "accountKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "queryKey",
+            "columnName": "queryKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updatedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastScan",
+            "columnName": "lastScan",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "accountKey",
+            "queryKey"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '771b24e5fbbb2bfe75eaa2635a6133ec')"
+    ]
+  }
+}

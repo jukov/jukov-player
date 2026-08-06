@@ -6,8 +6,8 @@ import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.toAppError
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.album.domain.GetAlbumsUseCase
-import info.jukov.player.core.presentation.LoadableState
-import info.jukov.player.core.presentation.updateItem
+import info.jukov.player.core.domain.LoadableState
+import info.jukov.player.core.domain.updateItem
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,20 +15,25 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import info.jukov.player.core.presentation.LoadingOrigin
 
 class AlbumsViewModel(
     private val getAlbumsUseCase: GetAlbumsUseCase,
     private val favoriteDelegate: FavoriteDelegate,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Album>>>(
-        LoadableState.Content(emptyList()),
+        LoadableState.Loading(content = null),
     )
     val state: StateFlow<LoadableState<List<Album>>> = _state.asStateFlow()
+    private val _loadingOrigin = MutableStateFlow<LoadingOrigin?>(LoadingOrigin.Initial)
+    val loadingOrigin: StateFlow<LoadingOrigin?> = _loadingOrigin.asStateFlow()
     val pending = favoriteDelegate.pending
     val messages = favoriteDelegate.messages
 
     private var artistId: String? = null
     private var initialized = false
+    private var loadJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -43,11 +48,13 @@ class AlbumsViewModel(
         if (initialized && this.artistId == artistId) return
         this.artistId = artistId
         initialized = true
-        _state.update { LoadableState.Content(emptyList()) }
-        loadAlbums()
+        _state.value = LoadableState.Loading(content = null)
+        _loadingOrigin.value = LoadingOrigin.Initial
+        loadAlbums(forceRefresh = false)
     }
 
-    fun retry() = loadAlbums()
+    fun retry() = loadAlbums(forceRefresh = true)
+    fun refresh() = loadAlbums(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
 
     fun toggleFavorite(album: Album) {
         viewModelScope.launch {
@@ -61,22 +68,17 @@ class AlbumsViewModel(
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }
     }
 
-    private fun loadAlbums() {
-        if (_state.value is LoadableState.Loading) return
-        viewModelScope.launch {
-            _state.update { LoadableState.Loading(it.content) }
-            getAlbumsUseCase(artistId)
-                .onSuccess { albums ->
-                    _state.update { LoadableState.Content(albums) }
+    private fun loadAlbums(forceRefresh: Boolean, requestedOrigin: LoadingOrigin? = null) {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            getAlbumsUseCase(artistId, forceRefresh).collect { state ->
+                _state.value = state
+                _loadingOrigin.value = when (state) {
+                    is LoadableState.Loading -> requestedOrigin
+                        ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic
+                    else -> null
                 }
-                .onFailure { error ->
-                    _state.update {
-                        LoadableState.Failure(
-                            error = error.toAppError(AppError.AlbumsLoadFailed),
-                            content = it.content,
-                        )
-                    }
-                }
+            }
         }
     }
 }

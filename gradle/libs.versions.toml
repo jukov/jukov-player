@@ -21,6 +21,9 @@ metro = "1.3.2"
 serialization = "1.11.0"
 navigation3 = "1.1.1"
 media3 = "1.10.1"
+room3 = "3.0.1"
+sqlite = "2.7.0"
+ksp = "2.3.11"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -54,6 +57,9 @@ multiplatform-settings-test = { module = "com.russhwolf:multiplatform-settings-t
 navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
 androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
 androidx-media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
+androidx-room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3" }
+androidx-room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room3" }
+androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -63,3 +69,5 @@ composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "k
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+androidxRoom3 = { id = "androidx.room3", version.ref = "room3" }

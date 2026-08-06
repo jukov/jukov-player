@@ -5,6 +5,7 @@ data class Album(
     val name: String,
     val artist: String,
     val artistId: String?,
+    val coverArtId: String? = null,
     val coverArtUrl: String?,
     val isFavorite: Boolean = false,
 )

@@ -2,7 +2,7 @@ package info.jukov.player.feature.playback.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.feature.playback.domain.PlaybackController

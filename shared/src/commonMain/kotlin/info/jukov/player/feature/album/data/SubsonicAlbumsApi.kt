@@ -41,6 +41,7 @@ class SubsonicAlbumsApi(private val client: SubsonicApiClient) : AlbumsApi {
                 name = album.name,
                 artist = album.artist.ifBlank { artistName },
                 artistId = album.artistId,
+                coverArtId = album.coverArt,
                 coverArtUrl = album.coverArt?.let {
                     client.buildUrl(
                         endpoint = "getCoverArt",

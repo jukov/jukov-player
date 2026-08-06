@@ -2,6 +2,8 @@ package info.jukov.player.feature.album.presentation.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -24,7 +26,7 @@ import coil3.compose.AsyncImage
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.album.presentation.AlbumsViewModel
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
@@ -32,6 +34,7 @@ import info.jukov.player.core.presentation.ui.localizedMessage
 import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.LARGE_ARTWORK_SIZE
 import info.jukov.player.core.presentation.ui.withPlayerBottomInset
+import info.jukov.player.core.presentation.LoadingOrigin
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -47,6 +50,7 @@ fun AlbumsScreen(
 ) {
     LaunchedEffect(artistId) { viewModel.load(artistId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val albums = state.content.orEmpty()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -57,10 +61,7 @@ fun AlbumsScreen(
         snackbarMessage?.let { snackbarHostState.showSnackbar(it) }
         snackbarError = null
     }
-    var refreshRequested by remember { mutableStateOf(false) }
-    LaunchedEffect(state) {
-        if (state !is LoadableState.Loading) refreshRequested = false
-    }
+    val isRefreshing = loadingOrigin == LoadingOrigin.PullToRefresh
 
     val refreshState = rememberPullToRefreshState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
@@ -75,45 +76,47 @@ fun AlbumsScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            AppFlexibleTopAppBar(
-                title = artistName ?: stringResource(Res.string.albums),
-                scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            painter = painterResource(Res.drawable.arrow_back),
-                            contentDescription = stringResource(Res.string.back),
-                        )
-                    }
-                },
-            )
+            Column {
+                AppFlexibleTopAppBar(
+                    title = artistName ?: stringResource(Res.string.albums),
+                    scrollBehavior = scrollBehavior,
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.back))
+                        }
+                    },
+                )
+                if (loadingOrigin == LoadingOrigin.Automatic && albums.isNotEmpty()) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { scaffoldPadding ->
         PullToRefreshBox(
-            isRefreshing = refreshRequested && state is LoadableState.Loading,
-            onRefresh = {
-                refreshRequested = true
-                viewModel.retry()
-            },
+            isRefreshing = isRefreshing,
+            onRefresh = viewModel::refresh,
             state = refreshState,
             enabled = refreshEnabled,
             indicator = {
-                PullToRefreshDefaults.Indicator(
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    isRefreshing = refreshRequested && state is LoadableState.Loading,
+                PullToRefreshDefaults.LoadingIndicator(
                     state = refreshState,
+                    isRefreshing = isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
                 )
             },
             modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
         ) {
             when {
-                state is LoadableState.Loading && albums.isEmpty() -> CenteredLoading()
+                state is LoadableState.Loading && albums.isEmpty() && !isRefreshing -> CenteredLoading()
                 state is LoadableState.Failure && albums.isEmpty() -> CenteredError(
                     error = (state as LoadableState.Failure).error,
                     onRetry = viewModel::retry,
                 )
-                albums.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                albums.isEmpty() -> Box(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Text(stringResource(Res.string.albums_not_found))
                 }
                 else -> AlbumsGrid(
@@ -217,13 +220,19 @@ fun AlbumCard(
 }
 
 @Composable
-private fun CenteredLoading() = Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-    CircularProgressIndicator()
+private fun CenteredLoading() = Box(
+    Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+    contentAlignment = Alignment.Center,
+) {
+    LoadingIndicator(Modifier.size(96.dp))
 }
 
 @Composable
 private fun CenteredError(error: AppError, onRetry: () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(Padding.large), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Padding.large),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(error.localizedMessage(), color = MaterialTheme.colorScheme.error)
             Spacer(Modifier.height(Padding.medium))

@@ -7,6 +7,8 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.metro)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.androidxRoom3)
 }
 
 kotlin {
@@ -67,6 +69,8 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.navigation3.ui)
+            implementation(libs.androidx.room3.runtime)
+            implementation(libs.androidx.sqlite.bundled)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -78,4 +82,11 @@ kotlin {
 
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
+    add("kspAndroid", libs.androidx.room3.compiler)
+    add("kspIosArm64", libs.androidx.room3.compiler)
+    add("kspIosSimulatorArm64", libs.androidx.room3.compiler)
+}
+
+room3 {
+    schemaDirectory("$projectDir/schemas")
 }

@@ -20,9 +20,9 @@ class DefaultFavoritesRepositoryTest {
     fun getFavoritesRequiresLoggedInSession() = runTest {
         val repository = DefaultFavoritesRepository(FakeApi(), FakeAuthRepository(AuthState.LoggedOut))
 
-        val result = repository.getFavorites()
+        val result = repository.getFavorites().first()
 
-        assertTrue(result.isFailure)
+        assertTrue(result is info.jukov.player.core.domain.LoadableState.Failure)
     }
 
     @Test

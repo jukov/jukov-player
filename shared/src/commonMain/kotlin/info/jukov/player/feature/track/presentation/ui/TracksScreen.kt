@@ -18,7 +18,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +29,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,10 +47,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import info.jukov.player.core.domain.AppError
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBar
 import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBarState
@@ -61,6 +67,7 @@ import info.jukov.player.core.presentation.ui.localizedMessage
 import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
+import info.jukov.player.core.presentation.LoadingOrigin
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -82,6 +89,7 @@ fun TracksScreen(
 ) {
     LaunchedEffect(filter, albumIsFavorite) { viewModel.load(filter, albumIsFavorite) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val currentAlbumIsFavorite by viewModel.albumIsFavorite.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -98,6 +106,8 @@ fun TracksScreen(
     } else null
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val albumAppBarState = rememberAppCollapsingTopAppBarState()
+    val pullToRefreshState = rememberPullToRefreshState()
+    val isRefreshing = loadingOrigin == LoadingOrigin.PullToRefresh
 
     Scaffold(
         modifier = Modifier.nestedScroll(
@@ -105,56 +115,69 @@ fun TracksScreen(
                 ?: scrollBehavior.nestedScrollConnection,
         ),
         topBar = {
-            if (albumHeader == null) {
-                AppFlexibleTopAppBar(
-                    title = stringResource(Res.string.tracks),
-                    scrollBehavior = scrollBehavior,
-                    navigationIcon = { BackButton(onBack) },
-                )
-            } else {
-                AlbumTracksTopAppBar(
-                    header = albumHeader,
-                    tracks = tracks,
-                    appBarState = albumAppBarState,
-                    onBack = onBack,
-                    onPlayClick = { onPlayClick(tracks, 0) },
-                    isFavorite = currentAlbumIsFavorite,
-                    favoriteEnabled = albumHeader.albumId !in pending,
-                    onFavoriteClick = { viewModel.toggleAlbumFavorite(albumHeader.albumId) },
-                )
+            Column {
+                if (albumHeader == null) {
+                    AppFlexibleTopAppBar(
+                        title = stringResource(Res.string.tracks),
+                        scrollBehavior = scrollBehavior,
+                        navigationIcon = { BackButton(onBack) },
+                    )
+                } else {
+                    AlbumTracksTopAppBar(
+                        header = albumHeader, tracks = tracks, appBarState = albumAppBarState,
+                        onBack = onBack, onPlayClick = { onPlayClick(tracks, 0) },
+                        isFavorite = currentAlbumIsFavorite,
+                        favoriteEnabled = albumHeader.albumId !in pending,
+                        onFavoriteClick = { viewModel.toggleAlbumFavorite(albumHeader.albumId) },
+                    )
+                }
+                if (loadingOrigin == LoadingOrigin.Automatic && tracks.isNotEmpty()) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { scaffoldPadding ->
-        when {
-            state is LoadableState.Loading && tracks.isEmpty() ->
-                CenteredLoading(Modifier.padding(scaffoldPadding))
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = viewModel::refresh,
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.LoadingIndicator(
+                    state = pullToRefreshState,
+                    isRefreshing = isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            },
+            modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
+        ) {
+            when {
+                state is LoadableState.Loading && tracks.isEmpty() && !isRefreshing -> CenteredLoading()
 
-            state is LoadableState.Failure && tracks.isEmpty() -> CenteredError(
-                error = (state as LoadableState.Failure).error,
-                onRetry = viewModel::retry,
-                modifier = Modifier.padding(scaffoldPadding),
-            )
+                state is LoadableState.Failure && tracks.isEmpty() -> CenteredError(
+                    error = (state as LoadableState.Failure).error,
+                    onRetry = viewModel::retry,
+                )
 
-            tracks.isEmpty() -> Box(
-                modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(stringResource(Res.string.tracks_not_found))
+                tracks.isEmpty() -> Box(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(stringResource(Res.string.tracks_not_found))
+                }
+
+                else -> TracksList(
+                    tracks = tracks,
+                    showArtwork = filter !is TracksFilter.ByAlbum,
+                    error = (state as? LoadableState.Failure)?.error,
+                    onPlayClick = onPlayClick,
+                    onActiveTrackClick = onActiveTrackClick,
+                    activeTrackId = activeTrackId,
+                    isPlaying = isPlaying,
+                    pendingIds = pending,
+                    onFavoriteClick = viewModel::toggleFavorite,
+                )
             }
-
-            else -> TracksList(
-                tracks = tracks,
-                showArtwork = filter !is TracksFilter.ByAlbum,
-                error = (state as? LoadableState.Failure)?.error,
-                onPlayClick = onPlayClick,
-                onActiveTrackClick = onActiveTrackClick,
-                activeTrackId = activeTrackId,
-                isPlaying = isPlaying,
-                pendingIds = pending,
-                onFavoriteClick = viewModel::toggleFavorite,
-                modifier = Modifier.padding(scaffoldPadding),
-            )
         }
     }
 }
@@ -467,8 +490,11 @@ fun TrackRow(
 
 @Composable
 private fun CenteredLoading(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+    Box(
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        contentAlignment = Alignment.Center,
+    ) {
+        LoadingIndicator(Modifier.size(96.dp))
     }
 }
 
@@ -478,7 +504,10 @@ private fun CenteredError(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(error.localizedMessage(), color = MaterialTheme.colorScheme.error)
             Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }

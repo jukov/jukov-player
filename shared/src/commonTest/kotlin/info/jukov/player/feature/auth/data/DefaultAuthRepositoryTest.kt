@@ -53,11 +53,11 @@ class DefaultAuthRepositoryTest {
     }
 
     private object SuccessfulAuthApi : AuthApi {
-        override suspend fun ping(session: AuthSession) = true
+        override suspend fun ping(session: AuthSession) = ServerInfo("navidrome", "test")
     }
 
     private object FailingAuthApi : AuthApi {
-        override suspend fun ping(session: AuthSession): Boolean {
+        override suspend fun ping(session: AuthSession): ServerInfo {
             error("Unauthorized")
         }
     }

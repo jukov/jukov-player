@@ -1,11 +1,12 @@
 package info.jukov.player.feature.track.data
 
 internal fun List<TrackDto>.withSharedAlbumCoverArt(): List<TrackDto> {
-    val coverArtByAlbum = buildMap {
+    val coverArtByAlbum = mutableMapOf<String, String>()
+    run {
         this@withSharedAlbumCoverArt.forEach { track ->
             val albumId = track.albumId ?: return@forEach
             val coverArt = track.coverArt ?: return@forEach
-            putIfAbsent(albumId, coverArt)
+            if (albumId !in coverArtByAlbum) coverArtByAlbum[albumId] = coverArt
         }
     }
     return map { track ->

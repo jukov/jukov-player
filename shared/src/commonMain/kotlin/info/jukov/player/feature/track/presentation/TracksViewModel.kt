@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.toAppError
-import info.jukov.player.core.presentation.LoadableState
-import info.jukov.player.core.presentation.updateItem
+import info.jukov.player.core.domain.LoadableState
+import info.jukov.player.core.domain.updateItem
 import info.jukov.player.feature.track.domain.GetTracksUseCase
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
+import info.jukov.player.core.presentation.LoadingOrigin
 import kotlinx.coroutines.launch
 
 class TracksViewModel(
@@ -23,9 +24,11 @@ class TracksViewModel(
     private val favoriteDelegate: FavoriteDelegate,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Track>>>(
-        LoadableState.Content(emptyList()),
+        LoadableState.Loading(content = null),
     )
     val state: StateFlow<LoadableState<List<Track>>> = _state.asStateFlow()
+    private val _loadingOrigin = MutableStateFlow<LoadingOrigin?>(LoadingOrigin.Initial)
+    val loadingOrigin: StateFlow<LoadingOrigin?> = _loadingOrigin.asStateFlow()
     private val _albumIsFavorite = MutableStateFlow(false)
     val albumIsFavorite: StateFlow<Boolean> = _albumIsFavorite.asStateFlow()
     val pending = favoriteDelegate.pending
@@ -55,11 +58,13 @@ class TracksViewModel(
         loadJob?.cancel()
         this.filter = filter
         _albumIsFavorite.value = albumIsFavorite
-        _state.value = LoadableState.Content(emptyList())
-        loadTracks()
+        _state.value = LoadableState.Loading(content = null)
+        _loadingOrigin.value = LoadingOrigin.Initial
+        loadTracks(forceRefresh = false)
     }
 
-    fun retry() = loadTracks()
+    fun retry() = loadTracks(forceRefresh = true)
+    fun refresh() = loadTracks(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
 
     fun toggleFavorite(track: Track) {
         viewModelScope.launch {
@@ -81,21 +86,18 @@ class TracksViewModel(
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }
     }
 
-    private fun loadTracks() {
+    private fun loadTracks(forceRefresh: Boolean, requestedOrigin: LoadingOrigin? = null) {
         val currentFilter = filter ?: return
         if (loadJob?.isActive == true) return
         loadJob = viewModelScope.launch {
-            _state.update { LoadableState.Loading(it.content) }
-            getTracksUseCase(currentFilter)
-                .onSuccess { tracks -> _state.value = LoadableState.Content(tracks) }
-                .onFailure { error ->
-                    _state.update {
-                        LoadableState.Failure(
-                            error = error.toAppError(AppError.TracksLoadFailed),
-                            content = it.content,
-                        )
-                    }
+            getTracksUseCase(currentFilter, forceRefresh).collect { state ->
+                _state.value = state
+                _loadingOrigin.value = when (state) {
+                    is LoadableState.Loading -> requestedOrigin
+                        ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic
+                    else -> null
                 }
+            }
         }
     }
 }

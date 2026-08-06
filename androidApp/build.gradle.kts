@@ -15,6 +15,7 @@ dependencies {
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.compose.uiToolingPreview)
+    implementation(libs.androidx.room3.runtime)
     debugImplementation(libs.compose.uiTooling)
 }
 

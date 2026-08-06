@@ -14,7 +14,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import info.jukov.player.core.domain.AppError
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackControllerFactory

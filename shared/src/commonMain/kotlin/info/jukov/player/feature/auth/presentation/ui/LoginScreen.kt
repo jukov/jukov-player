@@ -11,7 +11,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import info.jukov.player.feature.auth.presentation.AuthUiState
 import info.jukov.player.feature.auth.presentation.AuthViewModel
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.localizedMessage
 import jukovplayer.shared.generated.resources.*
@@ -67,7 +67,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                    LoadingIndicator(Modifier.size(22.dp))
                 } else {
                     Text(stringResource(Res.string.sign_in))
                 }

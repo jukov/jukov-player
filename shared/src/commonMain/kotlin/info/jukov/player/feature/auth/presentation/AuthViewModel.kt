@@ -8,7 +8,7 @@ import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.feature.auth.domain.AuthState
 import info.jukov.player.feature.auth.domain.LoginUseCase
 import info.jukov.player.feature.auth.domain.LogoutUseCase
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

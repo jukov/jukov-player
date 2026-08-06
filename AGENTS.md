@@ -34,6 +34,7 @@
 
 - Prefer `MutableStateFlow.update { ... }` when deriving a new state from the current value.
 - Use direct `.value = ...` assignment only for intentional replacement that does not depend on the previous state.
+- Always use named arguments when passing boolean literals.
 
 ## Navigation
 

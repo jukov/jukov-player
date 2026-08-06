@@ -11,7 +11,11 @@ class AuthStorageImpl(
         val username = settings.getStringOrNull(USERNAME_KEY) ?: return null
         val token = settings.getStringOrNull(TOKEN_KEY) ?: return null
         val salt = settings.getStringOrNull(SALT_KEY) ?: return null
-        return AuthSession(server, username, token, salt)
+        return AuthSession(
+            server, username, token, salt,
+            settings.getStringOrNull(SERVER_TYPE_KEY),
+            settings.getStringOrNull(SERVER_VERSION_KEY),
+        )
     }
 
     override fun write(session: AuthSession) {
@@ -19,6 +23,8 @@ class AuthStorageImpl(
         settings.putString(USERNAME_KEY, session.username)
         settings.putString(TOKEN_KEY, session.token)
         settings.putString(SALT_KEY, session.salt)
+        session.serverType?.let { settings.putString(SERVER_TYPE_KEY, it) }
+        session.serverVersion?.let { settings.putString(SERVER_VERSION_KEY, it) }
     }
 
     override fun clear() {
@@ -26,6 +32,8 @@ class AuthStorageImpl(
         settings.remove(USERNAME_KEY)
         settings.remove(TOKEN_KEY)
         settings.remove(SALT_KEY)
+        settings.remove(SERVER_TYPE_KEY)
+        settings.remove(SERVER_VERSION_KEY)
     }
 
     private companion object {
@@ -33,5 +41,7 @@ class AuthStorageImpl(
         const val USERNAME_KEY = "auth.username"
         const val TOKEN_KEY = "auth.token"
         const val SALT_KEY = "auth.salt"
+        const val SERVER_TYPE_KEY = "auth.serverType"
+        const val SERVER_VERSION_KEY = "auth.serverVersion"
     }
 }

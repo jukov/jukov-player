@@ -13,6 +13,8 @@ import info.jukov.player.feature.track.domain.GetTracksUseCase
 import info.jukov.player.feature.track.domain.TracksRepository
 import info.jukov.player.feature.track.presentation.TracksViewModel
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
+import info.jukov.player.core.data.cache.CacheDao
+import info.jukov.player.core.data.cache.LibraryCachePolicy
 
 @BindingContainer
 object TracksModule {
@@ -25,7 +27,10 @@ object TracksModule {
     fun provideTracksRepository(
         api: TracksApi,
         authRepository: AuthRepository,
-    ): TracksRepository = DefaultTracksRepository(api, authRepository)
+        dao: CacheDao,
+        policy: LibraryCachePolicy,
+        client: SubsonicApiClient,
+    ): TracksRepository = DefaultTracksRepository(api, authRepository, dao, policy, client)
 
     @Provides
     fun provideGetTracksUseCase(repository: TracksRepository): GetTracksUseCase =

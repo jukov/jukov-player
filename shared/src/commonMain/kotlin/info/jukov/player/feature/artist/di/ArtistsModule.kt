@@ -13,6 +13,8 @@ import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.di.AppScope
 import info.jukov.player.subsonic.data.SubsonicApiClient
+import info.jukov.player.core.data.cache.CacheDao
+import info.jukov.player.core.data.cache.LibraryCachePolicy
 
 @BindingContainer
 object ArtistsModule {
@@ -25,7 +27,9 @@ object ArtistsModule {
     fun provideArtistsRepository(
         api: ArtistsApi,
         authRepository: AuthRepository,
-    ): ArtistsRepository = DefaultArtistsRepository(api, authRepository)
+        dao: CacheDao,
+        policy: LibraryCachePolicy,
+    ): ArtistsRepository = DefaultArtistsRepository(api, authRepository, dao, policy)
 
     @Provides
     fun provideGetArtistsUseCase(repository: ArtistsRepository): GetArtistsUseCase =

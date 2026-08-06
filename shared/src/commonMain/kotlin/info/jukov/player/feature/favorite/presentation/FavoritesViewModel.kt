@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.toAppError
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.Favorites
 import info.jukov.player.feature.favorite.domain.FavoritesRepository
@@ -14,12 +14,18 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import info.jukov.player.core.presentation.LoadingOrigin
 
 enum class FavoritesTab { Tracks, Albums, Artists }
 
 class FavoritesViewModel(private val repository: FavoritesRepository) : ViewModel() {
-    private val _state = MutableStateFlow<LoadableState<Favorites>>(LoadableState.Loading())
+    private val _state = MutableStateFlow<LoadableState<Favorites>>(
+        LoadableState.Loading(content = null),
+    )
     val state = _state.asStateFlow()
+    private val _loadingOrigin = MutableStateFlow<LoadingOrigin?>(LoadingOrigin.Initial)
+    val loadingOrigin = _loadingOrigin.asStateFlow()
     private val _selectedTab = MutableStateFlow(FavoritesTab.Tracks)
     val selectedTab = _selectedTab.asStateFlow()
     private val _pending = MutableStateFlow<Set<FavoriteTarget>>(emptySet())
@@ -27,33 +33,33 @@ class FavoritesViewModel(private val repository: FavoritesRepository) : ViewMode
     private val _messages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
     val messages = _messages.asSharedFlow()
     private var initialized = false
+    private var loadJob: Job? = null
 
     fun load() {
         if (initialized) return
         initialized = true
-        loadFavorites()
+        loadFavorites(forceRefresh = false)
     }
 
     fun selectTab(tab: FavoritesTab) { _selectedTab.value = tab }
 
     fun refresh() {
-        if (_state.value is LoadableState.Loading) return
-        loadFavorites()
+        loadFavorites(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
     }
 
-    private fun loadFavorites() {
-        viewModelScope.launch {
-            _state.update { LoadableState.Loading(it.content) }
-            repository.getFavorites()
-                .onSuccess { _state.value = LoadableState.Content(it) }
-                .onFailure { error ->
-                    _state.update {
-                        LoadableState.Failure(
-                            error.toAppError(AppError.FavoritesLoadFailed),
-                            it.content,
-                        )
-                    }
+    fun retry() = loadFavorites(forceRefresh = true)
+
+    private fun loadFavorites(forceRefresh: Boolean, requestedOrigin: LoadingOrigin? = null) {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            repository.getFavorites(forceRefresh).collect { state ->
+                _state.value = state
+                _loadingOrigin.value = when (state) {
+                    is LoadableState.Loading -> requestedOrigin
+                        ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic
+                    else -> null
                 }
+            }
         }
     }
 

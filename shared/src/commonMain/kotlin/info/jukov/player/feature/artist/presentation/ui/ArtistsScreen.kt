@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -19,16 +21,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.artist.domain.Artist
 import info.jukov.player.feature.artist.presentation.ArtistsViewModel
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import info.jukov.player.core.presentation.ui.localizedMessage
 import info.jukov.player.core.presentation.ui.withPlayerBottomInset
+import info.jukov.player.core.presentation.LoadingOrigin
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -43,6 +47,7 @@ fun ArtistsScreen(
     onAllAlbumsClick: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val artists = state.content.orEmpty()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -53,13 +58,7 @@ fun ArtistsScreen(
         snackbarMessage?.let { snackbarHostState.showSnackbar(it) }
         snackbarError = null
     }
-    var refreshRequested by remember { mutableStateOf(false) }
-
-    LaunchedEffect(state) {
-        if (state !is LoadableState.Loading) refreshRequested = false
-    }
-
-    val isRefreshing = refreshRequested && state is LoadableState.Loading
+    val isRefreshing = loadingOrigin == LoadingOrigin.PullToRefresh
     val pullToRefreshState = rememberPullToRefreshState()
     val canScrollTopAppBar = remember(pullToRefreshState) {
         { pullToRefreshState.distanceFraction == 0f }
@@ -76,22 +75,31 @@ fun ArtistsScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
         topBar = {
-            ArtistsTopAppBar(onLogout, onBack, onAllAlbumsClick, topAppBarScrollBehavior)
+            Column {
+                ArtistsTopAppBar(onLogout, onBack, onAllAlbumsClick, topAppBarScrollBehavior)
+                if (loadingOrigin == LoadingOrigin.Automatic && artists.isNotEmpty()) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) {
         PullToRefreshBox(
             isRefreshing = isRefreshing,
-            onRefresh = {
-                refreshRequested = true
-                viewModel.retry()
-            },
+            onRefresh = viewModel::refresh,
             state = pullToRefreshState,
             enabled = isPullToRefreshEnabled,
+            indicator = {
+                PullToRefreshDefaults.LoadingIndicator(
+                    state = pullToRefreshState,
+                    isRefreshing = isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            },
             modifier = Modifier.fillMaxSize().padding(it),
         ) {
             when {
-                state is LoadableState.Loading && artists.isEmpty() -> LoadingContent()
+                state is LoadableState.Loading && artists.isEmpty() && !isRefreshing -> LoadingContent()
                 state is LoadableState.Failure && artists.isEmpty() ->
                     ErrorContent((state as LoadableState.Failure).error, viewModel::retry)
                 artists.isEmpty() -> EmptyContent()
@@ -213,14 +221,14 @@ fun ArtistRow(
 
 @Composable
 private fun LoadingContent() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
+        LoadingIndicator(Modifier.size(96.dp))
     }
 }
 
 @Composable
 private fun ErrorContent(error: AppError, onRetry: () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(Padding.large), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Padding.large), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(error.localizedMessage(), color = MaterialTheme.colorScheme.error)
             Spacer(Modifier.height(Padding.medium))
@@ -231,7 +239,7 @@ private fun ErrorContent(error: AppError, onRetry: () -> Unit) {
 
 @Composable
 private fun EmptyContent() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
         Text(stringResource(Res.string.artists_not_found))
     }
 }

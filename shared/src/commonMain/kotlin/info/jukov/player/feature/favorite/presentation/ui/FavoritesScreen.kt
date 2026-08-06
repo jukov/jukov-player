@@ -5,13 +5,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,6 +41,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import info.jukov.player.core.domain.AppError
@@ -43,7 +49,8 @@ import info.jukov.player.feature.album.presentation.ui.AlbumsGrid
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.artist.presentation.ui.ArtistRow
 import info.jukov.player.feature.artist.domain.Artist
-import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.feature.favorite.domain.Favorites
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.localizedMessage
@@ -56,6 +63,7 @@ import info.jukov.player.feature.track.presentation.ui.TracksList
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import info.jukov.player.core.presentation.LoadingOrigin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +79,7 @@ fun FavoritesScreen(
 ) {
     LaunchedEffect(viewModel) { viewModel.load() }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -81,10 +90,7 @@ fun FavoritesScreen(
         snackbarMessage?.let { snackbarHostState.showSnackbar(it) }
         snackbarError = null
     }
-    var refreshRequested by remember { mutableStateOf(false) }
-    LaunchedEffect(state) {
-        if (state !is LoadableState.Loading) refreshRequested = false
-    }
+    val isRefreshing = loadingOrigin == LoadingOrigin.PullToRefresh
     val refreshState = rememberPullToRefreshState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         canScroll = { refreshState.distanceFraction == 0f },
@@ -137,30 +143,30 @@ fun FavoritesScreen(
                         )
                     }
                 }
+                if (loadingOrigin == LoadingOrigin.Automatic && state.content?.isNotEmpty() == true) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { scaffoldPadding ->
         PullToRefreshBox(
-            isRefreshing = refreshRequested && state is LoadableState.Loading,
-            onRefresh = {
-                refreshRequested = true
-                viewModel.refresh()
-            },
+            isRefreshing = isRefreshing,
+            onRefresh = viewModel::refresh,
             state = refreshState,
             enabled = refreshEnabled,
             indicator = {
-                PullToRefreshDefaults.Indicator(
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    isRefreshing = refreshRequested && state is LoadableState.Loading,
+                PullToRefreshDefaults.LoadingIndicator(
                     state = refreshState,
+                    isRefreshing = isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
                 )
             },
             modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
         ) {
             val favorites = state.content
-            if (state is LoadableState.Loading && favorites == null) {
-                Centered { CircularProgressIndicator() }
+            if (state is LoadableState.Loading && favorites?.isEmpty() != false && !isRefreshing) {
+                Centered { LoadingIndicator(Modifier.size(96.dp)) }
             } else if (state is LoadableState.Failure && favorites == null) {
                 Centered {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -168,7 +174,7 @@ fun FavoritesScreen(
                             (state as LoadableState.Failure).error.localizedMessage(),
                             color = MaterialTheme.colorScheme.error,
                         )
-                        Button(onClick = viewModel::refresh) { Text(stringResource(Res.string.retry)) }
+                        Button(onClick = viewModel::retry) { Text(stringResource(Res.string.retry)) }
                     }
                 }
             } else {
@@ -252,12 +258,24 @@ private fun FavoritesTab.title(): String = when (this) {
     FavoritesTab.Artists -> stringResource(Res.string.artists)
 }
 
+private fun Favorites.isEmpty(): Boolean =
+    tracks.isEmpty() && albums.isEmpty() && artists.isEmpty()
+
+private fun Favorites.isNotEmpty(): Boolean = !isEmpty()
+
 @Composable
 private fun Empty(text: String, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text) }
+    Box(
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        contentAlignment = Alignment.Center,
+    ) { Text(text) }
 }
 
 @Composable
 private fun Centered(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center, content = { content() })
+    Box(
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        contentAlignment = Alignment.Center,
+        content = { content() },
+    )
 }

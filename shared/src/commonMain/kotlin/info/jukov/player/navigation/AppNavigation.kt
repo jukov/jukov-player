@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.savedstate.serialization.SavedStateConfiguration
 import androidx.navigation3.ui.NavDisplay
 import info.jukov.player.feature.artist.presentation.ui.ArtistsScreen
 import info.jukov.player.feature.album.presentation.ui.AlbumsScreen
@@ -28,6 +29,9 @@ import info.jukov.player.feature.track.presentation.ui.TracksScreen
 import info.jukov.player.feature.playback.presentation.ui.PlayerHost
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
 import info.jukov.player.feature.favorite.presentation.ui.FavoritesScreen
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
 
 @Composable
 fun AppNavigation(
@@ -42,7 +46,7 @@ fun AppNavigation(
         AuthState.LoggedOut -> Routes.Login
         is AuthState.LoggedIn -> Routes.Library
     }
-    val backStack = rememberNavBackStack(destination)
+    val backStack = rememberNavBackStack(NAV_SAVED_STATE_CONFIGURATION, destination)
 
     LaunchedEffect(destination) {
         if (backStack.lastOrNull() != destination) {
@@ -148,6 +152,19 @@ fun AppNavigation(
             PlayerHost(viewModel = playerViewModel, content = navigationContent)
         } else {
             navigationContent()
+        }
+    }
+}
+
+private val NAV_SAVED_STATE_CONFIGURATION = SavedStateConfiguration {
+    serializersModule = SerializersModule {
+        polymorphic(NavKey::class) {
+            subclass(Routes.Login.serializer())
+            subclass(Routes.Library.serializer())
+            subclass(Routes.Favorites.serializer())
+            subclass(Routes.Artists.serializer())
+            subclass(Routes.Albums.serializer())
+            subclass(Routes.Tracks.serializer())
         }
     }
 }
