@@ -48,9 +48,9 @@ import info.jukov.player.feature.favorite.presentation.FavoritesTab
 import info.jukov.player.feature.favorite.presentation.FavoritesViewModel
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.presentation.ui.TracksList
-import jukovplayer.shared.generated.resources.Res
-import jukovplayer.shared.generated.resources.arrow_back
+import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,13 +103,13 @@ fun FavoritesScreen(
         topBar = {
             Column {
                 AppFlexibleTopAppBar(
-                    title = "Избранное",
+                    title = stringResource(Res.string.favorites),
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(
                                 painterResource(Res.drawable.arrow_back),
-                                contentDescription = "Назад",
+                                contentDescription = stringResource(Res.string.back),
                             )
                         }
                     },
@@ -122,7 +122,7 @@ fun FavoritesScreen(
                         Tab(
                             selected = tab == selectedTab,
                             onClick = { viewModel.selectTab(tab) },
-                            text = { Text(tab.title) },
+                            text = { Text(tab.title()) },
                         )
                     }
                 }
@@ -157,7 +157,7 @@ fun FavoritesScreen(
                             (state as LoadableState.Failure).message,
                             color = MaterialTheme.colorScheme.error,
                         )
-                        Button(onClick = viewModel::refresh) { Text("Повторить") }
+                        Button(onClick = viewModel::refresh) { Text(stringResource(Res.string.retry)) }
                     }
                 }
             } else {
@@ -169,7 +169,7 @@ fun FavoritesScreen(
                 ) { page ->
                     when (FavoritesTab.entries[page]) {
                         FavoritesTab.Tracks -> if (content.tracks.isEmpty()) {
-                            Empty("Нет избранных треков")
+                            Empty(stringResource(Res.string.no_favorite_tracks))
                         } else TracksList(
                             tracks = content.tracks,
                             error = (state as? LoadableState.Failure)?.message,
@@ -188,7 +188,7 @@ fun FavoritesScreen(
                             modifier = Modifier,
                         )
                         FavoritesTab.Albums -> if (content.albums.isEmpty()) {
-                            Empty("Нет избранных альбомов")
+                            Empty(stringResource(Res.string.no_favorite_albums))
                         } else AlbumsGrid(
                             albums = content.albums,
                             error = (state as? LoadableState.Failure)?.message,
@@ -205,7 +205,7 @@ fun FavoritesScreen(
                             modifier = Modifier,
                         )
                         FavoritesTab.Artists -> if (content.artists.isEmpty()) {
-                            Empty("Нет избранных исполнителей")
+                            Empty(stringResource(Res.string.no_favorite_artists))
                         } else LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(vertical = Padding.small),
@@ -233,10 +233,11 @@ fun FavoritesScreen(
 }
 
 
-private val FavoritesTab.title: String get() = when (this) {
-    FavoritesTab.Tracks -> "Треки"
-    FavoritesTab.Albums -> "Альбомы"
-    FavoritesTab.Artists -> "Артисты"
+@Composable
+private fun FavoritesTab.title(): String = when (this) {
+    FavoritesTab.Tracks -> stringResource(Res.string.tracks)
+    FavoritesTab.Albums -> stringResource(Res.string.albums)
+    FavoritesTab.Artists -> stringResource(Res.string.artists)
 }
 
 @Composable

@@ -26,10 +26,9 @@ import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
-import jukovplayer.shared.generated.resources.Res
-import jukovplayer.shared.generated.resources.arrow_back
-import jukovplayer.shared.generated.resources.more_vert
+import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,13 +110,13 @@ private fun ArtistsTopAppBar(
     var menuExpanded by remember { mutableStateOf(false) }
 
     AppFlexibleTopAppBar(
-        title = "Исполнители",
+        title = stringResource(Res.string.artists),
         scrollBehavior = scrollBehavior,
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(
                     painter = painterResource(Res.drawable.arrow_back),
-                    contentDescription = "Назад",
+                    contentDescription = stringResource(Res.string.back),
                 )
             }
         },
@@ -127,7 +126,7 @@ private fun ArtistsTopAppBar(
             ) {
                 Icon(
                     painter = painterResource(Res.drawable.more_vert),
-                    contentDescription = "Ещё",
+                    contentDescription = stringResource(Res.string.more),
                 )
             }
             DropdownMenu(
@@ -135,14 +134,14 @@ private fun ArtistsTopAppBar(
                 onDismissRequest = { menuExpanded = false },
             ) {
                 DropdownMenuItem(
-                    text = { Text("Все альбомы") },
+                    text = { Text(stringResource(Res.string.all_albums)) },
                     onClick = {
                         menuExpanded = false
                         onAllAlbumsClick()
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Выйти") },
+                    text = { Text(stringResource(Res.string.sign_out)) },
                     onClick = {
                         menuExpanded = false
                         onLogout()
@@ -196,7 +195,7 @@ fun ArtistRow(
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         headlineContent = { Text(artist.name, fontWeight = FontWeight.Medium) },
-        supportingContent = { Text("Альбомы: ${artist.albumCount}") },
+        supportingContent = { Text(stringResource(Res.string.albums_count, artist.albumCount)) },
         trailingContent = {
             FavoriteToggleButton(artist.isFavorite, onFavoriteClick, favoriteEnabled)
         },
@@ -216,7 +215,7 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(message, color = MaterialTheme.colorScheme.error)
             Spacer(Modifier.height(Padding.medium))
-            Button(onClick = onRetry) { Text("Повторить") }
+            Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
         }
     }
 }
@@ -224,6 +223,6 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 @Composable
 private fun EmptyContent() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Исполнители не найдены")
+        Text(stringResource(Res.string.artists_not_found))
     }
 }

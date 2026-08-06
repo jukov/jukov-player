@@ -43,11 +43,9 @@ import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.feature.track.presentation.TracksViewModel
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
-import jukovplayer.shared.generated.resources.Res
-import jukovplayer.shared.generated.resources.arrow_back
-import jukovplayer.shared.generated.resources.pause
-import jukovplayer.shared.generated.resources.play_arrow
+import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,13 +70,13 @@ fun TracksScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             AppFlexibleTopAppBar(
-                title = "Треки",
+                title = stringResource(Res.string.tracks),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             painter = painterResource(Res.drawable.arrow_back),
-                            contentDescription = "Назад",
+                            contentDescription = stringResource(Res.string.back),
                         )
                     }
                 },
@@ -100,7 +98,7 @@ fun TracksScreen(
                 modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Треки не найдены")
+                Text(stringResource(Res.string.tracks_not_found))
             }
 
             else -> TracksList(
@@ -182,7 +180,7 @@ fun TrackRow(
             track.coverArtUrl?.let { url ->
                 AsyncImage(
                     model = url,
-                    contentDescription = "Обложка ${track.title}",
+                    contentDescription = stringResource(Res.string.track_cover, track.title),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
@@ -208,7 +206,9 @@ fun TrackRow(
                 painter = painterResource(
                     if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow,
                 ),
-                contentDescription = if (isPlaying) "Пауза" else "Воспроизвести",
+                contentDescription = stringResource(
+                    if (isPlaying) Res.string.pause else Res.string.play,
+                ),
             )
         }
     }
@@ -230,7 +230,7 @@ private fun CenteredError(
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(message, color = MaterialTheme.colorScheme.error)
-            Button(onClick = onRetry) { Text("Повторить") }
+            Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
         }
     }
 }

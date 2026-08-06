@@ -43,15 +43,10 @@ import coil3.compose.AsyncImage
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.feature.playback.presentation.PlayerUiState
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
-import jukovplayer.shared.generated.resources.Res
-import jukovplayer.shared.generated.resources.pause
-import jukovplayer.shared.generated.resources.play_arrow
-import jukovplayer.shared.generated.resources.repeat
-import jukovplayer.shared.generated.resources.shuffle
-import jukovplayer.shared.generated.resources.skip_next
-import jukovplayer.shared.generated.resources.skip_previous
+import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,7 +103,7 @@ private fun MiniPlayer(
     ) {
         Artwork(
             url = track.coverArtUrl,
-            description = "Обложка ${track.title}",
+            description = stringResource(Res.string.track_cover, track.title),
             modifier = Modifier.size(48.dp),
         )
         Column(
@@ -151,7 +146,7 @@ private fun FullPlayer(
     ) {
         Artwork(
             url = track.coverArtUrl,
-            description = "Обложка ${track.title}",
+            description = stringResource(Res.string.track_cover, track.title),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).aspectRatio(1f),
         )
         Spacer(Modifier.height(20.dp))
@@ -202,14 +197,14 @@ private fun FullPlayer(
         ) {
             PlayerIconButton(
                 resource = Res.drawable.skip_previous,
-                description = "Предыдущий трек",
+                description = stringResource(Res.string.previous_track),
                 enabled = snapshot.hasPrevious,
                 onClick = viewModel::previous,
             )
             PlayPauseButton(snapshot.isPlaying, viewModel::playPause, Modifier.size(64.dp))
             PlayerIconButton(
                 resource = Res.drawable.skip_next,
-                description = "Следующий трек",
+                description = stringResource(Res.string.next_track),
                 enabled = snapshot.hasNext,
                 onClick = viewModel::next,
             )
@@ -218,8 +213,18 @@ private fun FullPlayer(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            PlayerIconButton(Res.drawable.shuffle, "Перемешать", enabled = false, onClick = {})
-            PlayerIconButton(Res.drawable.repeat, "Повтор", enabled = false, onClick = {})
+            PlayerIconButton(
+                Res.drawable.shuffle,
+                stringResource(Res.string.shuffle),
+                enabled = false,
+                onClick = {},
+            )
+            PlayerIconButton(
+                Res.drawable.repeat,
+                stringResource(Res.string.repeat),
+                enabled = false,
+                onClick = {},
+            )
         }
     }
 }
@@ -242,7 +247,7 @@ private fun Artwork(url: String?, description: String, modifier: Modifier = Modi
 private fun PlayPauseButton(isPlaying: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     PlayerIconButton(
         resource = if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow,
-        description = if (isPlaying) "Пауза" else "Воспроизвести",
+        description = stringResource(if (isPlaying) Res.string.pause else Res.string.play),
         onClick = onClick,
         modifier = modifier,
     )

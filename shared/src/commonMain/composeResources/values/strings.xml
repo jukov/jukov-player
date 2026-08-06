@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">Jukov Player</string>
+    <string name="login_subtitle">Connect to your Subsonic server</string>
+    <string name="server">Server</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="sign_in">Sign in</string>
+
+    <string name="library">Library</string>
+    <string name="favorites">Favorites</string>
+    <string name="playlists">Playlists</string>
+    <string name="tracks">Tracks</string>
+    <string name="artists">Artists</string>
+    <string name="albums">Albums</string>
+    <string name="downloads">Downloads</string>
+
+    <string name="back">Back</string>
+    <string name="more">More</string>
+    <string name="retry">Retry</string>
+    <string name="all_albums">All albums</string>
+    <string name="sign_out">Sign out</string>
+    <string name="albums_count">Albums: %1$d</string>
+    <string name="artists_not_found">No artists found</string>
+    <string name="albums_not_found">No albums found</string>
+    <string name="tracks_not_found">No tracks found</string>
+    <string name="no_favorite_tracks">No favorite tracks</string>
+    <string name="no_favorite_albums">No favorite albums</string>
+    <string name="no_favorite_artists">No favorite artists</string>
+
+    <string name="album_cover">Cover of album %1$s</string>
+    <string name="track_cover">Cover of %1$s</string>
+    <string name="no_cover">No cover</string>
+    <string name="previous_track">Previous track</string>
+    <string name="next_track">Next track</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat">Repeat</string>
+    <string name="pause">Pause</string>
+    <string name="play">Play</string>
+    <string name="remove_from_favorites">Remove from favorites</string>
+    <string name="add_to_favorites">Add to favorites</string>
+</resources>

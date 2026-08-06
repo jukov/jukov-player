@@ -13,6 +13,8 @@ import info.jukov.player.feature.auth.presentation.AuthUiState
 import info.jukov.player.feature.auth.presentation.AuthViewModel
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.Padding
+import jukovplayer.shared.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
@@ -25,12 +27,12 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
             modifier = Modifier.widthIn(max = 440.dp),
             verticalArrangement = Arrangement.spacedBy(Padding.medium),
         ) {
-            Text("Jukov Player", style = MaterialTheme.typography.headlineLarge)
-            Text("Подключитесь к своему Subsonic-серверу", style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.headlineLarge)
+            Text(stringResource(Res.string.login_subtitle), style = MaterialTheme.typography.bodyLarge)
             OutlinedTextField(
                 value = state.server,
                 onValueChange = viewModel::setServer,
-                label = { Text("Сервер") },
+                label = { Text(stringResource(Res.string.server)) },
                 placeholder = { Text("https://example.com") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 enabled = !isLoading,
@@ -40,7 +42,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
             OutlinedTextField(
                 value = state.username,
                 onValueChange = viewModel::setUsername,
-                label = { Text("Логин") },
+                label = { Text(stringResource(Res.string.username)) },
                 enabled = !isLoading,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -48,7 +50,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
             OutlinedTextField(
                 value = state.password,
                 onValueChange = viewModel::setPassword,
-                label = { Text("Пароль") },
+                label = { Text(stringResource(Res.string.password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 enabled = !isLoading,
@@ -66,7 +68,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 if (isLoading) {
                     CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("Войти")
+                    Text(stringResource(Res.string.sign_in))
                 }
             }
         }

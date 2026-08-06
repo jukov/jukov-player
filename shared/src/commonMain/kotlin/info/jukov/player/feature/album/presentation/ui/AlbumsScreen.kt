@@ -27,9 +27,9 @@ import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
-import jukovplayer.shared.generated.resources.Res
-import jukovplayer.shared.generated.resources.arrow_back
+import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,13 +64,13 @@ fun AlbumsScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             AppFlexibleTopAppBar(
-                title = "Альбомы",
+                title = stringResource(Res.string.albums),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             painter = painterResource(Res.drawable.arrow_back),
-                            contentDescription = "Назад",
+                            contentDescription = stringResource(Res.string.back),
                         )
                     }
                 },
@@ -102,7 +102,7 @@ fun AlbumsScreen(
                     onRetry = viewModel::retry,
                 )
                 albums.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Альбомы не найдены")
+                    Text(stringResource(Res.string.albums_not_found))
                 }
                 else -> AlbumsGrid(
                     albums = albums,
@@ -167,12 +167,12 @@ fun AlbumCard(
             if (album.coverArtUrl != null) {
                 AsyncImage(
                     model = album.coverArtUrl,
-                    contentDescription = "Обложка альбома ${album.name}",
+                    contentDescription = stringResource(Res.string.album_cover, album.name),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
             } else {
-                Text("Нет обложки", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(Res.string.no_cover), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(Modifier.height(Padding.small))
@@ -209,7 +209,7 @@ private fun CenteredError(message: String, onRetry: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(message, color = MaterialTheme.colorScheme.error)
             Spacer(Modifier.height(Padding.medium))
-            Button(onClick = onRetry) { Text("Повторить") }
+            Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
         }
     }
 }

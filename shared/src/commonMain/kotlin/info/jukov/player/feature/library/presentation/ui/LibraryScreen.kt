@@ -19,15 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
-import jukovplayer.shared.generated.resources.Res
-import jukovplayer.shared.generated.resources.account_multiple
-import jukovplayer.shared.generated.resources.album
-import jukovplayer.shared.generated.resources.download_circle
-import jukovplayer.shared.generated.resources.heart
-import jukovplayer.shared.generated.resources.music_box_multiple
-import jukovplayer.shared.generated.resources.playlist_music
+import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 
 private data class LibraryItem(
     val title: String,
@@ -44,12 +39,12 @@ fun LibraryScreen(
     onAlbumsClick: () -> Unit,
 ) {
     val items = listOf(
-        LibraryItem("Избранное", Res.drawable.heart, onFavoritesClick),
-        LibraryItem("Плейлисты", Res.drawable.playlist_music),
-        LibraryItem("Треки", Res.drawable.music_box_multiple, onTracksClick),
-        LibraryItem("Артисты", Res.drawable.account_multiple, onArtistsClick),
-        LibraryItem("Альбомы", Res.drawable.album, onAlbumsClick),
-        LibraryItem("Загрузки", Res.drawable.download_circle),
+        LibraryItem(stringResource(Res.string.favorites), Res.drawable.heart, onFavoritesClick),
+        LibraryItem(stringResource(Res.string.playlists), Res.drawable.playlist_music),
+        LibraryItem(stringResource(Res.string.tracks), Res.drawable.music_box_multiple, onTracksClick),
+        LibraryItem(stringResource(Res.string.artists), Res.drawable.account_multiple, onArtistsClick),
+        LibraryItem(stringResource(Res.string.albums), Res.drawable.album, onAlbumsClick),
+        LibraryItem(stringResource(Res.string.downloads), Res.drawable.download_circle),
     )
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -57,7 +52,7 @@ fun LibraryScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             AppFlexibleTopAppBar(
-                title = "Библиотека",
+                title = stringResource(Res.string.library),
                 scrollBehavior = scrollBehavior,
             )
         },

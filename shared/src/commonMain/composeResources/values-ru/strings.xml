@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">Jukov Player</string>
+    <string name="login_subtitle">Подключитесь к своему Subsonic-серверу</string>
+    <string name="server">Сервер</string>
+    <string name="username">Логин</string>
+    <string name="password">Пароль</string>
+    <string name="sign_in">Войти</string>
+
+    <string name="library">Библиотека</string>
+    <string name="favorites">Избранное</string>
+    <string name="playlists">Плейлисты</string>
+    <string name="tracks">Треки</string>
+    <string name="artists">Артисты</string>
+    <string name="albums">Альбомы</string>
+    <string name="downloads">Загрузки</string>
+
+    <string name="back">Назад</string>
+    <string name="more">Ещё</string>
+    <string name="retry">Повторить</string>
+    <string name="all_albums">Все альбомы</string>
+    <string name="sign_out">Выйти</string>
+    <string name="albums_count">Альбомы: %1$d</string>
+    <string name="artists_not_found">Исполнители не найдены</string>
+    <string name="albums_not_found">Альбомы не найдены</string>
+    <string name="tracks_not_found">Треки не найдены</string>
+    <string name="no_favorite_tracks">Нет избранных треков</string>
+    <string name="no_favorite_albums">Нет избранных альбомов</string>
+    <string name="no_favorite_artists">Нет избранных исполнителей</string>
+
+    <string name="album_cover">Обложка альбома %1$s</string>
+    <string name="track_cover">Обложка %1$s</string>
+    <string name="no_cover">Нет обложки</string>
+    <string name="previous_track">Предыдущий трек</string>
+    <string name="next_track">Следующий трек</string>
+    <string name="shuffle">Перемешать</string>
+    <string name="repeat">Повтор</string>
+    <string name="pause">Пауза</string>
+    <string name="play">Воспроизвести</string>
+    <string name="remove_from_favorites">Удалить из избранного</string>
+    <string name="add_to_favorites">Добавить в избранное</string>
+</resources>
