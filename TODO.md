@@ -1,4 +1,5 @@
-- Add inset padding to player row
 - Extract features to /feature package
 - Back press screen animation
 - Localization
+- Reuse same artworks
+- Show play indicator on playing artist/album/track
