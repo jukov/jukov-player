@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
+import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -61,7 +62,7 @@ fun LibraryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(scaffoldPadding),
-            contentPadding = PaddingValues(vertical = Padding.small),
+            contentPadding = PaddingValues(vertical = Padding.small).withPlayerBottomInset(),
             verticalArrangement = Arrangement.spacedBy(Padding.small),
         ) {
             items(items, key = LibraryItem::title) { item ->

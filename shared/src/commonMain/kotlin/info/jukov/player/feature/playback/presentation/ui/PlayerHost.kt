@@ -25,6 +25,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -43,6 +44,7 @@ import coil3.compose.AsyncImage
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.localizedMessage
+import info.jukov.player.core.presentation.ui.LocalPlayerBottomInset
 import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.LARGE_ARTWORK_SIZE
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
@@ -63,16 +65,25 @@ fun PlayerHost(
     val snapshot = loadable.content ?: PlayerUiState()
     var showPlayer by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f)) { content() }
+    Box(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(
+            LocalPlayerBottomInset provides if (snapshot.currentTrack != null) {
+                MINI_PLAYER_CONTENT_INSET
+            } else {
+                0.dp
+            },
+        ) {
+            content()
+        }
         if (snapshot.currentTrack != null) {
             MiniPlayer(
                 snapshot = snapshot,
                 onOpen = { showPlayer = true },
                 onPlayPause = viewModel::playPause,
                 modifier = Modifier
+                    .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = MINI_PLAYER_VERTICAL_PADDING),
             )
         }
     }
@@ -88,6 +99,10 @@ fun PlayerHost(
     }
 }
 
+private val MINI_PLAYER_HEIGHT = 64.dp
+private val MINI_PLAYER_VERTICAL_PADDING = 8.dp
+private val MINI_PLAYER_CONTENT_INSET = MINI_PLAYER_HEIGHT + MINI_PLAYER_VERTICAL_PADDING * 2
+
 @Composable
 private fun MiniPlayer(
     snapshot: PlayerUiState,
@@ -99,7 +114,7 @@ private fun MiniPlayer(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(64.dp)
+            .height(MINI_PLAYER_HEIGHT)
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onOpen)

@@ -28,6 +28,7 @@ import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import info.jukov.player.core.presentation.ui.localizedMessage
+import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -177,7 +178,7 @@ fun ArtistsContent(
         }
         LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = Padding.small),
+                contentPadding = PaddingValues(vertical = Padding.small).withPlayerBottomInset(),
                 verticalArrangement = Arrangement.spacedBy(Padding.xSmall),
             ) {
                 items(artists, key = { it.id }) { artist ->

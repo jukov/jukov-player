@@ -59,6 +59,7 @@ import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.feature.track.presentation.TracksViewModel
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import info.jukov.player.core.presentation.ui.localizedMessage
+import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import jukovplayer.shared.generated.resources.*
@@ -383,7 +384,8 @@ fun TracksList(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(Padding.small),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(Padding.small)
+            .withPlayerBottomInset(),
         verticalArrangement = Arrangement.spacedBy(Padding.small),
     ) {
         error?.let { message ->

@@ -47,6 +47,7 @@ import info.jukov.player.core.presentation.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.localizedMessage
+import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.presentation.FavoritesTab
 import info.jukov.player.feature.favorite.presentation.FavoritesViewModel
@@ -218,7 +219,8 @@ fun FavoritesScreen(
                             Empty(stringResource(Res.string.no_favorite_artists))
                         } else LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(vertical = Padding.small),
+                            contentPadding = PaddingValues(vertical = Padding.small)
+                                .withPlayerBottomInset(),
                             verticalArrangement = Arrangement.spacedBy(Padding.xSmall),
                         ) {
                             items(content.artists, key = { it.id }) { artist ->

@@ -31,6 +31,7 @@ import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import info.jukov.player.core.presentation.ui.localizedMessage
 import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.LARGE_ARTWORK_SIZE
+import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -141,7 +142,7 @@ fun AlbumsGrid(
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 180.dp),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(Padding.small),
+        contentPadding = PaddingValues(Padding.small).withPlayerBottomInset(),
         horizontalArrangement = Arrangement.spacedBy(Padding.small),
         verticalArrangement = Arrangement.spacedBy(Padding.medium),
     ) {
