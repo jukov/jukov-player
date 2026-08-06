@@ -4,7 +4,7 @@ import android.app.Application
 import info.jukov.player.di.AppGraph
 import info.jukov.player.di.AndroidAppGraphOwner
 import info.jukov.player.di.createAppGraph
-import info.jukov.player.playback.AndroidPlaybackControllerFactory
+import info.jukov.player.feature.playback.AndroidPlaybackControllerFactory
 
 class JukovApplication : Application(), AndroidAppGraphOwner {
     override lateinit var graph: AppGraph

@@ -25,7 +25,7 @@
         </activity>
 
         <service
-            android:name="info.jukov.player.playback.PlaybackService"
+            android:name="info.jukov.player.feature.playback.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
@@ -35,7 +35,7 @@
         </service>
 
         <receiver
-            android:name="info.jukov.player.playback.PlaybackMediaButtonReceiver"
+            android:name="info.jukov.player.feature.playback.PlaybackMediaButtonReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />

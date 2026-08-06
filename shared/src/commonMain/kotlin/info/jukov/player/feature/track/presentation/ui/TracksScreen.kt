@@ -1,0 +1,236 @@
+package info.jukov.player.feature.track.presentation.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
+import info.jukov.player.core.presentation.LoadableState
+import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
+import info.jukov.player.core.presentation.ui.Padding
+import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.track.domain.TracksFilter
+import info.jukov.player.feature.track.presentation.TracksViewModel
+import info.jukov.player.core.presentation.ui.FavoriteToggleButton
+import jukovplayer.shared.generated.resources.Res
+import jukovplayer.shared.generated.resources.arrow_back
+import jukovplayer.shared.generated.resources.pause
+import jukovplayer.shared.generated.resources.play_arrow
+import org.jetbrains.compose.resources.painterResource
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TracksScreen(
+    filter: TracksFilter,
+    viewModel: TracksViewModel,
+    onBack: () -> Unit,
+    onPlayClick: (List<Track>, Int) -> Unit = { _, _ -> },
+    onActiveTrackClick: () -> Unit = {},
+    activeTrackId: String? = null,
+    isPlaying: Boolean = false,
+) {
+    LaunchedEffect(filter) { viewModel.load(filter) }
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val pending by viewModel.pending.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarHostState.showSnackbar(it) } }
+    val tracks = state.content.orEmpty()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            AppFlexibleTopAppBar(
+                title = "Треки",
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            painter = painterResource(Res.drawable.arrow_back),
+                            contentDescription = "Назад",
+                        )
+                    }
+                },
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { scaffoldPadding ->
+        when {
+            state is LoadableState.Loading && tracks.isEmpty() ->
+                CenteredLoading(Modifier.padding(scaffoldPadding))
+
+            state is LoadableState.Failure && tracks.isEmpty() -> CenteredError(
+                message = (state as LoadableState.Failure).message,
+                onRetry = viewModel::retry,
+                modifier = Modifier.padding(scaffoldPadding),
+            )
+
+            tracks.isEmpty() -> Box(
+                modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Треки не найдены")
+            }
+
+            else -> TracksList(
+                tracks = tracks,
+                error = (state as? LoadableState.Failure)?.message,
+                onPlayClick = onPlayClick,
+                onActiveTrackClick = onActiveTrackClick,
+                activeTrackId = activeTrackId,
+                isPlaying = isPlaying,
+                pendingIds = pending,
+                onFavoriteClick = viewModel::toggleFavorite,
+                modifier = Modifier.padding(scaffoldPadding),
+            )
+        }
+    }
+}
+
+@Composable
+fun TracksList(
+    tracks: List<Track>,
+    error: String?,
+    onPlayClick: (List<Track>, Int) -> Unit,
+    onActiveTrackClick: () -> Unit,
+    activeTrackId: String?,
+    isPlaying: Boolean,
+    pendingIds: Set<String> = emptySet(),
+    onFavoriteClick: (Track) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(Padding.small),
+        verticalArrangement = Arrangement.spacedBy(Padding.small),
+    ) {
+        error?.let { message ->
+            item { Text(message, color = MaterialTheme.colorScheme.error) }
+        }
+        itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+            TrackRow(
+                track = track,
+                onPlayClick = {
+                    if (track.id == activeTrackId) onActiveTrackClick()
+                    else onPlayClick(tracks, index)
+                },
+                isPlaying = track.id == activeTrackId && isPlaying,
+                favoriteEnabled = track.id !in pendingIds,
+                onFavoriteClick = { onFavoriteClick(track) },
+            )
+        }
+    }
+}
+
+@Composable
+fun TrackRow(
+    track: Track,
+    onPlayClick: () -> Unit,
+    isPlaying: Boolean,
+    favoriteEnabled: Boolean = true,
+    onFavoriteClick: () -> Unit = {},
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = Padding.small, vertical = Padding.xSmall),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = track.trackNumber?.toString().orEmpty(),
+            modifier = Modifier.width(28.dp),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(MaterialTheme.colorScheme.surface),
+            contentAlignment = Alignment.Center,
+        ) {
+            track.coverArtUrl?.let { url ->
+                AsyncImage(
+                    model = url,
+                    contentDescription = "Обложка ${track.title}",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
+        }
+        Spacer(Modifier.width(Padding.medium))
+        Column(Modifier.weight(1f)) {
+            Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = track.artist,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        FavoriteToggleButton(
+            isFavorite = track.isFavorite,
+            onClick = onFavoriteClick,
+            enabled = favoriteEnabled,
+        )
+        IconButton(onClick = onPlayClick) {
+            Icon(
+                painter = painterResource(
+                    if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow,
+                ),
+                contentDescription = if (isPlaying) "Пауза" else "Воспроизвести",
+            )
+        }
+    }
+}
+
+@Composable
+private fun CenteredLoading(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun CenteredError(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(message, color = MaterialTheme.colorScheme.error)
+            Button(onClick = onRetry) { Text("Повторить") }
+        }
+    }
+}

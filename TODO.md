@@ -1,4 +1,3 @@
-- Extract features to /feature package
 - Back press screen animation
 - Localization
 - Reuse same artworks

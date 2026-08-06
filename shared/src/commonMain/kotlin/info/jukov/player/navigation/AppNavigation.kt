@@ -12,18 +12,18 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
-import info.jukov.player.artist.presentation.ui.ArtistsScreen
-import info.jukov.player.album.presentation.ui.AlbumsScreen
-import info.jukov.player.auth.domain.AuthState
-import info.jukov.player.auth.presentation.AuthViewModel
-import info.jukov.player.auth.presentation.ui.LoginScreen
+import info.jukov.player.feature.artist.presentation.ui.ArtistsScreen
+import info.jukov.player.feature.album.presentation.ui.AlbumsScreen
+import info.jukov.player.feature.auth.domain.AuthState
+import info.jukov.player.feature.auth.presentation.AuthViewModel
+import info.jukov.player.feature.auth.presentation.ui.LoginScreen
 import info.jukov.player.di.AppGraph
-import info.jukov.player.library.presentation.ui.LibraryScreen
-import info.jukov.player.track.domain.TracksFilter
-import info.jukov.player.track.presentation.ui.TracksScreen
-import info.jukov.player.playback.presentation.ui.PlayerHost
-import info.jukov.player.playback.presentation.PlayerViewModel
-import info.jukov.player.favorite.presentation.ui.FavoritesScreen
+import info.jukov.player.feature.library.presentation.ui.LibraryScreen
+import info.jukov.player.feature.track.domain.TracksFilter
+import info.jukov.player.feature.track.presentation.ui.TracksScreen
+import info.jukov.player.feature.playback.presentation.ui.PlayerHost
+import info.jukov.player.feature.playback.presentation.PlayerViewModel
+import info.jukov.player.feature.favorite.presentation.ui.FavoritesScreen
 
 @Composable
 fun AppNavigation(
