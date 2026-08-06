@@ -1,4 +1,3 @@
-- Status bar color
 - Add inset padding to player row
 - Extract features to /feature package
 - Back press screen animation
