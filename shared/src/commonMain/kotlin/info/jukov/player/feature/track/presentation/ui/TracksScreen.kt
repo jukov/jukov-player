@@ -141,7 +141,7 @@ fun TracksScreen(
             Column {
                 if (albumHeader == null) {
                     AppFlexibleTopAppBar(
-                        title = stringResource(Res.string.tracks),
+                        title = artistName ?: stringResource(Res.string.tracks),
                         scrollBehavior = scrollBehavior,
                         navigationIcon = { BackButton(onBack) },
                     )

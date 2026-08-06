@@ -1,5 +1,4 @@
 - Show play indicator on playing artist/album/track
-- Show content under mini player
 - Load track on device
 - Paging for data
 - Queue

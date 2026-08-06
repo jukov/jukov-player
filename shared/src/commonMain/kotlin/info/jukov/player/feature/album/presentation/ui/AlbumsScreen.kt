@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,6 +49,7 @@ fun AlbumsScreen(
     viewModel: AlbumsViewModel,
     onBack: () -> Unit,
     onAlbumClick: (Album) -> Unit,
+    onAllTracksClick: () -> Unit,
 ) {
     LaunchedEffect(artistId) { viewModel.load(artistId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -82,7 +85,10 @@ fun AlbumsScreen(
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.back))
+                            Icon(
+                                painterResource(Res.drawable.arrow_back),
+                                stringResource(Res.string.back)
+                            )
                         }
                     },
                 )
@@ -113,12 +119,14 @@ fun AlbumsScreen(
                     error = (state as LoadableState.Failure).error,
                     onRetry = viewModel::retry,
                 )
-                albums.isEmpty() -> Box(
+
+                albums.isEmpty() && artistId == null -> Box(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(stringResource(Res.string.albums_not_found))
                 }
+
                 else -> AlbumsGrid(
                     albums = albums,
                     error = (state as? LoadableState.Failure)?.error,
@@ -126,6 +134,8 @@ fun AlbumsScreen(
                     onAlbumClick = onAlbumClick,
                     pendingIds = pending,
                     onFavoriteClick = viewModel::toggleFavorite,
+                    onAllTracksClick = onAllTracksClick.takeIf { artistId != null },
+                    showEmptyMessage = albums.isEmpty(),
                 )
             }
         }
@@ -140,6 +150,8 @@ fun AlbumsGrid(
     onAlbumClick: (Album) -> Unit,
     pendingIds: Set<String> = emptySet(),
     onFavoriteClick: (Album) -> Unit = {},
+    onAllTracksClick: (() -> Unit)? = null,
+    showEmptyMessage: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     LazyVerticalGrid(
@@ -147,12 +159,27 @@ fun AlbumsGrid(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Padding.small).withPlayerBottomInset(),
         horizontalArrangement = Arrangement.spacedBy(Padding.small),
-        verticalArrangement = Arrangement.spacedBy(Padding.medium),
+        verticalArrangement = Arrangement.spacedBy(Padding.small),
     ) {
+        onAllTracksClick?.let { onClick ->
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                AllTracksCard(onClick)
+            }
+        }
         error?.let {
-            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 TextButton(onClick = onRetry) {
                     Text(it.localizedMessage(), color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+        if (showEmptyMessage) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Padding.large),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(stringResource(Res.string.albums_not_found))
                 }
             }
         }
@@ -164,6 +191,24 @@ fun AlbumsGrid(
                 favoriteEnabled = album.id !in pendingIds,
             )
         }
+    }
+}
+
+@Composable
+private fun AllTracksCard(onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            text = stringResource(Res.string.all_tracks),
+            modifier = Modifier.fillMaxWidth()
+                .padding(vertical = Padding.medium, horizontal = Padding.large),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Start,
+        )
     }
 }
 
@@ -193,7 +238,10 @@ fun AlbumCard(
                     contentScale = ContentScale.Crop,
                 )
             } else {
-                Text(stringResource(Res.string.no_cover), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    stringResource(Res.string.no_cover),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
         Spacer(Modifier.height(Padding.small))

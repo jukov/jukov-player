@@ -18,6 +18,7 @@
     <string name="more">More</string>
     <string name="retry">Retry</string>
     <string name="all_albums">All albums</string>
+    <string name="all_tracks">All tracks</string>
     <string name="sign_out">Sign out</string>
     <string name="albums_count">Albums: %1$d</string>
     <string name="artists_not_found">No artists found</string>

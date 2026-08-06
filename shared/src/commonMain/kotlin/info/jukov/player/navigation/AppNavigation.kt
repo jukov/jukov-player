@@ -120,6 +120,16 @@ fun AppNavigation(
                         viewModel = albumsViewModel,
                         onBack = { backStack.removeLastOrNull() },
                         onAlbumClick = { album -> backStack.add(album.tracksRoute()) },
+                        onAllTracksClick = {
+                            route.artistId?.let { artistId ->
+                                backStack.add(
+                                    Routes.Tracks(
+                                        artistId = artistId,
+                                        artistName = route.artistName,
+                                    ),
+                                )
+                            }
+                        },
                     )
                 }
                 entry<Routes.Tracks> { route ->
