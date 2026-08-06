@@ -1,5 +1,9 @@
 package info.jukov.player.navigation
 
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -55,6 +59,9 @@ fun AppNavigation(
         val navigationContent: @Composable () -> Unit = {
             NavDisplay(
                 backStack = backStack,
+                transitionSpec = { navigationContentTransform() },
+                popTransitionSpec = { navigationContentTransform() },
+                predictivePopTransitionSpec = { navigationContentTransform() },
                 entryProvider = entryProvider {
                 entry<Routes.Login> {
                     LoginScreen(authUiState, authViewModel)
@@ -135,3 +142,10 @@ fun AppNavigation(
         }
     }
 }
+
+private const val NAVIGATION_ANIMATION_DURATION_MILLIS = 250
+
+private fun navigationContentTransform() = ContentTransform(
+    targetContentEnter = fadeIn(tween(NAVIGATION_ANIMATION_DURATION_MILLIS)),
+    initialContentExit = fadeOut(tween(NAVIGATION_ANIMATION_DURATION_MILLIS)),
+)
