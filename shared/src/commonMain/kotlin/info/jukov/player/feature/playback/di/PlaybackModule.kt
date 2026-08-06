@@ -10,6 +10,7 @@ import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackControllerFactory
 import kotlinx.serialization.json.Json
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
+import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 
 @BindingContainer
 object PlaybackModule {
@@ -25,6 +26,8 @@ object PlaybackModule {
     ): PlaybackController = factory.create(playbackStore)
 
     @Provides
-    fun providePlayerViewModel(controller: PlaybackController): PlayerViewModel =
-        PlayerViewModel(controller)
+    fun providePlayerViewModel(
+        controller: PlaybackController,
+        favoriteDelegate: FavoriteDelegate,
+    ): PlayerViewModel = PlayerViewModel(controller, favoriteDelegate)
 }
