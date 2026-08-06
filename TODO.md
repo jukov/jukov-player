@@ -5,3 +5,4 @@
 - Queue
 - Playlists
 - History
+- Cross links from album to artist, etc.добавь короче

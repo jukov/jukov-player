@@ -13,6 +13,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,7 +27,9 @@ import androidx.compose.material3.MaterialTheme
 import kotlin.math.roundToInt
 
 @Stable
-class AppCollapsingTopAppBarState internal constructor() {
+class AppCollapsingTopAppBarState internal constructor(
+    private val canScroll: () -> Boolean,
+) {
     var heightOffsetPx by mutableFloatStateOf(0f)
         private set
 
@@ -37,13 +40,13 @@ class AppCollapsingTopAppBarState internal constructor() {
 
     val nestedScrollConnection = object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
-            if (available.y < 0f) consume(available.y) else Offset.Zero
+            if (canScroll() && available.y < 0f) consume(available.y) else Offset.Zero
 
         override fun onPostScroll(
             consumed: Offset,
             available: Offset,
             source: NestedScrollSource,
-        ): Offset = if (available.y > 0f) consume(available.y) else Offset.Zero
+        ): Offset = if (canScroll() && available.y > 0f) consume(available.y) else Offset.Zero
     }
 
     internal fun updateCollapseRange(rangePx: Float) {
@@ -58,8 +61,12 @@ class AppCollapsingTopAppBarState internal constructor() {
 }
 
 @Composable
-fun rememberAppCollapsingTopAppBarState(): AppCollapsingTopAppBarState =
-    remember { AppCollapsingTopAppBarState() }
+fun rememberAppCollapsingTopAppBarState(
+    canScroll: () -> Boolean = { true },
+): AppCollapsingTopAppBarState {
+    val currentCanScroll by rememberUpdatedState(canScroll)
+    return remember { AppCollapsingTopAppBarState { currentCanScroll() } }
+}
 
 @Composable
 fun AppCollapsingTopAppBar(

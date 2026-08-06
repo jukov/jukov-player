@@ -34,6 +34,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -104,10 +105,32 @@ fun TracksScreen(
     val albumHeader = if (filter is TracksFilter.ByAlbum && albumName != null) {
         AlbumHeader(albumName, artistName.orEmpty(), coverArtUrl, filter.albumId)
     } else null
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val albumAppBarState = rememberAppCollapsingTopAppBarState()
     val pullToRefreshState = rememberPullToRefreshState()
+    val canScrollAppBar = remember(pullToRefreshState) {
+        { pullToRefreshState.distanceFraction == 0f }
+    }
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+        canScroll = canScrollAppBar,
+    )
+    val albumAppBarState = rememberAppCollapsingTopAppBarState(
+        canScroll = canScrollAppBar,
+    )
     val isRefreshing = loadingOrigin == LoadingOrigin.PullToRefresh
+    val isPullToRefreshEnabled by remember(
+        albumHeader,
+        albumAppBarState,
+        scrollBehavior,
+        pullToRefreshState,
+    ) {
+        derivedStateOf {
+            val isAppBarExpanded = if (albumHeader == null) {
+                scrollBehavior.state.collapsedFraction == 0f
+            } else {
+                albumAppBarState.collapsedFraction == 0f
+            }
+            isAppBarExpanded || pullToRefreshState.distanceFraction > 0f
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(
@@ -142,6 +165,7 @@ fun TracksScreen(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             state = pullToRefreshState,
+            enabled = isPullToRefreshEnabled,
             indicator = {
                 PullToRefreshDefaults.LoadingIndicator(
                     state = pullToRefreshState,
@@ -169,6 +193,7 @@ fun TracksScreen(
                 else -> TracksList(
                     tracks = tracks,
                     showArtwork = filter !is TracksFilter.ByAlbum,
+                    showTrackNumber = filter is TracksFilter.ByAlbum,
                     error = (state as? LoadableState.Failure)?.error,
                     onPlayClick = onPlayClick,
                     onActiveTrackClick = onActiveTrackClick,
@@ -385,6 +410,7 @@ private fun CollapsedAlbumTracksHeader(
 fun TracksList(
     tracks: List<Track>,
     showArtwork: Boolean = true,
+    showTrackNumber: Boolean = false,
     error: AppError?,
     onPlayClick: (List<Track>, Int) -> Unit,
     onActiveTrackClick: () -> Unit,
@@ -407,6 +433,7 @@ fun TracksList(
             TrackRow(
                 track = track,
                 showArtwork = showArtwork,
+                showTrackNumber = showTrackNumber,
                 onPlayClick = {
                     if (track.id == activeTrackId) onActiveTrackClick()
                     else onPlayClick(tracks, index)
@@ -423,6 +450,7 @@ fun TracksList(
 fun TrackRow(
     track: Track,
     showArtwork: Boolean = true,
+    showTrackNumber: Boolean = false,
     onPlayClick: () -> Unit,
     isPlaying: Boolean,
     favoriteEnabled: Boolean = true,
@@ -434,11 +462,13 @@ fun TrackRow(
             .padding(horizontal = Padding.small, vertical = Padding.xSmall),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = track.trackNumber?.toString().orEmpty(),
-            modifier = Modifier.width(28.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        if (showTrackNumber) {
+            Text(
+                text = track.trackNumber?.toString().orEmpty(),
+                modifier = Modifier.width(28.dp),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
         if (showArtwork) {
             Box(
                 modifier = Modifier
