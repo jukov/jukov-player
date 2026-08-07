@@ -1,4 +1,3 @@
-- Cross links from album to artist, etc.
 - Playlists
 - History
 - Load state

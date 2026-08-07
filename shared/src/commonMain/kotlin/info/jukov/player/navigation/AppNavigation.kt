@@ -188,6 +188,7 @@ fun AppNavigation(
                         filter = filter,
                         albumName = route.albumName,
                         artistName = route.artistName,
+                        albumArtistId = route.albumArtistId,
                         coverArtUrl = route.coverArtUrl,
                         coverArtId = route.coverArtId,
                         albumIsFavorite = route.albumIsFavorite,
@@ -199,13 +200,38 @@ fun AppNavigation(
                         isPlaying = playbackState.content?.isPlaying == true,
                         activeOrigin = playbackState.content?.origin ?: PlaybackOrigin.TrackList,
                         onAddToQueue = playerViewModel::addToQueue,
+                        onArtistClick = { artistId, artistName ->
+                            backStack.add(Routes.Albums(artistId, artistName))
+                        },
                     )
                 }
                 },
             )
         }
         if (authState is AuthState.LoggedIn) {
-            PlayerHost(viewModel = playerViewModel, content = navigationContent)
+            PlayerHost(
+                viewModel = playerViewModel,
+                onArtistClick = { track ->
+                    track.artistId?.let { artistId ->
+                        backStack.add(Routes.Albums(artistId, track.artist))
+                    }
+                },
+                onAlbumClick = { track ->
+                    track.albumId?.let { albumId ->
+                        backStack.add(
+                            Routes.Tracks(
+                                albumId = albumId,
+                                albumName = track.album,
+                                artistName = track.artist,
+                                albumArtistId = track.artistId,
+                                coverArtUrl = track.coverArtUrl,
+                                coverArtId = track.coverArtId,
+                            ),
+                        )
+                    }
+                },
+                content = navigationContent,
+            )
         } else {
             navigationContent()
         }
@@ -231,6 +257,7 @@ private fun info.jukov.player.feature.album.domain.Album.tracksRoute() = Routes.
     albumId = id,
     albumName = name,
     artistName = artist,
+    albumArtistId = artistId,
     coverArtUrl = coverArtUrl,
     coverArtId = coverArtId,
     albumIsFavorite = isFavorite,

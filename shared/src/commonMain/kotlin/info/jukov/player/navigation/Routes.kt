@@ -34,6 +34,7 @@ object Routes {
         val albumId: String? = null,
         val albumName: String? = null,
         val artistName: String? = null,
+        val albumArtistId: String? = null,
         val coverArtUrl: String? = null,
         val coverArtId: String? = null,
         val albumIsFavorite: Boolean = false,

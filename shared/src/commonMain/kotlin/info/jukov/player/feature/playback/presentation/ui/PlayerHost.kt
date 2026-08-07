@@ -67,6 +67,7 @@ import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.feature.playback.presentation.PlayerUiState
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
+import info.jukov.player.feature.track.domain.Track
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -77,6 +78,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun PlayerHost(
     viewModel: PlayerViewModel,
+    onArtistClick: (Track) -> Unit,
+    onAlbumClick: (Track) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val loadable by viewModel.state.collectAsStateWithLifecycle()
@@ -116,6 +119,18 @@ fun PlayerHost(
                     sheetOffset = { runCatching { sheetState.requireOffset() }.getOrNull() },
                     onExpand = { scope.launch { sheetState.expand() } },
                     onOpenQueue = { queueVisible = true },
+                    onArtistClick = { selectedTrack ->
+                        scope.launch {
+                            sheetState.partialExpand()
+                            onArtistClick(selectedTrack)
+                        }
+                    },
+                    onAlbumClick = { selectedTrack ->
+                        scope.launch {
+                            sheetState.partialExpand()
+                            onAlbumClick(selectedTrack)
+                        }
+                    },
                 )
             },
             modifier = Modifier.fillMaxSize(),
@@ -162,6 +177,8 @@ private fun PlayerSheetContent(
     sheetOffset: () -> Float?,
     onExpand: () -> Unit,
     onOpenQueue: () -> Unit,
+    onArtistClick: (Track) -> Unit,
+    onAlbumClick: (Track) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
@@ -181,6 +198,8 @@ private fun PlayerSheetContent(
             viewModel = viewModel,
             favoriteEnabled = favoriteEnabled,
             onOpenQueue = onOpenQueue,
+            onArtistClick = onArtistClick,
+            onAlbumClick = onAlbumClick,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = expansionProgress }
@@ -261,6 +280,8 @@ private fun FullPlayer(
     viewModel: PlayerViewModel,
     favoriteEnabled: Boolean,
     onOpenQueue: () -> Unit,
+    onArtistClick: (Track) -> Unit,
+    onAlbumClick: (Track) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val track = snapshot.currentTrack ?: return
@@ -291,14 +312,22 @@ private fun FullPlayer(
                 .clip(RoundedCornerShape(8.dp)),
         )
         Text(
-            track.title,
+            text = track.title,
+            modifier = Modifier.clickable(
+                enabled = track.albumId != null,
+                onClick = { onAlbumClick(track) },
+            ),
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            track.artist,
+            text = track.artist,
+            modifier = Modifier.clickable(
+                enabled = track.artistId != null,
+                onClick = { onArtistClick(track) },
+            ),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
             maxLines = 1,

@@ -3,6 +3,7 @@ package info.jukov.player.feature.track.presentation.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,6 +90,7 @@ fun TracksScreen(
     filter: TracksFilter,
     albumName: String? = null,
     artistName: String? = null,
+    albumArtistId: String? = null,
     coverArtUrl: String? = null,
     coverArtId: String? = null,
     albumIsFavorite: Boolean = false,
@@ -100,6 +102,7 @@ fun TracksScreen(
     isPlaying: Boolean = false,
     activeOrigin: PlaybackOrigin = PlaybackOrigin.TrackList,
     onAddToQueue: (List<Track>) -> Unit = {},
+    onArtistClick: (String, String) -> Unit = { _, _ -> },
 ) {
     LaunchedEffect(filter, albumIsFavorite) { viewModel.load(filter, albumIsFavorite) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -137,7 +140,7 @@ fun TracksScreen(
         AlbumHeader(
             albumName, artistName.orEmpty(),
             coverArtId?.let(artworkUris::get) ?: coverArtUrl,
-            coverArtId, filter.albumId,
+            coverArtId, filter.albumId, albumArtistId,
         )
     } else null
     val pullToRefreshState = rememberPullToRefreshState()
@@ -226,6 +229,7 @@ fun TracksScreen(
                                 )
                             }
                         },
+                        onArtistClick = onArtistClick,
                     )
                 }
                 if (loadingOrigin == LoadingOrigin.Automatic && tracks.isNotEmpty()) {
@@ -308,6 +312,7 @@ private fun AlbumTracksTopAppBar(
     onFavoriteClick: () -> Unit,
     downloadStatus: DownloadStatus?,
     onDownloadClick: () -> Unit,
+    onArtistClick: (String, String) -> Unit,
 ) {
     BoxWithConstraints {
         val artworkSize = (maxWidth * 0.75f).coerceAtMost(400.dp)
@@ -326,6 +331,7 @@ private fun AlbumTracksTopAppBar(
                     onFavoriteClick = onFavoriteClick,
                     downloadStatus = downloadStatus,
                     onDownloadClick = onDownloadClick,
+                    onArtistClick = onArtistClick,
                 )
             },
             collapsedContent = {
@@ -334,6 +340,7 @@ private fun AlbumTracksTopAppBar(
                     onPlayClick = onPlayClick,
                     playEnabled = tracks.isNotEmpty(),
                     isPlaying = isPlaying,
+                    onArtistClick = onArtistClick,
                 )
             },
         )
@@ -362,6 +369,7 @@ private fun ExpandedAlbumTracksHeader(
     onFavoriteClick: () -> Unit,
     downloadStatus: DownloadStatus?,
     onDownloadClick: () -> Unit,
+    onArtistClick: (String, String) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -401,6 +409,12 @@ private fun ExpandedAlbumTracksHeader(
             if (header.artist.isNotBlank()) {
                 Text(
                     text = header.artist,
+                    modifier = Modifier.clickable(
+                        enabled = header.artistId != null,
+                        onClick = {
+                            header.artistId?.let { onArtistClick(it, header.artist) }
+                        },
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -446,6 +460,7 @@ private fun CollapsedAlbumTracksHeader(
     onPlayClick: () -> Unit,
     playEnabled: Boolean,
     isPlaying: Boolean,
+    onArtistClick: (String, String) -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -482,6 +497,12 @@ private fun CollapsedAlbumTracksHeader(
             if (header.artist.isNotBlank()) {
                 Text(
                     text = header.artist,
+                    modifier = Modifier.clickable(
+                        enabled = header.artistId != null,
+                        onClick = {
+                            header.artistId?.let { onArtistClick(it, header.artist) }
+                        },
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -775,6 +796,7 @@ data class AlbumHeader(
     val coverArtUrl: String?,
     val coverArtId: String?,
     val albumId: String,
+    val artistId: String?,
 )
 
 @Composable
