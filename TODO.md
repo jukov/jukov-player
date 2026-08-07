@@ -1,7 +1,9 @@
+- Long press on album with selection
+- Click on track starts playback
+- Ripple on track row
 - Playlists
 - History
 - Load state
-- Year of the album
 - Scroll between downloaded pages
 - Add artist tab on downloads
 - Styling

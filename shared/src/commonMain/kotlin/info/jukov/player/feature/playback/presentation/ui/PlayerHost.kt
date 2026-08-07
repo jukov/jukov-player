@@ -163,6 +163,9 @@ fun PlayerHost(
     }
 }
 
+private val Track.artistAndYear: String
+    get() = year?.let { "$artist · $it" } ?: artist
+
 private val MINI_PLAYER_HEIGHT = 64.dp
 private val MINI_PLAYER_VERTICAL_PADDING = 8.dp
 private val MINI_PLAYER_CONTENT_INSET = MINI_PLAYER_HEIGHT + MINI_PLAYER_VERTICAL_PADDING * 2
@@ -323,7 +326,7 @@ private fun FullPlayer(
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = track.artist,
+            text = track.artistAndYear,
             modifier = Modifier.clickable(
                 enabled = track.artistId != null,
                 onClick = { onArtistClick(track) },

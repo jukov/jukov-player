@@ -17,4 +17,5 @@ data class Track(
     val durationMs: Long = 0,
     val contentType: String? = null,
     val isFavorite: Boolean,
+    val year: Int? = null,
 )

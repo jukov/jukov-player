@@ -21,6 +21,7 @@ data class AlbumEntity(
     val name: String,
     val artist: String,
     val artistId: String?,
+    val year: Int?,
     val coverArtId: String?,
     val isFavorite: Boolean,
 )
@@ -35,6 +36,7 @@ data class TrackEntity(
     val albumId: String?,
     val artistId: String?,
     val trackNumber: Int?,
+    val year: Int?,
     val coverArtId: String?,
     val durationMs: Long,
     val contentType: String?,

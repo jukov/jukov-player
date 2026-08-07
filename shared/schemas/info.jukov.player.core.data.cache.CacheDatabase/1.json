@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "1a22c2bfeafce9b0552121f31fdf53d8",
+    "identityHash": "e133a1fca088080ee7383344711bcd0e",
     "entities": [
       {
         "tableName": "ArtistEntity",
@@ -54,7 +54,7 @@
       },
       {
         "tableName": "AlbumEntity",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountKey` TEXT NOT NULL, `id` TEXT NOT NULL, `name` TEXT NOT NULL, `artist` TEXT NOT NULL, `artistId` TEXT, `coverArtId` TEXT, `isFavorite` INTEGER NOT NULL, PRIMARY KEY(`accountKey`, `id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountKey` TEXT NOT NULL, `id` TEXT NOT NULL, `name` TEXT NOT NULL, `artist` TEXT NOT NULL, `artistId` TEXT, `year` INTEGER, `coverArtId` TEXT, `isFavorite` INTEGER NOT NULL, PRIMARY KEY(`accountKey`, `id`))",
         "fields": [
           {
             "fieldPath": "accountKey",
@@ -86,6 +86,11 @@
             "affinity": "TEXT"
           },
           {
+            "fieldPath": "year",
+            "columnName": "year",
+            "affinity": "INTEGER"
+          },
+          {
             "fieldPath": "coverArtId",
             "columnName": "coverArtId",
             "affinity": "TEXT"
@@ -107,7 +112,7 @@
       },
       {
         "tableName": "TrackEntity",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountKey` TEXT NOT NULL, `id` TEXT NOT NULL, `title` TEXT NOT NULL, `artist` TEXT NOT NULL, `album` TEXT, `albumId` TEXT, `artistId` TEXT, `trackNumber` INTEGER, `coverArtId` TEXT, `durationMs` INTEGER NOT NULL, `contentType` TEXT, `isFavorite` INTEGER NOT NULL, PRIMARY KEY(`accountKey`, `id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountKey` TEXT NOT NULL, `id` TEXT NOT NULL, `title` TEXT NOT NULL, `artist` TEXT NOT NULL, `album` TEXT, `albumId` TEXT, `artistId` TEXT, `trackNumber` INTEGER, `year` INTEGER, `coverArtId` TEXT, `durationMs` INTEGER NOT NULL, `contentType` TEXT, `isFavorite` INTEGER NOT NULL, PRIMARY KEY(`accountKey`, `id`))",
         "fields": [
           {
             "fieldPath": "accountKey",
@@ -151,6 +156,11 @@
           {
             "fieldPath": "trackNumber",
             "columnName": "trackNumber",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "year",
+            "columnName": "year",
             "affinity": "INTEGER"
           },
           {
@@ -525,7 +535,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1a22c2bfeafce9b0552121f31fdf53d8')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e133a1fca088080ee7383344711bcd0e')"
     ]
   }
 }

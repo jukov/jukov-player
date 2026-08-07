@@ -28,6 +28,7 @@ class SubsonicFavoritesApi(private val client: SubsonicApiClient) : FavoritesApi
                     albumId = song.albumId,
                     artistId = song.artistId,
                     trackNumber = song.track,
+                    year = song.year,
                     coverArtId = song.coverArt,
                     coverArtUrl = song.coverArt?.let {
                         client.buildUrl("getCoverArt", session, mapOf("id" to it))
@@ -44,6 +45,7 @@ class SubsonicFavoritesApi(private val client: SubsonicApiClient) : FavoritesApi
                     name = album.name,
                     artist = album.artist,
                     artistId = album.artistId,
+                    year = album.year,
                     coverArtUrl = album.coverArt?.let {
                         client.buildUrl("getCoverArt", session, mapOf("id" to it))
                     },

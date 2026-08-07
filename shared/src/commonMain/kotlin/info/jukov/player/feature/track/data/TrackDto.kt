@@ -11,6 +11,7 @@ internal data class TrackDto(
     val albumId: String? = null,
     val artistId: String? = null,
     val track: Int? = null,
+    val year: Int? = null,
     val coverArt: String? = null,
     val duration: Int? = null,
     val contentType: String? = null,

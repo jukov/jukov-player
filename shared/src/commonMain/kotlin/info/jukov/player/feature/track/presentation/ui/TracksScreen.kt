@@ -91,6 +91,7 @@ fun TracksScreen(
     albumName: String? = null,
     artistName: String? = null,
     albumArtistId: String? = null,
+    albumYear: Int? = null,
     coverArtUrl: String? = null,
     coverArtId: String? = null,
     albumIsFavorite: Boolean = false,
@@ -140,7 +141,7 @@ fun TracksScreen(
         AlbumHeader(
             albumName, artistName.orEmpty(),
             coverArtId?.let(artworkUris::get) ?: coverArtUrl,
-            coverArtId, filter.albumId, albumArtistId,
+            coverArtId, filter.albumId, albumArtistId, albumYear,
         )
     } else null
     val pullToRefreshState = rememberPullToRefreshState()
@@ -222,6 +223,7 @@ fun TracksScreen(
                                         name = albumHeader.name,
                                         artist = albumHeader.artist,
                                         artistId = null,
+                                        year = albumHeader.year,
                                         coverArtId = albumHeader.coverArtId,
                                         coverArtUrl = albumHeader.coverArtUrl,
                                         isFavorite = currentAlbumIsFavorite,
@@ -408,7 +410,7 @@ private fun ExpandedAlbumTracksHeader(
             )
             if (header.artist.isNotBlank()) {
                 Text(
-                    text = header.artist,
+                    text = header.artistAndYear,
                     modifier = Modifier.clickable(
                         enabled = header.artistId != null,
                         onClick = {
@@ -496,7 +498,7 @@ private fun CollapsedAlbumTracksHeader(
             )
             if (header.artist.isNotBlank()) {
                 Text(
-                    text = header.artist,
+                    text = header.artistAndYear,
                     modifier = Modifier.clickable(
                         enabled = header.artistId != null,
                         onClick = {
@@ -797,7 +799,11 @@ data class AlbumHeader(
     val coverArtId: String?,
     val albumId: String,
     val artistId: String?,
+    val year: Int?,
 )
+
+private val AlbumHeader.artistAndYear: String
+    get() = year?.let { "$artist · $it" } ?: artist
 
 @Composable
 private fun DownloadIconButton(status: DownloadStatus?, onClick: () -> Unit) {

@@ -262,6 +262,7 @@ private fun OfflineTrackEntity.toOfflineTrack(
         id = trackId, title = metadata.title, artist = metadata.artist,
         album = metadata.album, albumId = metadata.albumId,
         artistId = metadata.artistId, trackNumber = metadata.trackNumber,
+        year = metadata.year,
         coverArtId = metadata.coverArtId,
         coverArtUrl = artworkPath?.let { platform.fileUri(key, it) },
         streamUrl = relativePath?.let { platform.fileUri(key, it) },

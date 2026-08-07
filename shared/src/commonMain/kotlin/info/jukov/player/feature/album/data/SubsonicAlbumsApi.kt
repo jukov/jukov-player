@@ -52,6 +52,7 @@ class SubsonicAlbumsApi(private val client: SubsonicApiClient) : AlbumsApi {
         name = name,
         artist = artist.ifBlank { fallbackArtist },
         artistId = artistId,
+        year = year,
         coverArtId = coverArt,
         coverArtUrl = coverArt?.let {
             client.buildUrl("getCoverArt", session, mapOf("id" to it))

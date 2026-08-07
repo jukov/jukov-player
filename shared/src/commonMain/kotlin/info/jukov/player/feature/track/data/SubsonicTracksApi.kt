@@ -80,6 +80,7 @@ class SubsonicTracksApi(private val client: SubsonicApiClient) : TracksApi {
         albumId = albumId,
         artistId = artistId,
         trackNumber = track,
+        year = year,
         coverArtId = coverArt,
         coverArtUrl = coverArt?.let {
             client.buildUrl("getCoverArt", session, mapOf("id" to it))

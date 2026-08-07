@@ -8,4 +8,5 @@ data class Album(
     val coverArtId: String? = null,
     val coverArtUrl: String?,
     val isFavorite: Boolean = false,
+    val year: Int? = null,
 )
