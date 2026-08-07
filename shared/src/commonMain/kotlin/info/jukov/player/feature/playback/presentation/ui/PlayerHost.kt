@@ -140,6 +140,12 @@ fun PlayerHost(
             }
         }
     }
+
+    PlayerBackHandler(
+        enabled = sheetState.currentValue == SheetValue.Expanded && !queueVisible,
+    ) {
+        scope.launch { sheetState.partialExpand() }
+    }
 }
 
 private val MINI_PLAYER_HEIGHT = 64.dp

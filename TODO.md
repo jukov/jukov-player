@@ -1,4 +1,3 @@
-- Actions for items
 - Cross links from album to artist, etc.
 - Playlists
 - History
@@ -9,6 +8,5 @@
 - Styling
 - App icon
 - App name
-- On back pressed on player close it
 - Cancel loading from notification
 - Long loading of all tracks list even if cache is presented
