@@ -23,6 +23,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -70,6 +73,9 @@ import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.core.presentation.LoadingOrigin
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
+import info.jukov.player.feature.download.domain.DownloadState
+import info.jukov.player.feature.download.domain.DownloadStatus
+import info.jukov.player.feature.album.domain.Album
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -81,6 +87,7 @@ fun TracksScreen(
     albumName: String? = null,
     artistName: String? = null,
     coverArtUrl: String? = null,
+    coverArtId: String? = null,
     albumIsFavorite: Boolean = false,
     viewModel: TracksViewModel,
     onBack: () -> Unit,
@@ -96,6 +103,9 @@ fun TracksScreen(
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val currentAlbumIsFavorite by viewModel.albumIsFavorite.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
+    val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
+    val albumDownloadStatuses by viewModel.albumDownloadStatuses.collectAsStateWithLifecycle()
+    val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
@@ -119,7 +129,11 @@ fun TracksScreen(
         }
     }
     val albumHeader = if (filter is TracksFilter.ByAlbum && albumName != null) {
-        AlbumHeader(albumName, artistName.orEmpty(), coverArtUrl, filter.albumId)
+        AlbumHeader(
+            albumName, artistName.orEmpty(),
+            coverArtId?.let(artworkUris::get) ?: coverArtUrl,
+            coverArtId, filter.albumId,
+        )
     } else null
     val pullToRefreshState = rememberPullToRefreshState()
     val canScrollAppBar = remember(pullToRefreshState) {
@@ -179,6 +193,25 @@ fun TracksScreen(
                         isFavorite = currentAlbumIsFavorite,
                         favoriteEnabled = albumHeader.albumId !in pending,
                         onFavoriteClick = { viewModel.toggleAlbumFavorite(albumHeader.albumId) },
+                        downloadStatus = albumDownloadStatuses[albumHeader.albumId],
+                        onDownloadClick = {
+                            val status = albumDownloadStatuses[albumHeader.albumId]
+                            if (status?.state == DownloadState.Queued || status?.state == DownloadState.Downloading) {
+                                viewModel.cancelAlbumDownload(albumHeader.albumId)
+                            } else if (status?.state != DownloadState.Completed) {
+                                viewModel.downloadAlbum(
+                                    Album(
+                                        id = albumHeader.albumId,
+                                        name = albumHeader.name,
+                                        artist = albumHeader.artist,
+                                        artistId = null,
+                                        coverArtId = albumHeader.coverArtId,
+                                        coverArtUrl = albumHeader.coverArtUrl,
+                                        isFavorite = currentAlbumIsFavorite,
+                                    ),
+                                )
+                            }
+                        },
                     )
                 }
                 if (loadingOrigin == LoadingOrigin.Automatic && tracks.isNotEmpty()) {
@@ -230,6 +263,11 @@ fun TracksScreen(
                     isPlaying = isPlaying,
                     pendingIds = pending,
                     onFavoriteClick = viewModel::toggleFavorite,
+                    downloadStatuses = downloadStatuses,
+                    onDownloadClick = viewModel::downloadTrack,
+                    onCancelDownload = viewModel::cancelTrackDownload,
+                    onRetryDownload = viewModel::retryTrackDownload,
+                    artworkUris = artworkUris,
                     hasMore = hasMore,
                     isLoadingMore = loadingOrigin == LoadingOrigin.Pagination,
                     onLoadMore = viewModel::loadMore,
@@ -251,6 +289,8 @@ private fun AlbumTracksTopAppBar(
     isFavorite: Boolean,
     favoriteEnabled: Boolean,
     onFavoriteClick: () -> Unit,
+    downloadStatus: DownloadStatus?,
+    onDownloadClick: () -> Unit,
 ) {
     BoxWithConstraints {
         val artworkSize = (maxWidth * 0.75f).coerceAtMost(400.dp)
@@ -267,6 +307,8 @@ private fun AlbumTracksTopAppBar(
                     isFavorite = isFavorite,
                     favoriteEnabled = favoriteEnabled,
                     onFavoriteClick = onFavoriteClick,
+                    downloadStatus = downloadStatus,
+                    onDownloadClick = onDownloadClick,
                 )
             },
             collapsedContent = {
@@ -301,6 +343,8 @@ private fun ExpandedAlbumTracksHeader(
     isFavorite: Boolean,
     favoriteEnabled: Boolean,
     onFavoriteClick: () -> Unit,
+    downloadStatus: DownloadStatus?,
+    onDownloadClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -373,12 +417,7 @@ private fun ExpandedAlbumTracksHeader(
                     modifier = Modifier.size(48.dp),
                 )
                 Spacer(Modifier.width(Padding.small))
-                IconButton(onClick = {}, enabled = false) {
-                    Icon(
-                        painter = painterResource(Res.drawable.download_circle),
-                        contentDescription = stringResource(Res.string.downloads),
-                    )
-                }
+                DownloadIconButton(downloadStatus, onDownloadClick)
             }
         }
     }
@@ -455,6 +494,11 @@ fun TracksList(
     isPlaying: Boolean,
     pendingIds: Set<String> = emptySet(),
     onFavoriteClick: (Track) -> Unit = {},
+    downloadStatuses: Map<String, DownloadStatus> = emptyMap(),
+    onDownloadClick: (Track) -> Unit = {},
+    onCancelDownload: (String) -> Unit = {},
+    onRetryDownload: (String) -> Unit = {},
+    artworkUris: Map<String, String> = emptyMap(),
     hasMore: Boolean = false,
     isLoadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
@@ -484,6 +528,11 @@ fun TracksList(
                 isPlaying = track.id == activeTrackId && isPlaying,
                 favoriteEnabled = track.id !in pendingIds,
                 onFavoriteClick = { onFavoriteClick(track) },
+                downloadStatus = downloadStatuses[track.id],
+                onDownloadClick = { onDownloadClick(track) },
+                onCancelDownload = { onCancelDownload(track.id) },
+                onRetryDownload = { onRetryDownload(track.id) },
+                artworkUrl = track.coverArtId?.let(artworkUris::get) ?: track.coverArtUrl,
             )
         }
         if (isLoadingMore) {
@@ -508,7 +557,13 @@ fun TrackRow(
     isPlaying: Boolean,
     favoriteEnabled: Boolean = true,
     onFavoriteClick: () -> Unit = {},
+    downloadStatus: DownloadStatus? = null,
+    onDownloadClick: () -> Unit = {},
+    onCancelDownload: () -> Unit = {},
+    onRetryDownload: () -> Unit = {},
+    artworkUrl: String? = track.coverArtUrl,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -529,7 +584,7 @@ fun TrackRow(
                     .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center,
             ) {
-                track.coverArtUrl?.let { url ->
+                artworkUrl?.let { url ->
                     AsyncImage(
                         model = rememberArtworkRequest(
                             url = url,
@@ -553,20 +608,43 @@ fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        FavoriteToggleButton(
-            isFavorite = track.isFavorite,
-            onClick = onFavoriteClick,
-            enabled = favoriteEnabled,
-        )
-        IconButton(onClick = onPlayClick) {
-            Icon(
-                painter = painterResource(
-                    if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow,
-                ),
-                contentDescription = stringResource(
-                    if (isPlaying) Res.string.pause else Res.string.play,
-                ),
-            )
+        Box {
+            IconButton(onClick = onPlayClick) {
+                Icon(
+                    painter = painterResource(if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow),
+                    contentDescription = stringResource(if (isPlaying) Res.string.pause else Res.string.play),
+                )
+            }
+            DownloadBadge(downloadStatus, Modifier.align(Alignment.BottomEnd))
+        }
+        Box {
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(painterResource(Res.drawable.more_vert), stringResource(Res.string.more_actions))
+            }
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(if (track.isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites)) },
+                    onClick = { menuExpanded = false; onFavoriteClick() },
+                    enabled = favoriteEnabled,
+                )
+                val action = when (downloadStatus?.state) {
+                    DownloadState.Queued, DownloadState.Downloading -> Res.string.cancel_download
+                    DownloadState.Completed -> Res.string.remove_download
+                    DownloadState.Failed -> Res.string.retry_download
+                    null -> Res.string.download
+                }
+                DropdownMenuItem(
+                    text = { Text(stringResource(action)) },
+                    onClick = {
+                        menuExpanded = false
+                        when (downloadStatus?.state) {
+                            DownloadState.Queued, DownloadState.Downloading, DownloadState.Completed -> onCancelDownload()
+                            DownloadState.Failed -> onRetryDownload()
+                            null -> onDownloadClick()
+                        }
+                    },
+                )
+            }
         }
     }
 }
@@ -602,5 +680,33 @@ data class AlbumHeader(
     val name: String,
     val artist: String,
     val coverArtUrl: String?,
+    val coverArtId: String?,
     val albumId: String,
 )
+
+@Composable
+private fun DownloadIconButton(status: DownloadStatus?, onClick: () -> Unit) {
+    Box {
+        IconButton(onClick = onClick) {
+            Icon(painterResource(Res.drawable.download_circle), stringResource(Res.string.downloads))
+        }
+        DownloadBadge(status, Modifier.align(Alignment.BottomEnd))
+    }
+}
+
+@Composable
+private fun DownloadBadge(status: DownloadStatus?, modifier: Modifier = Modifier) {
+    when (status?.state) {
+        DownloadState.Queued, DownloadState.Downloading -> status.progress?.let { progress ->
+            CircularProgressIndicator(
+                progress = { progress },
+                modifier = modifier.size(14.dp),
+                strokeWidth = 2.dp,
+            )
+        } ?: run {
+            CircularProgressIndicator(modifier = modifier.size(14.dp), strokeWidth = 2.dp)
+        }
+        DownloadState.Completed -> Text("✓", modifier = modifier, color = MaterialTheme.colorScheme.primary)
+        else -> Unit
+    }
+}

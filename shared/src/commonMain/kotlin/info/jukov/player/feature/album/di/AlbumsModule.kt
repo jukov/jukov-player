@@ -15,6 +15,7 @@ import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.core.data.cache.CacheDao
 import info.jukov.player.core.data.cache.LibraryCachePolicy
+import info.jukov.player.feature.download.presentation.DownloadDelegate
 
 @BindingContainer
 object AlbumsModule {
@@ -40,5 +41,6 @@ object AlbumsModule {
     fun provideAlbumsViewModel(
         getAlbumsUseCase: GetAlbumsUseCase,
         favoriteDelegate: FavoriteDelegate,
-    ): AlbumsViewModel = AlbumsViewModel(getAlbumsUseCase, favoriteDelegate)
+        downloadDelegate: DownloadDelegate,
+    ): AlbumsViewModel = AlbumsViewModel(getAlbumsUseCase, favoriteDelegate, downloadDelegate)
 }

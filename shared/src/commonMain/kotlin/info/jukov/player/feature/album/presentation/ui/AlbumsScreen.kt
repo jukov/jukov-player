@@ -57,6 +57,7 @@ fun AlbumsScreen(
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val albums = state.content.orEmpty()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
+    val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
@@ -140,6 +141,7 @@ fun AlbumsScreen(
                     hasMore = hasMore,
                     isLoadingMore = loadingOrigin == LoadingOrigin.Pagination,
                     onLoadMore = viewModel::loadMore,
+                    artworkUris = artworkUris,
                 )
             }
         }
@@ -160,6 +162,7 @@ fun AlbumsGrid(
     isLoadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
     modifier: Modifier = Modifier,
+    artworkUris: Map<String, String> = emptyMap(),
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 180.dp),
@@ -199,6 +202,7 @@ fun AlbumsGrid(
                 onClick = { onAlbumClick(album) },
                 onFavoriteClick = { onFavoriteClick(album) },
                 favoriteEnabled = album.id !in pendingIds,
+                artworkUrl = album.coverArtId?.let(artworkUris::get) ?: album.coverArtUrl,
             )
         }
         if (isLoadingMore) {
@@ -238,6 +242,7 @@ fun AlbumCard(
     onClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     favoriteEnabled: Boolean = true,
+    artworkUrl: String? = album.coverArtUrl,
 ) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Box(
@@ -246,10 +251,10 @@ fun AlbumCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
-            if (album.coverArtUrl != null) {
+            if (artworkUrl != null) {
                 AsyncImage(
                     model = rememberArtworkRequest(
-                        url = album.coverArtUrl,
+                        url = artworkUrl,
                         albumId = album.id,
                         requestedSize = LARGE_ARTWORK_SIZE,
                     ),

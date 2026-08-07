@@ -6,6 +6,8 @@ import info.jukov.player.core.domain.AppException
 import info.jukov.player.feature.auth.domain.AuthSession
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.headers
+import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.URLBuilder
@@ -62,6 +64,16 @@ class SubsonicApiClient(
         this.parameters.append("c", CLIENT_NAME)
         parameters.forEach { (key, value) -> this.parameters.append(key, value) }
     }.buildString()
+
+    suspend fun <T> rawGet(
+        endpoint: String,
+        session: AuthSession,
+        parameters: Map<String, String> = emptyMap(),
+        headers: Map<String, String> = emptyMap(),
+        block: suspend (HttpResponse) -> T,
+    ): T = client.prepareGet(buildUrl(endpoint, session, parameters)) {
+        headers { headers.forEach { (name, value) -> append(name, value) } }
+    }.execute(block)
 
     private companion object {
         const val API_VERSION = "1.16.1"

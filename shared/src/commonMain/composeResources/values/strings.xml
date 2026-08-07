@@ -13,6 +13,18 @@
     <string name="artists">Artists</string>
     <string name="albums">Albums</string>
     <string name="downloads">Downloads</string>
+    <string name="download">Download</string>
+    <string name="cancel_download">Cancel download</string>
+    <string name="retry_download">Retry download</string>
+    <string name="remove_download">Remove download</string>
+    <string name="no_downloaded_tracks">No downloaded tracks</string>
+    <string name="no_downloaded_albums">No downloaded albums</string>
+    <string name="more_actions">More actions</string>
+    <string name="download_notification_channel">Downloads</string>
+    <string name="download_notification_progress">Downloading %1$d of %2$d</string>
+    <string name="download_notification_track_progress">%1$d% • %2$s</string>
+    <string name="downloads_completed_notification_title">Everything is downloaded</string>
+    <string name="downloads_completed_notification_text">Successfully downloaded tracks: %1$d</string>
 
     <string name="back">Back</string>
     <string name="more">More</string>

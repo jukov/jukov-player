@@ -18,10 +18,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
 import kotlinx.coroutines.launch
+import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.album.domain.Album
 
 class TracksViewModel(
     private val getTracksUseCase: GetTracksUseCase,
     private val favoriteDelegate: FavoriteDelegate,
+    private val downloadDelegate: DownloadDelegate,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Track>>>(
         LoadableState.Loading(content = null),
@@ -33,6 +36,9 @@ class TracksViewModel(
     val albumIsFavorite: StateFlow<Boolean> = _albumIsFavorite.asStateFlow()
     val pending = favoriteDelegate.pending
     val messages = favoriteDelegate.messages
+    val downloadStatuses = downloadDelegate.trackStatuses
+    val albumDownloadStatuses = downloadDelegate.albumStatuses
+    val artworkUris = downloadDelegate.artworkUris
     private val _hasMore = MutableStateFlow(false)
     val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
 
@@ -98,6 +104,12 @@ class TracksViewModel(
             }
         }
     }
+
+    fun downloadTrack(track: Track) = viewModelScope.launch { downloadDelegate.download(track) }
+    fun cancelTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelTrack(id) }
+    fun retryTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.retry(id) }
+    fun downloadAlbum(album: Album) = viewModelScope.launch { downloadDelegate.download(album) }
+    fun cancelAlbumDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelAlbum(id) }
 
     private fun updateFavorite(id: String, isFavorite: Boolean) {
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }

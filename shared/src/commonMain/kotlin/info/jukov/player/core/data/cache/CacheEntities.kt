@@ -2,6 +2,7 @@ package info.jukov.player.core.data.cache
 
 import androidx.room3.Entity
 import androidx.room3.Index
+import androidx.room3.ForeignKey
 
 @Entity(primaryKeys = ["accountKey", "id"])
 data class ArtistEntity(
@@ -76,3 +77,70 @@ object CacheItemType {
     const val ALBUM = "album"
     const val TRACK = "track"
 }
+
+// Library metadata stays in TrackEntity/AlbumEntity. These entities only describe durable
+// offline artifacts and user download intent; CacheDao's orphan cleanup preserves referenced rows.
+@Entity(
+    primaryKeys = ["accountKey", "trackId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = TrackEntity::class,
+            parentColumns = ["accountKey", "id"],
+            childColumns = ["accountKey", "trackId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
+)
+data class OfflineTrackEntity(
+    val accountKey: String,
+    val trackId: String,
+    val relativePath: String?,
+    val expectedSize: Long?,
+    val downloadedBytes: Long,
+    val state: String,
+    val error: String?,
+    val requestedAtMs: Long,
+    val completedAtMs: Long?,
+)
+
+@Entity(
+    primaryKeys = ["accountKey", "albumId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = AlbumEntity::class,
+            parentColumns = ["accountKey", "id"],
+            childColumns = ["accountKey", "albumId"],
+            onDelete = ForeignKey.RESTRICT,
+        ),
+    ],
+)
+data class OfflineAlbumEntity(
+    val accountKey: String,
+    val albumId: String,
+    val trackCount: Int,
+    val requestedAtMs: Long,
+)
+
+@Entity(
+    primaryKeys = ["accountKey", "ownerType", "ownerId", "trackId"],
+    indices = [Index(value = ["accountKey", "trackId"])],
+)
+data class DownloadOwnershipEntity(
+    val accountKey: String,
+    val ownerType: String,
+    val ownerId: String,
+    val trackId: String,
+    val position: Int,
+)
+
+@Entity(primaryKeys = ["accountKey", "coverArtId"])
+data class OfflineArtworkEntity(
+    val accountKey: String,
+    val coverArtId: String,
+    val relativePath: String?,
+    val contentType: String?,
+    val downloadedBytes: Long,
+    val state: String,
+    val error: String?,
+    val completedAtMs: Long?,
+)

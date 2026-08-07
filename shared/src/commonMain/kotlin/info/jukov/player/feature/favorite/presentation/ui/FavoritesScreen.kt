@@ -82,6 +82,8 @@ fun FavoritesScreen(
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
+    val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
+    val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
@@ -202,6 +204,11 @@ fun FavoritesScreen(
                                     it.isFavorite,
                                 )
                             },
+                            downloadStatuses = downloadStatuses,
+                            onDownloadClick = viewModel::downloadTrack,
+                            onCancelDownload = viewModel::cancelTrackDownload,
+                            onRetryDownload = viewModel::retryTrackDownload,
+                            artworkUris = artworkUris,
                             modifier = Modifier,
                         )
                         FavoritesTab.Albums -> if (content.albums.isEmpty()) {
@@ -219,6 +226,7 @@ fun FavoritesScreen(
                                     it.isFavorite,
                                 )
                             },
+                            artworkUris = artworkUris,
                             modifier = Modifier,
                         )
                         FavoritesTab.Artists -> if (content.artists.isEmpty()) {

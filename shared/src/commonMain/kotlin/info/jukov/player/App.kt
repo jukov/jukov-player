@@ -10,12 +10,22 @@ import info.jukov.player.di.AppGraph
 import info.jukov.player.navigation.AppNavigation
 
 @Composable
-fun App(graph: AppGraph) {
+fun App(
+    graph: AppGraph,
+    openDownloads: Boolean = false,
+    onOpenDownloadsConsumed: () -> Unit = {},
+) {
     val authViewModel = viewModel { graph.authViewModel }
     val playerViewModel = viewModel { graph.playerViewModel }
     val colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
 
     MaterialTheme(colorScheme = colorScheme) {
-        AppNavigation(authViewModel, playerViewModel, graph)
+        AppNavigation(
+            authViewModel,
+            playerViewModel,
+            graph,
+            openDownloads,
+            onOpenDownloadsConsumed,
+        )
     }
 }

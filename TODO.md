@@ -2,4 +2,5 @@
 - Queue
 - Playlists
 - History
+- Load state
 - Cross links from album to artist, etc.

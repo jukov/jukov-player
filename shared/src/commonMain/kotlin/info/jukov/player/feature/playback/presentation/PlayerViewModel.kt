@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import info.jukov.player.feature.playback.domain.PlaybackQueueResolver
 
 data class PlayerUiState(
     val currentTrack: Track? = null,
@@ -30,7 +32,9 @@ data class PlayerUiState(
 class PlayerViewModel(
     private val controller: PlaybackController,
     private val favoriteDelegate: FavoriteDelegate,
+    private val queueResolver: PlaybackQueueResolver,
 ) : ViewModel() {
+    private var playJob: Job? = null
     private val favoriteOverrides = MutableStateFlow<Map<String, Boolean>>(emptyMap())
 
     val state: StateFlow<LoadableState<PlayerUiState>> = combine(
@@ -61,12 +65,22 @@ class PlayerViewModel(
         tracks: List<Track>,
         startIndex: Int,
         origin: PlaybackOrigin = PlaybackOrigin.TrackList,
-    ) = controller.play(tracks, startIndex, origin)
+    ) {
+        if (tracks.isEmpty() || startIndex !in tracks.indices) return
+        playJob?.cancel()
+        playJob = viewModelScope.launch {
+            val queue = queueResolver.resolve(tracks.drop(startIndex))
+            controller.play(queue, startIndex = 0, origin = origin)
+        }
+    }
     fun playPause() = controller.playPause()
     fun next() = controller.next()
     fun previous() = controller.previous()
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
-    fun stopAndClear() = controller.stopAndClear()
+    fun stopAndClear() {
+        playJob?.cancel()
+        controller.stopAndClear()
+    }
     fun toggleFavorite() {
         val track = state.value.content?.currentTrack ?: return
         viewModelScope.launch {

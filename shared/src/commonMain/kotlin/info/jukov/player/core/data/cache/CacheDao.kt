@@ -8,6 +8,100 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CacheDao {
+    @Query("SELECT * FROM TrackEntity WHERE accountKey=:accountKey")
+    fun observeAccountTracks(accountKey: String): Flow<List<TrackEntity>>
+
+    @Query("SELECT * FROM AlbumEntity WHERE accountKey=:accountKey")
+    fun observeAccountAlbums(accountKey: String): Flow<List<AlbumEntity>>
+
+    @Query("SELECT * FROM TrackEntity WHERE accountKey=:accountKey AND id=:trackId")
+    suspend fun track(accountKey: String, trackId: String): TrackEntity?
+
+    @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND EXISTS (SELECT 1 FROM DownloadOwnershipEntity o WHERE o.accountKey=OfflineTrackEntity.accountKey AND o.trackId=OfflineTrackEntity.trackId) ORDER BY requestedAtMs DESC")
+    fun observeOfflineTracks(accountKey: String): Flow<List<OfflineTrackEntity>>
+
+    @Query("SELECT * FROM OfflineAlbumEntity WHERE accountKey=:accountKey ORDER BY requestedAtMs DESC")
+    fun observeOfflineAlbums(accountKey: String): Flow<List<OfflineAlbumEntity>>
+
+    @Query("SELECT * FROM DownloadOwnershipEntity WHERE accountKey=:accountKey")
+    fun observeDownloadOwnerships(accountKey: String): Flow<List<DownloadOwnershipEntity>>
+
+    @Query("SELECT * FROM OfflineArtworkEntity WHERE accountKey=:accountKey")
+    fun observeOfflineArtworks(accountKey: String): Flow<List<OfflineArtworkEntity>>
+
+    @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND trackId=:trackId")
+    fun observeOfflineTrack(accountKey: String, trackId: String): Flow<OfflineTrackEntity?>
+
+    @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND trackId=:trackId")
+    suspend fun offlineTrack(accountKey: String, trackId: String): OfflineTrackEntity?
+
+    @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND trackId IN (:trackIds)")
+    suspend fun offlineTracks(accountKey: String, trackIds: List<String>): List<OfflineTrackEntity>
+
+    @Query("SELECT * FROM OfflineArtworkEntity WHERE accountKey=:accountKey AND coverArtId=:coverArtId")
+    suspend fun offlineArtwork(accountKey: String, coverArtId: String): OfflineArtworkEntity?
+
+    @Query("SELECT * FROM OfflineArtworkEntity WHERE accountKey=:accountKey AND coverArtId IN (:coverArtIds)")
+    suspend fun offlineArtworks(accountKey: String, coverArtIds: List<String>): List<OfflineArtworkEntity>
+
+    @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND state IN ('Queued','Downloading')")
+    suspend fun pendingOfflineTracks(accountKey: String): List<OfflineTrackEntity>
+
+    @Query("SELECT COUNT(*) FROM OfflineTrackEntity WHERE accountKey=:accountKey AND state IN ('Queued','Downloading')")
+    suspend fun pendingOfflineTrackCount(accountKey: String): Int
+
+    @Query("SELECT COUNT(*) FROM OfflineTrackEntity WHERE accountKey=:accountKey AND state='Completed'")
+    suspend fun completedOfflineTrackCount(accountKey: String): Int
+
+    @Query("UPDATE OfflineTrackEntity SET state='Failed', error=:message WHERE accountKey=:accountKey AND state IN ('Queued','Downloading')")
+    suspend fun failPendingOfflineTracks(accountKey: String, message: String)
+
+    @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey")
+    suspend fun allOfflineTracks(accountKey: String): List<OfflineTrackEntity>
+
+    @Query("SELECT t.* FROM OfflineTrackEntity t JOIN DownloadOwnershipEntity o ON t.accountKey=o.accountKey AND t.trackId=o.trackId WHERE o.accountKey=:accountKey AND o.ownerType='album' AND o.ownerId=:albumId ORDER BY o.position")
+    suspend fun offlineAlbumTracks(accountKey: String, albumId: String): List<OfflineTrackEntity>
+
+    @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND state IN ('Queued','Downloading') ORDER BY requestedAtMs, trackId LIMIT 1")
+    suspend fun nextPendingOfflineTrack(accountKey: String): OfflineTrackEntity?
+
+    @Query("SELECT COUNT(*) FROM DownloadOwnershipEntity WHERE accountKey=:accountKey AND trackId=:trackId")
+    suspend fun ownershipCount(accountKey: String, trackId: String): Int
+
+    @Query("SELECT COUNT(*) FROM OfflineTrackEntity d JOIN TrackEntity t ON t.accountKey=d.accountKey AND t.id=d.trackId WHERE d.accountKey=:accountKey AND t.coverArtId=:coverArtId AND EXISTS (SELECT 1 FROM DownloadOwnershipEntity o WHERE o.accountKey=d.accountKey AND o.trackId=d.trackId)")
+    suspend fun artworkReferenceCount(accountKey: String, coverArtId: String): Int
+
+    @Upsert suspend fun upsertOfflineTrack(item: OfflineTrackEntity)
+    @Upsert suspend fun upsertOfflineAlbum(item: OfflineAlbumEntity)
+    @Upsert suspend fun upsertDownloadOwnership(items: List<DownloadOwnershipEntity>)
+    @Upsert suspend fun upsertOfflineArtwork(item: OfflineArtworkEntity)
+
+    @Query("UPDATE OfflineTrackEntity SET state=:state, downloadedBytes=:downloadedBytes, expectedSize=:expectedSize, relativePath=:relativePath, error=:error, completedAtMs=:completedAtMs WHERE accountKey=:accountKey AND trackId=:trackId")
+    suspend fun updateOfflineTrackState(accountKey: String, trackId: String, state: String, downloadedBytes: Long, expectedSize: Long?, relativePath: String?, error: String?, completedAtMs: Long?)
+
+    @Query("DELETE FROM DownloadOwnershipEntity WHERE accountKey=:accountKey AND trackId=:trackId")
+    suspend fun deleteTrackOwnerships(accountKey: String, trackId: String)
+
+    @Query("DELETE FROM DownloadOwnershipEntity WHERE accountKey=:accountKey AND ownerType='album' AND ownerId=:albumId")
+    suspend fun deleteAlbumOwnerships(accountKey: String, albumId: String)
+
+    @Query("DELETE FROM OfflineTrackEntity WHERE accountKey=:accountKey AND trackId=:trackId")
+    suspend fun deleteOfflineTrack(accountKey: String, trackId: String)
+
+    @Query("DELETE FROM OfflineAlbumEntity WHERE accountKey=:accountKey AND albumId=:albumId")
+    suspend fun deleteOfflineAlbum(accountKey: String, albumId: String)
+
+    @Query("DELETE FROM OfflineArtworkEntity WHERE accountKey=:accountKey AND coverArtId=:coverArtId")
+    suspend fun deleteOfflineArtwork(accountKey: String, coverArtId: String)
+
+    @Query("DELETE FROM DownloadOwnershipEntity WHERE accountKey=:accountKey")
+    suspend fun deleteOfflineOwnerships(accountKey: String)
+    @Query("DELETE FROM OfflineTrackEntity WHERE accountKey=:accountKey")
+    suspend fun deleteOfflineTracks(accountKey: String)
+    @Query("DELETE FROM OfflineAlbumEntity WHERE accountKey=:accountKey")
+    suspend fun deleteOfflineAlbums(accountKey: String)
+    @Query("DELETE FROM OfflineArtworkEntity WHERE accountKey=:accountKey")
+    suspend fun deleteOfflineArtworks(accountKey: String)
     @Query("SELECT a.* FROM ArtistEntity a JOIN CacheMembership m ON a.accountKey=m.accountKey AND a.id=m.itemId WHERE m.accountKey=:accountKey AND m.queryKey=:queryKey AND m.itemType='artist' ORDER BY m.position")
     fun observeArtists(accountKey: String, queryKey: String): Flow<List<ArtistEntity>>
 
@@ -48,9 +142,9 @@ interface CacheDao {
     @Query("DELETE FROM CacheMetadata WHERE accountKey=:accountKey") suspend fun deleteMetadata(accountKey: String)
     @Query("DELETE FROM ArtistEntity WHERE accountKey=:accountKey AND NOT EXISTS (SELECT 1 FROM CacheMembership m WHERE m.accountKey=ArtistEntity.accountKey AND m.itemType='artist' AND m.itemId=ArtistEntity.id)")
     suspend fun deleteOrphanArtists(accountKey: String)
-    @Query("DELETE FROM AlbumEntity WHERE accountKey=:accountKey AND NOT EXISTS (SELECT 1 FROM CacheMembership m WHERE m.accountKey=AlbumEntity.accountKey AND m.itemType='album' AND m.itemId=AlbumEntity.id)")
+    @Query("DELETE FROM AlbumEntity WHERE accountKey=:accountKey AND NOT EXISTS (SELECT 1 FROM CacheMembership m WHERE m.accountKey=AlbumEntity.accountKey AND m.itemType='album' AND m.itemId=AlbumEntity.id) AND NOT EXISTS (SELECT 1 FROM OfflineAlbumEntity d WHERE d.accountKey=AlbumEntity.accountKey AND d.albumId=AlbumEntity.id)")
     suspend fun deleteOrphanAlbums(accountKey: String)
-    @Query("DELETE FROM TrackEntity WHERE accountKey=:accountKey AND NOT EXISTS (SELECT 1 FROM CacheMembership m WHERE m.accountKey=TrackEntity.accountKey AND m.itemType='track' AND m.itemId=TrackEntity.id)")
+    @Query("DELETE FROM TrackEntity WHERE accountKey=:accountKey AND NOT EXISTS (SELECT 1 FROM CacheMembership m WHERE m.accountKey=TrackEntity.accountKey AND m.itemType='track' AND m.itemId=TrackEntity.id) AND NOT EXISTS (SELECT 1 FROM OfflineTrackEntity d WHERE d.accountKey=TrackEntity.accountKey AND d.trackId=TrackEntity.id)")
     suspend fun deleteOrphanTracks(accountKey: String)
     @Query("UPDATE ArtistEntity SET isFavorite=:favorite WHERE accountKey=:accountKey AND id=:id") suspend fun updateArtistFavorite(accountKey: String, id: String, favorite: Boolean)
     @Query("UPDATE AlbumEntity SET isFavorite=:favorite WHERE accountKey=:accountKey AND id=:id") suspend fun updateAlbumFavorite(accountKey: String, id: String, favorite: Boolean)
@@ -167,10 +261,19 @@ interface CacheDao {
 
     @Transaction
     suspend fun clearAccount(accountKey: String) {
+        clearOfflineAccount(accountKey)
         deleteMemberships(accountKey)
         deleteMetadata(accountKey)
         deleteArtists(accountKey)
         deleteAlbums(accountKey)
         deleteTracks(accountKey)
+    }
+
+    @Transaction
+    suspend fun clearOfflineAccount(accountKey: String) {
+        deleteOfflineOwnerships(accountKey)
+        deleteOfflineTracks(accountKey)
+        deleteOfflineAlbums(accountKey)
+        deleteOfflineArtworks(accountKey)
     }
 }

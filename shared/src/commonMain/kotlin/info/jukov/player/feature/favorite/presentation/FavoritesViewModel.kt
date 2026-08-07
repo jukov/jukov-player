@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.toAppError
+import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.Favorites
@@ -19,7 +21,10 @@ import info.jukov.player.core.presentation.LoadingOrigin
 
 enum class FavoritesTab { Tracks, Albums, Artists }
 
-class FavoritesViewModel(private val repository: FavoritesRepository) : ViewModel() {
+class FavoritesViewModel(
+    private val repository: FavoritesRepository,
+    private val downloadDelegate: DownloadDelegate,
+) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<Favorites>>(
         LoadableState.Loading(content = null),
     )
@@ -32,6 +37,8 @@ class FavoritesViewModel(private val repository: FavoritesRepository) : ViewMode
     val pending = _pending.asStateFlow()
     private val _messages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
     val messages = _messages.asSharedFlow()
+    val downloadStatuses = downloadDelegate.trackStatuses
+    val artworkUris = downloadDelegate.artworkUris
     private var initialized = false
     private var loadJob: Job? = null
 
@@ -83,6 +90,10 @@ class FavoritesViewModel(private val repository: FavoritesRepository) : ViewMode
             _pending.update { it - target }
         }
     }
+
+    fun downloadTrack(track: Track) = viewModelScope.launch { downloadDelegate.download(track) }
+    fun cancelTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelTrack(id) }
+    fun retryTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.retry(id) }
 
     private fun Favorites.updateFavorite(target: FavoriteTarget, isFavorite: Boolean) = when (target) {
         is FavoriteTarget.Track -> copy(

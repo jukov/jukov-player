@@ -15,6 +15,7 @@ import info.jukov.player.feature.track.presentation.TracksViewModel
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.core.data.cache.CacheDao
 import info.jukov.player.core.data.cache.LibraryCachePolicy
+import info.jukov.player.feature.download.presentation.DownloadDelegate
 
 @BindingContainer
 object TracksModule {
@@ -40,5 +41,6 @@ object TracksModule {
     fun provideTracksViewModel(
         getTracksUseCase: GetTracksUseCase,
         favoriteDelegate: FavoriteDelegate,
-    ): TracksViewModel = TracksViewModel(getTracksUseCase, favoriteDelegate)
+        downloadDelegate: DownloadDelegate,
+    ): TracksViewModel = TracksViewModel(getTracksUseCase, favoriteDelegate, downloadDelegate)
 }

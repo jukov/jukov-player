@@ -1,5 +1,13 @@
 package info.jukov.player.feature.auth.domain
 
-class LogoutUseCase(private val repository: AuthRepository) {
-    suspend operator fun invoke() = repository.logout()
+import info.jukov.player.feature.download.domain.DownloadsRepository
+
+class LogoutUseCase(
+    private val repository: AuthRepository,
+    private val downloadsRepository: DownloadsRepository,
+) {
+    suspend operator fun invoke() {
+        downloadsRepository.clearCurrentAccount()
+        repository.logout()
+    }
 }

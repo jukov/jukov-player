@@ -1,0 +1,37 @@
+package info.jukov.player.feature.download.di
+
+import dev.zacsweers.metro.BindingContainer
+import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.SingleIn
+import info.jukov.player.core.data.cache.CacheDao
+import info.jukov.player.di.AppScope
+import info.jukov.player.feature.auth.domain.AuthRepository
+import info.jukov.player.feature.download.data.DefaultDownloadsRepository
+import info.jukov.player.feature.download.domain.DownloadsRepository
+import info.jukov.player.feature.download.domain.OfflinePlatform
+import info.jukov.player.feature.track.data.TracksApi
+import info.jukov.player.feature.download.presentation.DownloadsViewModel
+import info.jukov.player.feature.download.presentation.DownloadDelegate
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+
+@BindingContainer
+object DownloadsModule {
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideDownloadScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideDownloadsRepository(
+        authRepository: AuthRepository,
+        dao: CacheDao,
+        tracksApi: TracksApi,
+        platform: OfflinePlatform,
+    ): DownloadsRepository = DefaultDownloadsRepository(authRepository, dao, tracksApi, platform)
+
+    @Provides
+    fun provideDownloadsViewModel(repository: DownloadsRepository): DownloadsViewModel =
+        DownloadsViewModel(repository)
+}

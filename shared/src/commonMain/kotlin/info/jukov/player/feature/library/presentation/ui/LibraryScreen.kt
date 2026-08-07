@@ -38,6 +38,7 @@ fun LibraryScreen(
     onTracksClick: () -> Unit,
     onArtistsClick: () -> Unit,
     onAlbumsClick: () -> Unit,
+    onDownloadsClick: () -> Unit,
 ) {
     val items = listOf(
         LibraryItem(stringResource(Res.string.favorites), Res.drawable.heart, onFavoritesClick),
@@ -45,7 +46,7 @@ fun LibraryScreen(
         LibraryItem(stringResource(Res.string.tracks), Res.drawable.music_box_multiple, onTracksClick),
         LibraryItem(stringResource(Res.string.artists), Res.drawable.account_multiple, onArtistsClick),
         LibraryItem(stringResource(Res.string.albums), Res.drawable.album, onAlbumsClick),
-        LibraryItem(stringResource(Res.string.downloads), Res.drawable.download_circle),
+        LibraryItem(stringResource(Res.string.downloads), Res.drawable.download_circle, onDownloadsClick),
     )
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 

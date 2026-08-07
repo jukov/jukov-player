@@ -15,6 +15,7 @@ import info.jukov.player.feature.auth.presentation.AuthViewModel
 import info.jukov.player.di.AppScope
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.core.data.cache.CacheDao
+import info.jukov.player.feature.download.domain.DownloadsRepository
 
 @BindingContainer
 object AuthModule {
@@ -35,7 +36,10 @@ object AuthModule {
     fun provideLoginUseCase(repository: AuthRepository): LoginUseCase = LoginUseCase(repository)
 
     @Provides
-    fun provideLogoutUseCase(repository: AuthRepository): LogoutUseCase = LogoutUseCase(repository)
+    fun provideLogoutUseCase(
+        repository: AuthRepository,
+        downloadsRepository: DownloadsRepository,
+    ): LogoutUseCase = LogoutUseCase(repository, downloadsRepository)
 
     @Provides
     fun provideAuthViewModel(

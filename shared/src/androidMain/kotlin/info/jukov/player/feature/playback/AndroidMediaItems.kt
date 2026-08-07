@@ -5,18 +5,23 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import info.jukov.player.feature.track.domain.Track
 
-internal fun Track.toMediaItem(): MediaItem = MediaItem.Builder()
+internal fun Track.toMediaItem(uri: String, artworkUri: String?): MediaItem = MediaItem.Builder()
     .setMediaId(id)
-    .setUri(requireNotNull(streamUrl) { "Track $id has no stream URL" })
+    .setUri(uri)
     .setMimeType(contentType)
     .setMediaMetadata(
         MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)
             .setAlbumTitle(album)
-            .setArtworkUri(coverArtUrl?.let(Uri::parse))
+            .setArtworkUri(artworkUri?.let(Uri::parse))
             .setDurationMs(durationMs.takeIf { it > 0 })
             .setIsPlayable(true)
             .build(),
     )
     .build()
+
+internal fun Track.toMediaItem(): MediaItem = toMediaItem(
+    uri = requireNotNull(streamUrl) { "Track $id has no stream URL" },
+    artworkUri = coverArtUrl,
+)

@@ -7,7 +7,11 @@ import androidx.room3.RoomDatabaseConstructor
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 
 @Database(
-    entities = [ArtistEntity::class, AlbumEntity::class, TrackEntity::class, CacheMembership::class, CacheMetadata::class],
+    entities = [
+        ArtistEntity::class, AlbumEntity::class, TrackEntity::class, CacheMembership::class,
+        CacheMetadata::class, OfflineTrackEntity::class, OfflineAlbumEntity::class,
+        DownloadOwnershipEntity::class, OfflineArtworkEntity::class,
+    ],
     version = 1,
     exportSchema = true,
 )

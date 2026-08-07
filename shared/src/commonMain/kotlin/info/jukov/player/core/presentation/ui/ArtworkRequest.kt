@@ -13,10 +13,11 @@ fun rememberArtworkRequest(
 ): ImageRequest {
     val context = LocalPlatformContext.current
     return remember(context, url, albumId, requestedSize) {
+        val isRemote = url.startsWith("http://") || url.startsWith("https://")
         ImageRequest.Builder(context)
-            .data(url.withCoverArtSize(requestedSize))
+            .data(if (isRemote) url.withCoverArtSize(requestedSize) else url)
             .apply {
-                albumId?.let {
+                albumId?.takeIf { isRemote }?.let {
                     val server = url.substringBefore("/rest/").trimEnd('/')
                     val cacheKey = "$server:$it:$requestedSize"
                     memoryCacheKey(cacheKey)

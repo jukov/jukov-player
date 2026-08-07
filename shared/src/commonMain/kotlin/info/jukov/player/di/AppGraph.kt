@@ -20,6 +20,13 @@ import info.jukov.player.feature.favorite.di.FavoritesModule
 import info.jukov.player.feature.favorite.presentation.FavoritesViewModel
 import androidx.room3.RoomDatabase
 import info.jukov.player.core.data.cache.CacheDatabase
+import info.jukov.player.core.data.cache.CacheDao
+import info.jukov.player.feature.auth.domain.AuthRepository
+import info.jukov.player.feature.download.di.DownloadsModule
+import info.jukov.player.feature.download.domain.DownloadsRepository
+import info.jukov.player.feature.download.domain.OfflinePlatform
+import info.jukov.player.subsonic.data.SubsonicApiClient
+import info.jukov.player.feature.download.presentation.DownloadsViewModel
 
 @DependencyGraph(
     scope = AppScope::class,
@@ -31,6 +38,7 @@ import info.jukov.player.core.data.cache.CacheDatabase
         TracksModule::class,
         PlaybackModule::class,
         FavoritesModule::class,
+        DownloadsModule::class,
     ],
 )
 interface AppGraph {
@@ -42,12 +50,18 @@ interface AppGraph {
     val playbackStore: PlaybackStore
     val playerViewModel: PlayerViewModel
     val favoritesViewModel: FavoritesViewModel
+    val downloadsRepository: DownloadsRepository
+    val cacheDao: CacheDao
+    val authRepository: AuthRepository
+    val subsonicApiClient: SubsonicApiClient
+    val downloadsViewModel: DownloadsViewModel
 
     @DependencyGraph.Factory
     fun interface Factory {
         fun create(
             @Provides playbackControllerFactory: PlaybackControllerFactory,
             @Provides cacheDatabaseBuilder: RoomDatabase.Builder<CacheDatabase>,
+            @Provides offlinePlatform: OfflinePlatform,
         ): AppGraph
     }
 }
@@ -55,4 +69,7 @@ interface AppGraph {
 fun createAppGraph(
     playbackControllerFactory: PlaybackControllerFactory,
     cacheDatabaseBuilder: RoomDatabase.Builder<CacheDatabase>,
-): AppGraph = createGraphFactory<AppGraph.Factory>().create(playbackControllerFactory, cacheDatabaseBuilder)
+    offlinePlatform: OfflinePlatform,
+): AppGraph = createGraphFactory<AppGraph.Factory>().create(
+    playbackControllerFactory, cacheDatabaseBuilder, offlinePlatform,
+)

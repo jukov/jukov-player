@@ -14,6 +14,12 @@ object Routes {
     data object Favorites : NavKey
 
     @Serializable
+    data object Downloads : NavKey
+
+    @Serializable
+    data class OfflineAlbum(val albumId: String, val albumName: String) : NavKey
+
+    @Serializable
     data object Artists : NavKey
 
     @Serializable
@@ -29,6 +35,7 @@ object Routes {
         val albumName: String? = null,
         val artistName: String? = null,
         val coverArtUrl: String? = null,
+        val coverArtId: String? = null,
         val albumIsFavorite: Boolean = false,
     ) : NavKey {
         init {

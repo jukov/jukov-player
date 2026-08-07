@@ -13,6 +13,18 @@
     <string name="artists">Артисты</string>
     <string name="albums">Альбомы</string>
     <string name="downloads">Загрузки</string>
+    <string name="download">Скачать</string>
+    <string name="cancel_download">Отменить загрузку</string>
+    <string name="retry_download">Повторить загрузку</string>
+    <string name="remove_download">Удалить загрузку</string>
+    <string name="no_downloaded_tracks">Нет загруженных треков</string>
+    <string name="no_downloaded_albums">Нет загруженных альбомов</string>
+    <string name="more_actions">Другие действия</string>
+    <string name="download_notification_channel">Загрузки</string>
+    <string name="download_notification_progress">Загрузка %1$d из %2$d</string>
+    <string name="download_notification_track_progress">%1$d% • %2$s</string>
+    <string name="downloads_completed_notification_title">Всё загружено</string>
+    <string name="downloads_completed_notification_text">Успешно загружено треков: %1$d</string>
 
     <string name="back">Назад</string>
     <string name="more">Ещё</string>

@@ -17,10 +17,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
 import info.jukov.player.core.domain.toAppError
+import info.jukov.player.feature.download.presentation.DownloadDelegate
 
 class AlbumsViewModel(
     private val getAlbumsUseCase: GetAlbumsUseCase,
     private val favoriteDelegate: FavoriteDelegate,
+    private val downloadDelegate: DownloadDelegate,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Album>>>(
         LoadableState.Loading(content = null),
@@ -30,6 +32,7 @@ class AlbumsViewModel(
     val loadingOrigin: StateFlow<LoadingOrigin?> = _loadingOrigin.asStateFlow()
     val pending = favoriteDelegate.pending
     val messages = favoriteDelegate.messages
+    val artworkUris = downloadDelegate.artworkUris
     private val _hasMore = MutableStateFlow(false)
     val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
 

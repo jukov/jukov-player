@@ -33,12 +33,16 @@ import info.jukov.player.feature.favorite.presentation.ui.FavoritesScreen
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
+import info.jukov.player.feature.download.presentation.ui.DownloadsScreen
+import info.jukov.player.feature.download.presentation.ui.OfflineAlbumTracksScreen
 
 @Composable
 fun AppNavigation(
     authViewModel: AuthViewModel,
     playerViewModel: PlayerViewModel,
     graph: AppGraph,
+    openDownloads: Boolean = false,
+    onOpenDownloadsConsumed: () -> Unit = {},
 ) {
     val authUiState by authViewModel.state.collectAsStateWithLifecycle()
     val playbackState by playerViewModel.state.collectAsStateWithLifecycle()
@@ -60,6 +64,13 @@ fun AppNavigation(
         if (authState == AuthState.LoggedOut) playerViewModel.stopAndClear()
     }
 
+    LaunchedEffect(openDownloads, authState) {
+        if (openDownloads && authState is AuthState.LoggedIn) {
+            if (backStack.lastOrNull() != Routes.Downloads) backStack.add(Routes.Downloads)
+            onOpenDownloadsConsumed()
+        }
+    }
+
     Surface(Modifier.fillMaxSize()) {
         val navigationContent: @Composable () -> Unit = {
             NavDisplay(
@@ -77,6 +88,34 @@ fun AppNavigation(
                         onTracksClick = { backStack.add(Routes.Tracks()) },
                         onArtistsClick = { backStack.add(Routes.Artists) },
                         onAlbumsClick = { backStack.add(Routes.Albums()) },
+                        onDownloadsClick = { backStack.add(Routes.Downloads) },
+                    )
+                }
+                entry<Routes.Downloads> {
+                    val downloadsViewModel = viewModel { graph.downloadsViewModel }
+                    DownloadsScreen(
+                        viewModel = downloadsViewModel,
+                        onBack = { backStack.removeLastOrNull() },
+                        onAlbumClick = { album ->
+                            backStack.add(Routes.OfflineAlbum(album.album.id, album.album.name))
+                        },
+                        onPlayClick = { tracks, index -> playerViewModel.play(tracks, index) },
+                        onActiveTrackClick = playerViewModel::playPause,
+                        activeTrackId = playbackState.content?.currentTrack?.id,
+                        isPlaying = playbackState.content?.isPlaying == true,
+                    )
+                }
+                entry<Routes.OfflineAlbum> { route ->
+                    val downloadsViewModel = viewModel { graph.downloadsViewModel }
+                    OfflineAlbumTracksScreen(
+                        albumId = route.albumId,
+                        albumName = route.albumName,
+                        viewModel = downloadsViewModel,
+                        onBack = { backStack.removeLastOrNull() },
+                        onPlayClick = { tracks, index -> playerViewModel.play(tracks, index) },
+                        onActiveTrackClick = playerViewModel::playPause,
+                        activeTrackId = playbackState.content?.currentTrack?.id,
+                        isPlaying = playbackState.content?.isPlaying == true,
                     )
                 }
                 entry<Routes.Favorites> {
@@ -147,6 +186,7 @@ fun AppNavigation(
                         albumName = route.albumName,
                         artistName = route.artistName,
                         coverArtUrl = route.coverArtUrl,
+                        coverArtId = route.coverArtId,
                         albumIsFavorite = route.albumIsFavorite,
                         viewModel = tracksViewModel,
                         onBack = { backStack.removeLastOrNull() },
@@ -174,6 +214,8 @@ private val NAV_SAVED_STATE_CONFIGURATION = SavedStateConfiguration {
             subclass(Routes.Login.serializer())
             subclass(Routes.Library.serializer())
             subclass(Routes.Favorites.serializer())
+            subclass(Routes.Downloads.serializer())
+            subclass(Routes.OfflineAlbum.serializer())
             subclass(Routes.Artists.serializer())
             subclass(Routes.Albums.serializer())
             subclass(Routes.Tracks.serializer())
@@ -186,6 +228,7 @@ private fun info.jukov.player.feature.album.domain.Album.tracksRoute() = Routes.
     albumName = name,
     artistName = artist,
     coverArtUrl = coverArtUrl,
+    coverArtId = coverArtId,
     albumIsFavorite = isFavorite,
 )
 
