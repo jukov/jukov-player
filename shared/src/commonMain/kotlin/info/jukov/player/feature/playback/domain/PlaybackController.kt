@@ -18,6 +18,10 @@ interface PlaybackController {
     fun next()
     fun previous()
     fun seekTo(positionMs: Long)
+    fun playAt(index: Int) = Unit
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) = Unit
+    fun moveQueueItemsToTop(indices: Set<Int>) = Unit
+    fun removeQueueItems(indices: Set<Int>) = Unit
     fun stopAndClear()
 }
 

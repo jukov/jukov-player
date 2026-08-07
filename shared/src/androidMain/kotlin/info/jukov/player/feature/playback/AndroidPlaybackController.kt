@@ -20,6 +20,9 @@ import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackControllerFactory
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
+import info.jukov.player.feature.playback.domain.moveFutureQueueItem
+import info.jukov.player.feature.playback.domain.moveFutureQueueItemsToTop
+import info.jukov.player.feature.playback.domain.removeFutureQueueItems
 import info.jukov.player.feature.track.domain.Track
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -114,6 +117,57 @@ private class AndroidPlaybackController(
     override fun next() = withController { it.seekToNextMediaItem() }
     override fun previous() = withController { it.seekToPrevious() }
     override fun seekTo(positionMs: Long) = withController { it.seekTo(positionMs) }
+
+    override fun playAt(index: Int) {
+        val snapshot = _state.value.content ?: return
+        if (index !in snapshot.queue.indices || index < snapshot.currentIndex) return
+        withController { player ->
+            player.seekToDefaultPosition(index)
+            player.play()
+        }
+    }
+
+    override fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        val snapshot = _state.value.content ?: return
+        val queue = moveFutureQueueItem(snapshot.queue, snapshot.currentIndex, fromIndex, toIndex)
+        if (queue == snapshot.queue) return
+        playbackStore.write(queue, snapshot.currentIndex, snapshot.origin)
+        _state.update { it.mapContent { value -> value.copy(queue = queue) } }
+        withController { it.moveMediaItem(fromIndex, toIndex) }
+    }
+
+    override fun moveQueueItemsToTop(indices: Set<Int>) {
+        val snapshot = _state.value.content ?: return
+        val queue = moveFutureQueueItemsToTop(snapshot.queue, snapshot.currentIndex, indices)
+        if (queue == snapshot.queue) return
+        playbackStore.write(queue, snapshot.currentIndex, snapshot.origin)
+        _state.update { it.mapContent { value -> value.copy(queue = queue) } }
+        withController { player ->
+            val workingQueue = snapshot.queue.toMutableList()
+            for (targetIndex in snapshot.currentIndex + 1..queue.lastIndex) {
+                val fromIndex = workingQueue.indexOfFirstFrom(targetIndex) {
+                    it == queue[targetIndex]
+                }
+                if (fromIndex >= 0 && fromIndex != targetIndex) {
+                    player.moveMediaItem(fromIndex, targetIndex)
+                    workingQueue.add(targetIndex, workingQueue.removeAt(fromIndex))
+                }
+            }
+        }
+    }
+
+    override fun removeQueueItems(indices: Set<Int>) {
+        val snapshot = _state.value.content ?: return
+        val queue = removeFutureQueueItems(snapshot.queue, snapshot.currentIndex, indices)
+        if (queue == snapshot.queue) return
+        playbackStore.write(queue, snapshot.currentIndex, snapshot.origin)
+        _state.update { it.mapContent { value -> value.copy(queue = queue) } }
+        withController { player ->
+            indices.filter { it > snapshot.currentIndex && it < player.mediaItemCount }
+                .sortedDescending()
+                .forEach(player::removeMediaItem)
+        }
+    }
 
     override fun stopAndClear() {
         playbackStore.clear()
@@ -218,6 +272,14 @@ private class AndroidPlaybackController(
     }
 
     private fun Long.validDuration(): Long? = takeUnless { it == C.TIME_UNSET }?.coerceAtLeast(0)
+
+    private inline fun <T> List<T>.indexOfFirstFrom(
+        startIndex: Int,
+        predicate: (T) -> Boolean,
+    ): Int {
+        for (index in startIndex until size) if (predicate(this[index])) return index
+        return -1
+    }
 
     private companion object {
         const val POSITION_UPDATE_INTERVAL_MS = 500L

@@ -26,10 +26,12 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -95,7 +97,9 @@ fun PlayerHost(
         skipHiddenState = true,
     )
     val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
+    val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    var queueVisible by remember { mutableStateOf(false) }
 
     CompositionLocalProvider(LocalPlayerBottomInset provides peekHeight) {
         BottomSheetScaffold(
@@ -111,11 +115,29 @@ fun PlayerHost(
                     peekHeight = peekHeight,
                     sheetOffset = { runCatching { sheetState.requireOffset() }.getOrNull() },
                     onExpand = { scope.launch { sheetState.expand() } },
+                    onOpenQueue = { queueVisible = true },
                 )
             },
             modifier = Modifier.fillMaxSize(),
         ) {
             content()
+        }
+        if (queueVisible) {
+            ModalBottomSheet(
+                onDismissRequest = { queueVisible = false },
+                sheetState = queueSheetState,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                QueueScreen(
+                    state = snapshot,
+                    onPlayAt = viewModel::playAt,
+                    onPlayPause = viewModel::playPause,
+                    onMove = viewModel::moveQueueItem,
+                    onRemove = viewModel::removeQueueItem,
+                    onRemoveSelected = viewModel::removeQueueItems,
+                    onMoveSelectedToTop = viewModel::moveQueueItemsToTop,
+                )
+            }
         }
     }
 }
@@ -133,6 +155,7 @@ private fun PlayerSheetContent(
     peekHeight: Dp,
     sheetOffset: () -> Float?,
     onExpand: () -> Unit,
+    onOpenQueue: () -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
@@ -151,6 +174,7 @@ private fun PlayerSheetContent(
             error = error,
             viewModel = viewModel,
             favoriteEnabled = favoriteEnabled,
+            onOpenQueue = onOpenQueue,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = expansionProgress }
@@ -230,6 +254,7 @@ private fun FullPlayer(
     error: AppError?,
     viewModel: PlayerViewModel,
     favoriteEnabled: Boolean,
+    onOpenQueue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val track = snapshot.currentTrack ?: return
@@ -337,6 +362,11 @@ private fun FullPlayer(
                 stringResource(Res.string.repeat),
                 enabled = false,
                 onClick = {},
+            )
+            PlayerIconButton(
+                Res.drawable.playlist_play,
+                stringResource(Res.string.open_queue),
+                onClick = onOpenQueue,
             )
         }
     }

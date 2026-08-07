@@ -20,6 +20,8 @@ import kotlinx.coroutines.Job
 import info.jukov.player.feature.playback.domain.PlaybackQueueResolver
 
 data class PlayerUiState(
+    val queue: List<Track> = emptyList(),
+    val currentIndex: Int = -1,
     val currentTrack: Track? = null,
     val positionMs: Long = 0,
     val durationMs: Long = 0,
@@ -77,6 +79,11 @@ class PlayerViewModel(
     fun next() = controller.next()
     fun previous() = controller.previous()
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
+    fun playAt(index: Int) = controller.playAt(index)
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) = controller.moveQueueItem(fromIndex, toIndex)
+    fun removeQueueItem(index: Int) = controller.removeQueueItems(setOf(index))
+    fun removeQueueItems(indices: Set<Int>) = controller.removeQueueItems(indices)
+    fun moveQueueItemsToTop(indices: Set<Int>) = controller.moveQueueItemsToTop(indices)
     fun stopAndClear() {
         playJob?.cancel()
         controller.stopAndClear()
@@ -95,6 +102,8 @@ class PlayerViewModel(
     }
 
     private fun PlaybackSnapshot.toUiState(favoriteOverrides: Map<String, Boolean>) = PlayerUiState(
+        queue = queue,
+        currentIndex = currentIndex,
         currentTrack = currentTrack?.let { track ->
             favoriteOverrides[track.id]?.let { track.copy(isFavorite = it) } ?: track
         },

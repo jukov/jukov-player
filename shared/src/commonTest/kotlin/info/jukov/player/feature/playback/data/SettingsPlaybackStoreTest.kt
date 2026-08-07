@@ -50,6 +50,16 @@ class SettingsPlaybackStoreTest {
         assertNull(store.read())
     }
 
+    @Test
+    fun storesReorderedQueueWithCurrentIndexAndOrigin() {
+        val origin = PlaybackOrigin.Album("album-id")
+        val queue = listOf(track("current"), track("three"), track("one"), track("two"))
+
+        store.write(queue, currentIndex = 0, origin = origin)
+
+        assertEquals(PersistedPlaybackState(queue, currentIndex = 0, origin = origin), store.read())
+    }
+
     private companion object {
         fun track(id: String) = Track(
             id = id,

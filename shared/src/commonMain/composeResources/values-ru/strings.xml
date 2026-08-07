@@ -47,6 +47,15 @@
     <string name="next_track">Следующий трек</string>
     <string name="shuffle">Перемешать</string>
     <string name="repeat">Повтор</string>
+    <string name="queue">Очередь</string>
+    <string name="open_queue">Открыть очередь</string>
+    <string name="queue_empty">После текущего трека очередь пуста</string>
+    <string name="selected_tracks">Выбрано: %1$d</string>
+    <string name="select_track">Выбрать %1$s</string>
+    <string name="move_track">Переместить %1$s</string>
+    <string name="move_selected_to_top">Переместить выбранные треки наверх</string>
+    <string name="remove_selected_tracks">Удалить выбранные треки</string>
+    <string name="remove_track_from_queue">Удалить %1$s из очереди</string>
     <string name="pause">Пауза</string>
     <string name="play">Воспроизвести</string>
     <string name="remove_from_favorites">Удалить из избранного</string>

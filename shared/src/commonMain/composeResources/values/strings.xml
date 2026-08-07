@@ -47,6 +47,15 @@
     <string name="next_track">Next track</string>
     <string name="shuffle">Shuffle</string>
     <string name="repeat">Repeat</string>
+    <string name="queue">Queue</string>
+    <string name="open_queue">Open queue</string>
+    <string name="queue_empty">There are no tracks after the current track</string>
+    <string name="selected_tracks">Selected: %1$d</string>
+    <string name="select_track">Select %1$s</string>
+    <string name="move_track">Move %1$s</string>
+    <string name="move_selected_to_top">Move selected tracks to the top</string>
+    <string name="remove_selected_tracks">Remove selected tracks</string>
+    <string name="remove_track_from_queue">Remove %1$s from queue</string>
     <string name="pause">Pause</string>
     <string name="play">Play</string>
     <string name="remove_from_favorites">Remove from favorites</string>
