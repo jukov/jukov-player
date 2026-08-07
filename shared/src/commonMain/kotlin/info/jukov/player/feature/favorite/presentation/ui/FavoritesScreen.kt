@@ -60,6 +60,8 @@ import info.jukov.player.feature.favorite.presentation.FavoritesTab
 import info.jukov.player.feature.favorite.presentation.FavoritesViewModel
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.presentation.ui.TracksList
+import info.jukov.player.feature.track.presentation.ui.TrackSelectionTopAppBar
+import info.jukov.player.feature.track.presentation.ui.rememberTrackSelectionState
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -76,6 +78,7 @@ fun FavoritesScreen(
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
     isPlaying: Boolean,
+    onAddToQueue: (List<Track>) -> Unit,
 ) {
     LaunchedEffect(viewModel) { viewModel.load() }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -84,6 +87,11 @@ fun FavoritesScreen(
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
+    val visibleTracks = state.content?.tracks.orEmpty()
+    val selectionState = rememberTrackSelectionState(
+        tracks = visibleTracks,
+        active = selectedTab == FavoritesTab.Tracks,
+    )
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
@@ -121,18 +129,29 @@ fun FavoritesScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             Column {
-                AppFlexibleTopAppBar(
-                    title = stringResource(Res.string.favorites),
-                    scrollBehavior = scrollBehavior,
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                painterResource(Res.drawable.arrow_back),
-                                contentDescription = stringResource(Res.string.back),
-                            )
-                        }
-                    },
-                )
+                if (selectionState.isActive) {
+                    TrackSelectionTopAppBar(
+                        selectedCount = selectionState.selectedCount,
+                        allSelectedFavorite = selectionState.areAllSelectedFavorite(visibleTracks),
+                        onClose = selectionState::clear,
+                        onFavorite = { selectionState.finish(visibleTracks, viewModel::toggleFavorites) },
+                        onDownload = { selectionState.finish(visibleTracks, viewModel::downloadTracks) },
+                        onAddToQueue = { selectionState.finish(visibleTracks, onAddToQueue) },
+                    )
+                } else {
+                    AppFlexibleTopAppBar(
+                        title = stringResource(Res.string.favorites),
+                        scrollBehavior = scrollBehavior,
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    painterResource(Res.drawable.arrow_back),
+                                    contentDescription = stringResource(Res.string.back),
+                                )
+                            }
+                        },
+                    )
+                }
                 PrimaryTabRow(
                     selectedTabIndex = selectedTab.ordinal,
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -209,6 +228,9 @@ fun FavoritesScreen(
                             onCancelDownload = viewModel::cancelTrackDownload,
                             onRetryDownload = viewModel::retryTrackDownload,
                             artworkUris = artworkUris,
+                            selectionMode = selectionState.isActive,
+                            selectedIds = selectionState.selectedIds,
+                            onSelectionChange = selectionState::setSelected,
                             modifier = Modifier,
                         )
                         FavoritesTab.Albums -> if (content.albums.isEmpty()) {

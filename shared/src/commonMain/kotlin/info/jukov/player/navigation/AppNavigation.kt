@@ -103,6 +103,7 @@ fun AppNavigation(
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
+                        onAddToQueue = playerViewModel::addToQueue,
                     )
                 }
                 entry<Routes.OfflineAlbum> { route ->
@@ -116,6 +117,7 @@ fun AppNavigation(
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
+                        onAddToQueue = playerViewModel::addToQueue,
                     )
                 }
                 entry<Routes.Favorites> {
@@ -131,6 +133,7 @@ fun AppNavigation(
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
+                        onAddToQueue = playerViewModel::addToQueue,
                     )
                 }
                 entry<Routes.Artists> {
@@ -195,6 +198,7 @@ fun AppNavigation(
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
                         activeOrigin = playbackState.content?.origin ?: PlaybackOrigin.TrackList,
+                        onAddToQueue = playerViewModel::addToQueue,
                     )
                 }
                 },

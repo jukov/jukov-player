@@ -52,9 +52,27 @@ class DefaultFavoritesRepositoryTest {
         assertEquals(0, repository.changes.replayCache.size)
     }
 
+    @Test
+    fun batchMutationUsesSingleApiCallAndPublishesEveryChange() = runTest {
+        val api = FakeApi()
+        val repository = DefaultFavoritesRepository(api, FakeAuthRepository(loggedInState()))
+        val targets = listOf(
+            FavoriteTarget.Track("track-1"),
+            FavoriteTarget.Track("track-2"),
+        )
+
+        repository.setFavorites(targets, isFavorite = true).getOrThrow()
+
+        assertEquals(1, api.batchCalls)
+        assertEquals(targets, api.targets)
+        assertEquals(true, api.isFavorite)
+    }
+
     private class FakeApi(private val failMutation: Boolean = false) : FavoritesApi {
         var target: FavoriteTarget? = null
+        var targets: List<FavoriteTarget> = emptyList()
         var isFavorite: Boolean? = null
+        var batchCalls: Int = 0
         override suspend fun getFavorites(session: AuthSession) = Favorites()
         override suspend fun setFavorite(
             session: AuthSession,
@@ -63,6 +81,18 @@ class DefaultFavoritesRepositoryTest {
         ) {
             if (failMutation) error("failure")
             this.target = target
+            this.isFavorite = isFavorite
+        }
+
+        override suspend fun setFavorites(
+            session: AuthSession,
+            targets: List<FavoriteTarget>,
+            isFavorite: Boolean,
+        ) {
+            if (failMutation) error("failure")
+            batchCalls += 1
+            this.targets = targets
+            this.target = targets.singleOrNull()
             this.isFavorite = isFavorite
         }
     }

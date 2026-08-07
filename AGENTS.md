@@ -36,6 +36,10 @@
 - Use direct `.value = ...` assignment only for intentional replacement that does not depend on the previous state.
 - Always use named arguments when passing boolean literals.
 
+## Kotlin Style
+
+- Always use braces for conditional branches. Do not write single-line `if`/`else` branches without braces.
+
 ## Navigation
 
 - Use Navigation 3 as the application's navigation framework.

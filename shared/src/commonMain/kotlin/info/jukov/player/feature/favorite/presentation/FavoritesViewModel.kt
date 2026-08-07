@@ -8,6 +8,7 @@ import info.jukov.player.feature.download.presentation.DownloadDelegate
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
+import info.jukov.player.feature.favorite.domain.favoriteStateForSelection
 import info.jukov.player.feature.favorite.domain.Favorites
 import info.jukov.player.feature.favorite.domain.FavoritesRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -94,6 +95,39 @@ class FavoritesViewModel(
     fun downloadTrack(track: Track) = viewModelScope.launch { downloadDelegate.download(track) }
     fun cancelTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelTrack(id) }
     fun retryTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.retry(id) }
+    fun toggleFavorites(tracks: List<Track>) = viewModelScope.launch {
+        val desired = favoriteStateForSelection(tracks)
+        val targets = tracks.filter { it.isFavorite != desired }
+            .map { FavoriteTarget.Track(it.id) }
+        if (targets.isEmpty()) {
+            return@launch
+        }
+        _pending.update { it + targets }
+        repository.setFavorites(targets, desired)
+            .onSuccess {
+                _state.update { current ->
+                    LoadableState.Content(
+                        targets.fold(current.content ?: Favorites()) { favorites, target ->
+                            favorites.updateFavorite(target, desired)
+                        },
+                    )
+                }
+            }
+            .onFailure { error ->
+                _messages.tryEmit(error.toAppError(AppError.FavoriteUpdateFailed))
+            }
+        _pending.update { it - targets.toSet() }
+    }
+    fun downloadTracks(tracks: List<Track>) = viewModelScope.launch {
+        val statuses = downloadStatuses.value
+        tracks.forEach { track ->
+            when (statuses[track.id]?.state) {
+                null -> downloadDelegate.download(track)
+                info.jukov.player.feature.download.domain.DownloadState.Failed -> downloadDelegate.retry(track.id)
+                else -> Unit
+            }
+        }
+    }
 
     private fun Favorites.updateFavorite(target: FavoriteTarget, isFavorite: Boolean) = when (target) {
         is FavoriteTarget.Track -> copy(

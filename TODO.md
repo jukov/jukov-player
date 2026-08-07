@@ -1,8 +1,8 @@
-- Queue
+- Actions for items
+- Cross links from album to artist, etc.
 - Playlists
 - History
 - Load state
-- Cross links from album to artist, etc.
 - Year of the album
 - Scroll between downloaded pages
 - Add artist tab on downloads
@@ -10,3 +10,5 @@
 - App icon
 - App name
 - On back pressed on player close it
+- Cancel loading from notification
+- Long loading of all tracks list even if cache is presented

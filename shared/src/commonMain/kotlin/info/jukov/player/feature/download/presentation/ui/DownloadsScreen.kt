@@ -23,6 +23,9 @@ import info.jukov.player.feature.download.presentation.DownloadsTab
 import info.jukov.player.feature.download.presentation.DownloadsViewModel
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.presentation.ui.TracksList
+import info.jukov.player.feature.track.presentation.ui.TrackSelectionTopAppBar
+import info.jukov.player.feature.track.presentation.ui.TrackTrailingAction
+import info.jukov.player.feature.track.presentation.ui.rememberTrackSelectionState
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -37,21 +40,38 @@ fun DownloadsScreen(
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
     isPlaying: Boolean,
+    onAddToQueue: (List<Track>) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val tab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val library = state.content ?: OfflineLibrary()
+    val tracks = library.tracks.map { it.track }
+    val selectionState = rememberTrackSelectionState(
+        tracks = tracks,
+        active = tab == DownloadsTab.Tracks,
+    )
     Scaffold(
         topBar = {
             Column {
-                AppFlexibleTopAppBar(
-                    title = stringResource(Res.string.downloads),
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.back))
-                        }
-                    },
-                )
+                if (selectionState.isActive) {
+                    TrackSelectionTopAppBar(
+                        selectedCount = selectionState.selectedCount,
+                        allSelectedFavorite = selectionState.areAllSelectedFavorite(tracks),
+                        onClose = selectionState::clear,
+                        onFavorite = { selectionState.finish(tracks, viewModel::toggleFavorites) },
+                        onDownload = selectionState::clear,
+                        onAddToQueue = { selectionState.finish(tracks, onAddToQueue) },
+                    )
+                } else {
+                    AppFlexibleTopAppBar(
+                        title = stringResource(Res.string.downloads),
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.back))
+                            }
+                        },
+                    )
+                }
                 PrimaryTabRow(selectedTabIndex = tab.ordinal) {
                     DownloadsTab.entries.forEach { item ->
                         Tab(
@@ -71,7 +91,6 @@ fun DownloadsScreen(
                 DownloadsTab.Tracks -> {
                     if (library.tracks.isEmpty()) EmptyDownloads(Res.string.no_downloaded_tracks)
                     else {
-                        val tracks = library.tracks.map { it.track }
                         TracksList(
                             tracks = tracks,
                             error = null,
@@ -82,6 +101,11 @@ fun DownloadsScreen(
                             downloadStatuses = library.tracks.associate { it.track.id to it.status },
                             onCancelDownload = viewModel::removeTrack,
                             onRetryDownload = viewModel::retryTrack,
+                            onFavoriteClick = viewModel::toggleFavorite,
+                            selectionMode = selectionState.isActive,
+                            selectedIds = selectionState.selectedIds,
+                            onSelectionChange = selectionState::setSelected,
+                            trailingAction = TrackTrailingAction.RemoveDownload,
                         )
                     }
                 }
@@ -112,19 +136,32 @@ fun OfflineAlbumTracksScreen(
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
     isPlaying: Boolean,
+    onAddToQueue: (List<Track>) -> Unit,
 ) {
     val offlineTracks by viewModel.albumTracks(albumId).collectAsStateWithLifecycle(emptyList())
     val tracks = offlineTracks.map { it.track }
+    val selectionState = rememberTrackSelectionState(tracks, key = albumId)
     Scaffold(
         topBar = {
-            AppFlexibleTopAppBar(
-                title = albumName,
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.back))
-                    }
-                },
-            )
+            if (selectionState.isActive) {
+                TrackSelectionTopAppBar(
+                    selectedCount = selectionState.selectedCount,
+                    allSelectedFavorite = selectionState.areAllSelectedFavorite(tracks),
+                    onClose = selectionState::clear,
+                    onFavorite = { selectionState.finish(tracks, viewModel::toggleFavorites) },
+                    onDownload = selectionState::clear,
+                    onAddToQueue = { selectionState.finish(tracks, onAddToQueue) },
+                )
+            } else {
+                AppFlexibleTopAppBar(
+                    title = albumName,
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.back))
+                        }
+                    },
+                )
+            }
         },
     ) { padding ->
         TracksList(
@@ -137,6 +174,11 @@ fun OfflineAlbumTracksScreen(
             downloadStatuses = offlineTracks.associate { it.track.id to it.status },
             onCancelDownload = viewModel::removeTrack,
             onRetryDownload = viewModel::retryTrack,
+            onFavoriteClick = viewModel::toggleFavorite,
+            selectionMode = selectionState.isActive,
+            selectedIds = selectionState.selectedIds,
+            onSelectionChange = selectionState::setSelected,
+            trailingAction = TrackTrailingAction.RemoveDownload,
             modifier = Modifier.padding(padding),
         )
     }

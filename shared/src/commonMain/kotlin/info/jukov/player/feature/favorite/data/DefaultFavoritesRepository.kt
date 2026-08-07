@@ -66,17 +66,29 @@ class DefaultFavoritesRepository(
     }
 
     override suspend fun setFavorite(target: FavoriteTarget, isFavorite: Boolean): Result<Unit> =
-        withSession { session -> api.setFavorite(session, target, isFavorite) }
+        setFavorites(listOf(target), isFavorite)
+
+    override suspend fun setFavorites(
+        targets: List<FavoriteTarget>,
+        isFavorite: Boolean,
+    ): Result<Unit> {
+        if (targets.isEmpty()) {
+            return Result.success(Unit)
+        }
+        return withSession { session -> api.setFavorites(session, targets, isFavorite) }
             .onSuccess {
                 val session = (authRepository.authState.value as AuthState.LoggedIn).session
-                val type = when (target) {
-                    is FavoriteTarget.Artist -> CacheItemType.ARTIST
-                    is FavoriteTarget.Album -> CacheItemType.ALBUM
-                    is FavoriteTarget.Track -> CacheItemType.TRACK
+                targets.forEach { target ->
+                    val type = when (target) {
+                        is FavoriteTarget.Artist -> CacheItemType.ARTIST
+                        is FavoriteTarget.Album -> CacheItemType.ALBUM
+                        is FavoriteTarget.Track -> CacheItemType.TRACK
+                    }
+                    dao?.setFavorite(session.accountKey, type, target.id, isFavorite)
+                    _changes.emit(FavoriteChange(target, isFavorite))
                 }
-                dao?.setFavorite(session.accountKey, type, target.id, isFavorite)
-                _changes.emit(FavoriteChange(target, isFavorite))
             }
+    }
 
     private suspend fun <T> withSession(block: suspend (AuthSession) -> T): Result<T> = runCatching {
         val session = (authRepository.authState.value as? AuthState.LoggedIn)?.session

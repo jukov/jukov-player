@@ -2,6 +2,8 @@ package info.jukov.player.feature.playback.domain
 
 import info.jukov.player.feature.track.domain.Track
 
+internal fun appendQueueItems(queue: List<Track>, tracks: List<Track>): List<Track> = queue + tracks
+
 internal fun moveFutureQueueItem(
     queue: List<Track>,
     currentIndex: Int,

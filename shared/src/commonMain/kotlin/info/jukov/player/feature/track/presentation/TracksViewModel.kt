@@ -10,6 +10,7 @@ import info.jukov.player.feature.track.domain.GetTracksUseCase
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
+import info.jukov.player.feature.favorite.domain.favoriteStateForSelection
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -108,6 +109,22 @@ class TracksViewModel(
     fun downloadTrack(track: Track) = viewModelScope.launch { downloadDelegate.download(track) }
     fun cancelTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelTrack(id) }
     fun retryTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.retry(id) }
+    fun toggleFavorites(tracks: List<Track>) = viewModelScope.launch {
+        val desired = favoriteStateForSelection(tracks)
+        favoriteDelegate.set(tracks, desired) { track, isFavorite ->
+            updateFavorite(track.id, isFavorite)
+        }
+    }
+    fun downloadTracks(tracks: List<Track>) = viewModelScope.launch {
+        val statuses = downloadStatuses.value
+        tracks.forEach { track ->
+            when (statuses[track.id]?.state) {
+                null -> downloadDelegate.download(track)
+                info.jukov.player.feature.download.domain.DownloadState.Failed -> downloadDelegate.retry(track.id)
+                else -> Unit
+            }
+        }
+    }
     fun downloadAlbum(album: Album) = viewModelScope.launch { downloadDelegate.download(album) }
     fun cancelAlbumDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelAlbum(id) }
 

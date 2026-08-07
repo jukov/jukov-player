@@ -39,6 +39,18 @@ class PlaybackQueueOperationsTest {
         assertEquals(queue, moveFutureQueueItemsToTop(queue, currentIndex = 1, indices = setOf(0, 1, 10)))
     }
 
+    @Test
+    fun appendsTracksInOrderAndKeepsDuplicates() {
+        val added = listOf(track("two"), track("four"), track("two"))
+        assertEquals(queue.ids() + listOf("two", "four", "two"), appendQueueItems(queue, added).ids())
+    }
+
+    @Test
+    fun appendsToEmptyQueue() {
+        val added = listOf(track("one"), track("two"))
+        assertEquals(added, appendQueueItems(emptyList(), added))
+    }
+
     private fun List<Track>.ids() = map(Track::id)
 
     private fun track(id: String) = Track(

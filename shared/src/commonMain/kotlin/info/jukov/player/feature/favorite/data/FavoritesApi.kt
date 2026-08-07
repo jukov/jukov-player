@@ -7,4 +7,11 @@ import info.jukov.player.feature.favorite.domain.Favorites
 interface FavoritesApi {
     suspend fun getFavorites(session: AuthSession): Favorites
     suspend fun setFavorite(session: AuthSession, target: FavoriteTarget, isFavorite: Boolean)
+    suspend fun setFavorites(
+        session: AuthSession,
+        targets: List<FavoriteTarget>,
+        isFavorite: Boolean,
+    ) {
+        targets.forEach { setFavorite(session, it, isFavorite) }
+    }
 }

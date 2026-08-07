@@ -8,4 +8,5 @@ interface FavoritesRepository {
     val changes: SharedFlow<FavoriteChange>
     fun getFavorites(forceRefresh: Boolean = false): Flow<LoadableState<Favorites>>
     suspend fun setFavorite(target: FavoriteTarget, isFavorite: Boolean): Result<Unit>
+    suspend fun setFavorites(targets: List<FavoriteTarget>, isFavorite: Boolean): Result<Unit>
 }

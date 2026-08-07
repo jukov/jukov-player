@@ -52,6 +52,11 @@
     <string name="queue_empty">После текущего трека очередь пуста</string>
     <string name="selected_tracks">Выбрано: %1$d</string>
     <string name="select_track">Выбрать %1$s</string>
+    <string name="selected_track">%1$s выбран</string>
+    <string name="clear_selection">Снять выделение</string>
+    <string name="download_selected_tracks">Скачать выбранные треки</string>
+    <string name="favorite_selected_tracks">Добавить выбранные треки в избранное</string>
+    <string name="add_selected_to_queue">Добавить выбранные треки в очередь</string>
     <string name="move_track">Переместить %1$s</string>
     <string name="move_selected_to_top">Переместить выбранные треки наверх</string>
     <string name="remove_selected_tracks">Удалить выбранные треки</string>

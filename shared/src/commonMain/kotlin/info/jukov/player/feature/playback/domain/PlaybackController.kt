@@ -14,6 +14,7 @@ interface PlaybackController {
         startIndex: Int,
         origin: PlaybackOrigin,
     ) = play(tracks, startIndex)
+    fun addToQueue(tracks: List<Track>) = Unit
     fun playPause()
     fun next()
     fun previous()

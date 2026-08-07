@@ -75,6 +75,12 @@ class PlayerViewModel(
             controller.play(queue, startIndex = 0, origin = origin)
         }
     }
+    fun addToQueue(tracks: List<Track>) {
+        if (tracks.isEmpty()) return
+        viewModelScope.launch {
+            controller.addToQueue(queueResolver.resolve(tracks))
+        }
+    }
     fun playPause() = controller.playPause()
     fun next() = controller.next()
     fun previous() = controller.previous()

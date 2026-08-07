@@ -20,6 +20,7 @@ import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackControllerFactory
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
+import info.jukov.player.feature.playback.domain.appendQueueItems
 import info.jukov.player.feature.playback.domain.moveFutureQueueItem
 import info.jukov.player.feature.playback.domain.moveFutureQueueItemsToTop
 import info.jukov.player.feature.playback.domain.removeFutureQueueItems
@@ -111,6 +112,32 @@ private class AndroidPlaybackController(
         } else if (player.mediaItemCount > 0) {
             if (player.playbackState == Player.STATE_ENDED) player.seekToDefaultPosition()
             player.play()
+        }
+    }
+
+    override fun addToQueue(tracks: List<Track>) {
+        if (tracks.isEmpty()) return
+        if (tracks.any { it.streamUrl == null }) {
+            fail(AppError.MissingTrackStreamUrl)
+            return
+        }
+        val snapshot = _state.value.content ?: PlaybackSnapshot()
+        val wasEmpty = snapshot.queue.isEmpty()
+        val queue = appendQueueItems(snapshot.queue, tracks)
+        val currentIndex = if (wasEmpty) 0 else snapshot.currentIndex
+        playbackStore.write(queue, currentIndex, snapshot.origin)
+        _state.update {
+            LoadableState.Content(
+                snapshot.copy(
+                    queue = queue,
+                    currentIndex = currentIndex,
+                    durationMs = if (wasEmpty) tracks.first().durationMs else snapshot.durationMs,
+                ),
+            )
+        }
+        withController { player ->
+            player.addMediaItems(tracks.map(Track::toMediaItem))
+            if (wasEmpty) player.prepare()
         }
     }
 

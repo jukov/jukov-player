@@ -9,6 +9,7 @@ import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.subsonic.data.SubsonicEnvelopeDto
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.data.withSharedAlbumCoverArt
+import io.ktor.http.Parameters
 
 class SubsonicFavoritesApi(private val client: SubsonicApiClient) : FavoritesApi {
     override suspend fun getFavorites(session: AuthSession): Favorites {
@@ -66,16 +67,30 @@ class SubsonicFavoritesApi(private val client: SubsonicApiClient) : FavoritesApi
         target: FavoriteTarget,
         isFavorite: Boolean,
     ) {
-        val parameter = when (target) {
-            is FavoriteTarget.Track -> "id"
-            is FavoriteTarget.Album -> "albumId"
-            is FavoriteTarget.Artist -> "artistId"
+        setFavorites(session, listOf(target), isFavorite)
+    }
+
+    override suspend fun setFavorites(
+        session: AuthSession,
+        targets: List<FavoriteTarget>,
+        isFavorite: Boolean,
+    ) {
+        if (targets.isEmpty()) {
+            return
         }
         client.get(
             endpoint = if (isFavorite) "star" else "unstar",
             session = session,
             deserializer = SubsonicEnvelopeDto.serializer(),
-            parameters = mapOf(parameter to target.id),
+            parameters = Parameters.build {
+                targets.forEach { target ->
+                    when (target) {
+                        is FavoriteTarget.Track -> append("id", target.id)
+                        is FavoriteTarget.Album -> append("albumId", target.id)
+                        is FavoriteTarget.Artist -> append("artistId", target.id)
+                    }
+                }
+            },
         )
     }
 }

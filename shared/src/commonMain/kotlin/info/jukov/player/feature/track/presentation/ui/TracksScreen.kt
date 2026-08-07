@@ -1,6 +1,9 @@
 package info.jukov.player.feature.track.presentation.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,8 +26,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -32,6 +33,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -51,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -96,6 +99,7 @@ fun TracksScreen(
     activeTrackId: String? = null,
     isPlaying: Boolean = false,
     activeOrigin: PlaybackOrigin = PlaybackOrigin.TrackList,
+    onAddToQueue: (List<Track>) -> Unit = {},
 ) {
     LaunchedEffect(filter, albumIsFavorite) { viewModel.load(filter, albumIsFavorite) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -115,6 +119,7 @@ fun TracksScreen(
         snackbarError = null
     }
     val tracks = state.content.orEmpty()
+    val selectionState = rememberTrackSelectionState(tracks, key = filter)
     val collectionOrigin = when (filter) {
         is TracksFilter.ByAlbum -> PlaybackOrigin.Album(filter.albumId)
         is TracksFilter.ByArtist -> PlaybackOrigin.Artist(filter.artistId)
@@ -169,7 +174,16 @@ fun TracksScreen(
         ),
         topBar = {
             Column {
-                if (albumHeader == null) {
+                if (selectionState.isActive) {
+                    TrackSelectionTopAppBar(
+                        selectedCount = selectionState.selectedCount,
+                        allSelectedFavorite = selectionState.areAllSelectedFavorite(tracks),
+                        onClose = selectionState::clear,
+                        onFavorite = { selectionState.finish(tracks, viewModel::toggleFavorites) },
+                        onDownload = { selectionState.finish(tracks, viewModel::downloadTracks) },
+                        onAddToQueue = { selectionState.finish(tracks, onAddToQueue) },
+                    )
+                } else if (albumHeader == null) {
                     AppFlexibleTopAppBar(
                         title = artistName ?: stringResource(Res.string.tracks),
                         scrollBehavior = scrollBehavior,
@@ -267,6 +281,9 @@ fun TracksScreen(
                     onDownloadClick = viewModel::downloadTrack,
                     onCancelDownload = viewModel::cancelTrackDownload,
                     onRetryDownload = viewModel::retryTrackDownload,
+                    selectionMode = selectionState.isActive,
+                    selectedIds = selectionState.selectedIds,
+                    onSelectionChange = selectionState::setSelected,
                     artworkUris = artworkUris,
                     hasMore = hasMore,
                     isLoadingMore = loadingOrigin == LoadingOrigin.Pagination,
@@ -502,6 +519,10 @@ fun TracksList(
     hasMore: Boolean = false,
     isLoadingMore: Boolean = false,
     onLoadMore: () -> Unit = {},
+    selectionMode: Boolean = false,
+    selectedIds: Set<String> = emptySet(),
+    onSelectionChange: (String, Boolean) -> Unit = { _, _ -> },
+    trailingAction: TrackTrailingAction = TrackTrailingAction.Favorite,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -533,6 +554,10 @@ fun TracksList(
                 onCancelDownload = { onCancelDownload(track.id) },
                 onRetryDownload = { onRetryDownload(track.id) },
                 artworkUrl = track.coverArtId?.let(artworkUris::get) ?: track.coverArtUrl,
+                selectionMode = selectionMode,
+                selected = track.id in selectedIds,
+                onSelectedChange = { onSelectionChange(track.id, it) },
+                trailingAction = trailingAction,
             )
         }
         if (isLoadingMore) {
@@ -548,6 +573,9 @@ fun TracksList(
 
 private const val LOAD_MORE_THRESHOLD = 12
 
+enum class TrackTrailingAction { Favorite, RemoveDownload }
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackRow(
     track: Track,
@@ -562,20 +590,35 @@ fun TrackRow(
     onCancelDownload: () -> Unit = {},
     onRetryDownload: () -> Unit = {},
     artworkUrl: String? = track.coverArtUrl,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onSelectedChange: (Boolean) -> Unit = {},
+    trailingAction: TrackTrailingAction = TrackTrailingAction.Favorite,
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .combinedClickable(
+                onClick = {
+                    if (selectionMode) {
+                        onSelectedChange(!selected)
+                    }
+                },
+                onLongClick = { onSelectedChange(true) },
+            )
             .padding(horizontal = Padding.small, vertical = Padding.xSmall),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showTrackNumber) {
-            Text(
-                text = track.trackNumber?.toString().orEmpty(),
-                modifier = Modifier.width(28.dp),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            if (selectionMode) {
+                SelectionBadge(selected, track.title, Modifier.width(28.dp))
+            } else {
+                Text(
+                    text = track.trackNumber?.toString().orEmpty(),
+                    modifier = Modifier.width(28.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
         if (showArtwork) {
             Box(
@@ -595,6 +638,9 @@ fun TrackRow(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                     )
+                }
+                if (selectionMode) {
+                    SelectionBadge(selected, track.title, Modifier.align(Alignment.BottomEnd))
                 }
             }
             Spacer(Modifier.width(Padding.medium))
@@ -617,36 +663,83 @@ fun TrackRow(
             }
             DownloadBadge(downloadStatus, Modifier.align(Alignment.BottomEnd))
         }
-        Box {
-            IconButton(onClick = { menuExpanded = true }) {
-                Icon(painterResource(Res.drawable.more_vert), stringResource(Res.string.more_actions))
-            }
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(if (track.isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites)) },
-                    onClick = { menuExpanded = false; onFavoriteClick() },
-                    enabled = favoriteEnabled,
-                )
-                val action = when (downloadStatus?.state) {
-                    DownloadState.Queued, DownloadState.Downloading -> Res.string.cancel_download
-                    DownloadState.Completed -> Res.string.remove_download
-                    DownloadState.Failed -> Res.string.retry_download
-                    null -> Res.string.download
-                }
-                DropdownMenuItem(
-                    text = { Text(stringResource(action)) },
-                    onClick = {
-                        menuExpanded = false
-                        when (downloadStatus?.state) {
-                            DownloadState.Queued, DownloadState.Downloading, DownloadState.Completed -> onCancelDownload()
-                            DownloadState.Failed -> onRetryDownload()
-                            null -> onDownloadClick()
-                        }
-                    },
-                )
+        when (trailingAction) {
+            TrackTrailingAction.Favorite -> FavoriteToggleButton(
+                isFavorite = track.isFavorite,
+                onClick = onFavoriteClick,
+                enabled = favoriteEnabled,
+            )
+            TrackTrailingAction.RemoveDownload -> IconButton(onClick = onCancelDownload) {
+                Icon(painterResource(Res.drawable.delete), stringResource(Res.string.remove_download))
             }
         }
     }
+}
+
+@Composable
+private fun SelectionBadge(selected: Boolean, title: String, modifier: Modifier = Modifier) {
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.size(22.dp)
+                .clip(CircleShape)
+                .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) Icon(
+                painterResource(Res.drawable.check),
+                contentDescription = stringResource(Res.string.selected_track, title),
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TrackSelectionTopAppBar(
+    selectedCount: Int,
+    allSelectedFavorite: Boolean,
+    onClose: () -> Unit,
+    onFavorite: () -> Unit,
+    onDownload: () -> Unit,
+    onAddToQueue: () -> Unit,
+) {
+    TopAppBar(
+        title = { Text(stringResource(Res.string.selected_tracks, selectedCount)) },
+        navigationIcon = {
+            IconButton(onClick = onClose) {
+                Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.clear_selection))
+            }
+        },
+        actions = {
+            IconButton(onClick = onFavorite) {
+                Icon(
+                    painterResource(
+                        if (allSelectedFavorite) {
+                            Res.drawable.heart_outline
+                        } else {
+                            Res.drawable.heart
+                        },
+                    ),
+                    stringResource(
+                        if (allSelectedFavorite) {
+                            Res.string.remove_from_favorites
+                        } else {
+                            Res.string.favorite_selected_tracks
+                        },
+                    ),
+                )
+            }
+            IconButton(onClick = onDownload) {
+                Icon(painterResource(Res.drawable.download_circle), stringResource(Res.string.download_selected_tracks))
+            }
+            IconButton(onClick = onAddToQueue) {
+                Icon(painterResource(Res.drawable.playlist_play), stringResource(Res.string.add_selected_to_queue))
+            }
+        },
+    )
 }
 
 @Composable
