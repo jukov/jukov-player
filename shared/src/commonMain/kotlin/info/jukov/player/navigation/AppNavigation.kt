@@ -173,6 +173,7 @@ fun AppNavigation(
                                 )
                             }
                         },
+                        onAddToQueue = playerViewModel::addToQueue,
                     )
                 }
                 entry<Routes.Tracks> { route ->

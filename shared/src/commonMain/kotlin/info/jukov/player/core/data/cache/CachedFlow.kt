@@ -8,6 +8,7 @@ import info.jukov.player.feature.auth.domain.accountKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.CancellationException
 import kotlin.time.Clock
 
 fun <T> cachedLoadableFlow(
@@ -27,7 +28,7 @@ fun <T> cachedLoadableFlow(
         emit(LoadableState.Content(cached))
     } else {
         emit(LoadableState.Loading(if (metadata == null) null else cached))
-        try {
+        val result = try {
             policy.runDeduplicated(session.accountKey, queryKey) {
                 val serverRequiresRefresh = policy.shouldRefreshFromNetwork(session)
                 val cacheRequiresRefresh = forceRefresh || metadata == null
@@ -43,9 +44,16 @@ fun <T> cachedLoadableFlow(
                     )
                 }
             }
-            emit(LoadableState.Content(observe().first()))
+            LoadableState.Content(observe().first())
         } catch (error: Throwable) {
-            emit(LoadableState.Failure(error.toAppError(fallbackError), if (metadata == null) null else cached))
+            if (error is CancellationException) {
+                throw error
+            }
+            LoadableState.Failure(
+                error.toAppError(fallbackError),
+                if (metadata == null) null else cached,
+            )
         }
+        emit(result)
     }
 }

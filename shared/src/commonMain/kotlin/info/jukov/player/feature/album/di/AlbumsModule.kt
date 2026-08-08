@@ -16,6 +16,7 @@ import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.core.data.cache.CacheDao
 import info.jukov.player.core.data.cache.LibraryCachePolicy
 import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.track.domain.GetTracksUseCase
 
 @BindingContainer
 object AlbumsModule {
@@ -42,5 +43,11 @@ object AlbumsModule {
         getAlbumsUseCase: GetAlbumsUseCase,
         favoriteDelegate: FavoriteDelegate,
         downloadDelegate: DownloadDelegate,
-    ): AlbumsViewModel = AlbumsViewModel(getAlbumsUseCase, favoriteDelegate, downloadDelegate)
+        getTracksUseCase: GetTracksUseCase,
+    ): AlbumsViewModel = AlbumsViewModel(
+        getAlbumsUseCase,
+        favoriteDelegate,
+        downloadDelegate,
+        getTracksUseCase,
+    )
 }

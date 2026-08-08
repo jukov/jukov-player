@@ -18,11 +18,16 @@ import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
 import info.jukov.player.core.domain.toAppError
 import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.track.domain.GetTracksUseCase
+import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.track.domain.TracksFilter
+import kotlinx.coroutines.flow.first
 
 class AlbumsViewModel(
     private val getAlbumsUseCase: GetAlbumsUseCase,
     private val favoriteDelegate: FavoriteDelegate,
     private val downloadDelegate: DownloadDelegate,
+    private val getTracksUseCase: GetTracksUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Album>>>(
         LoadableState.Loading(content = null),
@@ -83,6 +88,27 @@ class AlbumsViewModel(
             }
         }
     }
+
+    fun toggleFavorites(albums: List<Album>) = viewModelScope.launch {
+        val desired = albums.any { !it.isFavorite }
+        favoriteDelegate.setAlbums(albums, desired) { album, isFavorite ->
+            updateFavorite(album.id, isFavorite)
+        }
+    }
+
+    fun downloadAlbums(albums: List<Album>) = viewModelScope.launch {
+        albums.forEach { downloadDelegate.download(it) }
+    }
+
+    fun addAlbumsToQueue(albums: List<Album>, onTracksReady: (List<Track>) -> Unit) =
+        viewModelScope.launch {
+            val tracks = albums.flatMap { album ->
+                getTracksUseCase(TracksFilter.ByAlbum(album.id))
+                    .first { it !is LoadableState.Loading }
+                    .content.orEmpty()
+            }
+            onTracksReady(tracks)
+        }
 
     private fun updateFavorite(id: String, isFavorite: Boolean) {
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }

@@ -1,4 +1,3 @@
-- Long press on album with selection
 - Click on track starts playback
 - Ripple on track row
 - Playlists
@@ -11,3 +10,4 @@
 - App name
 - Cancel loading from notification
 - Long loading of all tracks list even if cache is presented
+- Clear queue

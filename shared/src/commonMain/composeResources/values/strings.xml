@@ -53,10 +53,15 @@
     <string name="selected_tracks">Selected: %1$d</string>
     <string name="select_track">Select %1$s</string>
     <string name="selected_track">%1$s selected</string>
+    <string name="selected_albums">Selected: %1$d</string>
+    <string name="selected_album">%1$s selected</string>
     <string name="clear_selection">Clear selection</string>
     <string name="download_selected_tracks">Download selected tracks</string>
     <string name="favorite_selected_tracks">Add selected tracks to favorites</string>
     <string name="add_selected_to_queue">Add selected tracks to queue</string>
+    <string name="download_selected_albums">Download selected albums</string>
+    <string name="favorite_selected_albums">Add selected albums to favorites</string>
+    <string name="add_selected_albums_to_queue">Add selected albums to queue</string>
     <string name="move_track">Move %1$s</string>
     <string name="move_selected_to_top">Move selected tracks to the top</string>
     <string name="remove_selected_tracks">Remove selected tracks</string>

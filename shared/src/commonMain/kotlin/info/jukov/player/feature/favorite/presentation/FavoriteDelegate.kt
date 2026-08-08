@@ -7,6 +7,7 @@ import info.jukov.player.feature.favorite.domain.FavoriteChange
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.FavoritesRepository
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.album.domain.Album
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -64,6 +65,31 @@ class FavoriteDelegate(private val repository: FavoritesRepository) {
         changes.forEach { updateFavorite(it, isFavorite) }
         repository.setFavorites(
             changes.map { FavoriteTarget.Track(it.id) },
+            isFavorite,
+        ).onFailure { error ->
+            changes.forEach { updateFavorite(it, it.isFavorite) }
+            _messages.tryEmit(error.toAppError(AppError.FavoriteUpdateFailed))
+        }
+        _pending.update { it - ids }
+    }
+
+    suspend fun setAlbums(
+        albums: List<Album>,
+        isFavorite: Boolean,
+        updateFavorite: (Album, Boolean) -> Unit,
+    ) {
+        val pendingIds = _pending.value
+        val changes = albums.filter {
+            it.isFavorite != isFavorite && it.id !in pendingIds
+        }
+        if (changes.isEmpty()) {
+            return
+        }
+        val ids = changes.mapTo(mutableSetOf(), Album::id)
+        _pending.update { it + ids }
+        changes.forEach { updateFavorite(it, isFavorite) }
+        repository.setFavorites(
+            changes.map { FavoriteTarget.Album(it.id) },
             isFavorite,
         ).onFailure { error ->
             changes.forEach { updateFavorite(it, it.isFavorite) }

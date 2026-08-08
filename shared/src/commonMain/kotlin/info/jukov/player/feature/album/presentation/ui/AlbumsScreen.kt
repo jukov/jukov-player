@@ -1,7 +1,9 @@
 package info.jukov.player.feature.album.presentation.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -17,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +31,7 @@ import coil3.compose.AsyncImage
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.album.presentation.AlbumsViewModel
+import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.Padding
@@ -50,12 +54,14 @@ fun AlbumsScreen(
     onBack: () -> Unit,
     onAlbumClick: (Album) -> Unit,
     onAllTracksClick: () -> Unit,
+    onAddToQueue: (List<Track>) -> Unit = {},
 ) {
     LaunchedEffect(artistId) { viewModel.load(artistId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val albums = state.content.orEmpty()
+    val selectionState = rememberAlbumSelectionState(albums, key = artistId)
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -82,18 +88,33 @@ fun AlbumsScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             Column {
-                AppFlexibleTopAppBar(
-                    title = artistName ?: stringResource(Res.string.albums),
-                    scrollBehavior = scrollBehavior,
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                painterResource(Res.drawable.arrow_back),
-                                stringResource(Res.string.back)
-                            )
-                        }
-                    },
-                )
+                if (selectionState.isActive) {
+                    AlbumSelectionTopAppBar(
+                        selectedCount = selectionState.selectedCount,
+                        allSelectedFavorite = selectionState.areAllSelectedFavorite(albums),
+                        onClose = selectionState::clear,
+                        onFavorite = { selectionState.finish(albums, viewModel::toggleFavorites) },
+                        onDownload = { selectionState.finish(albums, viewModel::downloadAlbums) },
+                        onAddToQueue = {
+                            selectionState.finish(albums) {
+                                viewModel.addAlbumsToQueue(it, onAddToQueue)
+                            }
+                        },
+                    )
+                } else {
+                    AppFlexibleTopAppBar(
+                        title = artistName ?: stringResource(Res.string.albums),
+                        scrollBehavior = scrollBehavior,
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    painterResource(Res.drawable.arrow_back),
+                                    stringResource(Res.string.back)
+                                )
+                            }
+                        },
+                    )
+                }
                 if (loadingOrigin == LoadingOrigin.Automatic && albums.isNotEmpty()) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
@@ -142,6 +163,9 @@ fun AlbumsScreen(
                     isLoadingMore = loadingOrigin == LoadingOrigin.Pagination,
                     onLoadMore = viewModel::loadMore,
                     artworkUris = artworkUris,
+                    selectionMode = selectionState.isActive,
+                    selectedIds = selectionState.selectedIds,
+                    onSelectionChange = selectionState::setSelected,
                 )
             }
         }
@@ -163,6 +187,9 @@ fun AlbumsGrid(
     onLoadMore: () -> Unit = {},
     modifier: Modifier = Modifier,
     artworkUris: Map<String, String> = emptyMap(),
+    selectionMode: Boolean = false,
+    selectedIds: Set<String> = emptySet(),
+    onSelectionChange: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 180.dp),
@@ -203,6 +230,9 @@ fun AlbumsGrid(
                 onFavoriteClick = { onFavoriteClick(album) },
                 favoriteEnabled = album.id !in pendingIds,
                 artworkUrl = album.coverArtId?.let(artworkUris::get) ?: album.coverArtUrl,
+                selectionMode = selectionMode,
+                selected = album.id in selectedIds,
+                onSelectedChange = { onSelectionChange(album.id, it) },
             )
         }
         if (isLoadingMore) {
@@ -243,8 +273,22 @@ fun AlbumCard(
     onFavoriteClick: () -> Unit,
     favoriteEnabled: Boolean = true,
     artworkUrl: String? = album.coverArtUrl,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onSelectedChange: (Boolean) -> Unit = {},
 ) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Column(
+        Modifier.fillMaxWidth().combinedClickable(
+            onClick = {
+                if (selectionMode) {
+                    onSelectedChange(!selected)
+                } else {
+                    onClick()
+                }
+            },
+            onLongClick = { onSelectedChange(true) },
+        ),
+    ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(1f)
                 .clip(MaterialTheme.shapes.small)
@@ -268,6 +312,13 @@ fun AlbumCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            if (selectionMode) {
+                AlbumSelectionBadge(
+                    selected = selected,
+                    title = album.name,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(Padding.small),
+                )
+            }
         }
         Spacer(Modifier.height(Padding.small))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -287,9 +338,85 @@ fun AlbumCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            FavoriteToggleButton(album.isFavorite, onFavoriteClick, favoriteEnabled)
+            if (!selectionMode) {
+                FavoriteToggleButton(album.isFavorite, onFavoriteClick, favoriteEnabled)
+            }
         }
     }
+}
+
+@Composable
+private fun AlbumSelectionBadge(
+    selected: Boolean,
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier.size(28.dp)
+            .clip(CircleShape)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            )
+            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                painterResource(Res.drawable.check),
+                contentDescription = stringResource(Res.string.selected_album, title),
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AlbumSelectionTopAppBar(
+    selectedCount: Int,
+    allSelectedFavorite: Boolean,
+    onClose: () -> Unit,
+    onFavorite: () -> Unit,
+    onDownload: () -> Unit,
+    onAddToQueue: () -> Unit,
+) {
+    TopAppBar(
+        title = { Text(stringResource(Res.string.selected_albums, selectedCount)) },
+        navigationIcon = {
+            IconButton(onClick = onClose) {
+                Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.clear_selection))
+            }
+        },
+        actions = {
+            IconButton(onClick = onFavorite) {
+                Icon(
+                    painterResource(
+                        if (allSelectedFavorite) Res.drawable.heart_outline else Res.drawable.heart,
+                    ),
+                    stringResource(
+                        if (allSelectedFavorite) {
+                            Res.string.remove_from_favorites
+                        } else {
+                            Res.string.favorite_selected_albums
+                        },
+                    ),
+                )
+            }
+            IconButton(onClick = onDownload) {
+                Icon(
+                    painterResource(Res.drawable.download_circle),
+                    stringResource(Res.string.download_selected_albums),
+                )
+            }
+            IconButton(onClick = onAddToQueue) {
+                Icon(
+                    painterResource(Res.drawable.playlist_play),
+                    stringResource(Res.string.add_selected_albums_to_queue),
+                )
+            }
+        },
+    )
 }
 
 @Composable
