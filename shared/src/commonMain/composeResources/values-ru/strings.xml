@@ -21,6 +21,7 @@
     <string name="downloads">Загрузки</string>
     <string name="download">Скачать</string>
     <string name="cancel_download">Отменить загрузку</string>
+    <string name="cancel_all_downloads">Отменить все</string>
     <string name="retry_download">Повторить загрузку</string>
     <string name="remove_download">Удалить загрузку</string>
     <string name="no_downloaded_tracks">Нет загруженных треков</string>

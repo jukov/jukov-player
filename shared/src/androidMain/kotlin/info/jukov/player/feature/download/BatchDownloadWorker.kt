@@ -26,6 +26,7 @@ import io.ktor.utils.io.readAvailable
 import java.io.File
 import java.io.FileOutputStream
 import jukovplayer.shared.generated.resources.Res
+import jukovplayer.shared.generated.resources.cancel_all_downloads
 import jukovplayer.shared.generated.resources.download_notification_channel
 import jukovplayer.shared.generated.resources.download_notification_progress
 import jukovplayer.shared.generated.resources.download_notification_track_progress
@@ -37,6 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -53,6 +55,7 @@ class DownloadForegroundService : Service() {
     private val transferBuffer = ByteArray(DEFAULT_BUFFER_SIZE)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var downloadJob: Job? = null
+    private var accountKeyForActions: String? = null
     private val notificationMutex = Mutex()
     private var notificationState = NotificationState()
 
@@ -65,12 +68,30 @@ class DownloadForegroundService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
+        accountKeyForActions = accountKey
+        if (intent?.action == ACTION_CANCEL_ALL) {
+            scope.launch { cancelAllPendingDownloads(accountKey, startId) }
+            return START_NOT_STICKY
+        }
         if (downloadJob?.isActive != true) {
             downloadJob = scope.launch { runBatch(accountKey) }
         } else if (intent?.action == ACTION_QUEUE_CHANGED) {
             scope.launch { refreshForeground(accountKey) }
         }
         return START_STICKY
+    }
+
+    private suspend fun cancelAllPendingDownloads(accountKey: String, startId: Int) {
+        downloadJob?.cancelAndJoin()
+        val pending = dao.pendingOfflineTracks(accountKey)
+        pending.forEach { item ->
+            platform.cancelTrack(accountKey, item.trackId)
+            dao.deleteTrackOwnerships(accountKey, item.trackId)
+            dao.deleteOfflineTrack(accountKey, item.trackId)
+        }
+        platform.cancelRecovery(accountKey)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
     }
 
     override fun onDestroy() {
@@ -580,6 +601,15 @@ class DownloadForegroundService : Service() {
         }
     }
 
+    private fun cancelAllPendingIntent(): PendingIntent = PendingIntent.getService(
+        this,
+        CANCEL_REQUEST_CODE,
+        Intent(this, DownloadForegroundService::class.java)
+            .setAction(ACTION_CANCEL_ALL)
+            .putExtra(AndroidOfflinePlatform.KEY_ACCOUNT, accountKeyForActions),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
     private suspend fun foregroundInfo(
         completedCount: Int,
         batchSize: Int,
@@ -618,6 +648,11 @@ class DownloadForegroundService : Service() {
                 },
             )
             .setContentIntent(downloadsPendingIntent(NOTIFICATION_ID))
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                getString(Res.string.cancel_all_downloads),
+                cancelAllPendingIntent(),
+            )
             .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setProgress(100, (overall * 100).toInt().coerceIn(0, 100), false)
@@ -654,8 +689,10 @@ class DownloadForegroundService : Service() {
         const val CHANNEL_ID = "offline_downloads"
         const val NOTIFICATION_ID = 20_260_807
         const val COMPLETION_NOTIFICATION_ID = 20_260_808
+        const val CANCEL_REQUEST_CODE = 20_260_809
         const val EXTRA_OPEN_DOWNLOADS = "info.jukov.player.OPEN_DOWNLOADS"
         const val ACTION_QUEUE_CHANGED = "info.jukov.player.DOWNLOAD_QUEUE_CHANGED"
+        const val ACTION_CANCEL_ALL = "info.jukov.player.CANCEL_ALL_DOWNLOADS"
         const val MAX_TRACK_ATTEMPTS = 3
         const val RETRY_BASE_DELAY_MS = 1_000L
         const val PROGRESS_UPDATE_INTERVAL_MS = 100L
