@@ -1,5 +1,3 @@
-- Click on track starts playback
-- Ripple on track row
 - Playlists
 - History
 - Load state

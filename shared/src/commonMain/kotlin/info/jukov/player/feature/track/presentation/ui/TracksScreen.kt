@@ -550,7 +550,7 @@ fun TracksList(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(Padding.small)
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(top = Padding.medium)
             .withPlayerBottomInset(),
         verticalArrangement = Arrangement.spacedBy(Padding.small),
     ) {
@@ -625,11 +625,18 @@ fun TrackRow(
                 onClick = {
                     if (selectionMode) {
                         onSelectedChange(!selected)
+                    } else {
+                        onPlayClick()
                     }
                 },
                 onLongClick = { onSelectedChange(true) },
             )
-            .padding(horizontal = Padding.small, vertical = Padding.xSmall),
+            .padding(
+                start = Padding.medium,
+                end = Padding.small,
+                top = Padding.xSmall,
+                bottom = Padding.xSmall,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showTrackNumber) {
@@ -677,6 +684,13 @@ fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        if (trailingAction == TrackTrailingAction.Favorite) {
+            FavoriteToggleButton(
+                isFavorite = track.isFavorite,
+                onClick = onFavoriteClick,
+                enabled = favoriteEnabled,
+            )
+        }
         Box {
             IconButton(onClick = onPlayClick) {
                 Icon(
@@ -686,13 +700,8 @@ fun TrackRow(
             }
             DownloadBadge(downloadStatus, Modifier.align(Alignment.BottomEnd))
         }
-        when (trailingAction) {
-            TrackTrailingAction.Favorite -> FavoriteToggleButton(
-                isFavorite = track.isFavorite,
-                onClick = onFavoriteClick,
-                enabled = favoriteEnabled,
-            )
-            TrackTrailingAction.RemoveDownload -> IconButton(onClick = onCancelDownload) {
+        if (trailingAction == TrackTrailingAction.RemoveDownload) {
+            IconButton(onClick = onCancelDownload) {
                 Icon(painterResource(Res.drawable.delete), stringResource(Res.string.remove_download))
             }
         }
