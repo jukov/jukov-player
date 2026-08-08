@@ -87,13 +87,20 @@ fun AppNavigation(
                     LoginScreen(authUiState, authViewModel)
                 }
                 entry<Routes.Library> {
+                    val libraryViewModel = viewModel { graph.libraryViewModel }
                     LibraryScreen(
+                        viewModel = libraryViewModel,
                         onFavoritesClick = { backStack.add(Routes.Favorites) },
                         onTracksClick = { backStack.add(Routes.Tracks()) },
                         onArtistsClick = { backStack.add(Routes.Artists) },
                         onAlbumsClick = { backStack.add(Routes.Albums()) },
                         onDownloadsClick = { backStack.add(Routes.Downloads) },
                         onPlaylistsClick = { backStack.add(Routes.Playlists) },
+                        onArtistClick = { artist ->
+                            backStack.add(Routes.Albums(artist.id, artist.name))
+                        },
+                        onAlbumClick = { album -> backStack.add(album.tracksRoute()) },
+                        onTrackClick = { track -> playerViewModel.play(listOf(track), 0) },
                     )
                 }
                 entry<Routes.Downloads> {

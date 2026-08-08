@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -34,6 +36,7 @@ import info.jukov.player.feature.album.presentation.AlbumsViewModel
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
+import info.jukov.player.core.presentation.ui.SearchAction
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import info.jukov.player.core.presentation.ui.localizedMessage
@@ -59,9 +62,21 @@ fun AlbumsScreen(
 ) {
     LaunchedEffect(artistId) { viewModel.load(artistId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchState by viewModel.searchState.collectAsStateWithLifecycle()
+    val searchHasMore by viewModel.searchHasMore.collectAsStateWithLifecycle()
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
-    val albums = state.content.orEmpty()
+    val displayedState = if (searchActive && searchQuery.trim().length >= 2) searchState else state
+    val albums = displayedState.content.orEmpty()
+    val browseGridState = rememberLazyGridState()
+    val searchGridState = rememberLazyGridState()
+    LaunchedEffect(searchQuery) {
+        if (searchActive) {
+            searchGridState.scrollToItem(0)
+        }
+    }
     val selectionState = rememberAlbumSelectionState(albums, key = artistId)
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
@@ -120,6 +135,10 @@ fun AlbumsScreen(
                                 )
                             }
                         },
+                        actions = { SearchAction(viewModel::openSearch) },
+                        searchQuery = searchQuery.takeIf { searchActive },
+                        onSearchQueryChange = viewModel::updateSearchQuery,
+                        onSearchClose = viewModel::closeSearch,
                     )
                 }
                 if (loadingOrigin == LoadingOrigin.Automatic && albums.isNotEmpty()) {
@@ -133,7 +152,7 @@ fun AlbumsScreen(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             state = refreshState,
-            enabled = refreshEnabled,
+            enabled = refreshEnabled && !searchActive,
             indicator = {
                 PullToRefreshDefaults.LoadingIndicator(
                     state = refreshState,
@@ -144,31 +163,32 @@ fun AlbumsScreen(
             modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
         ) {
             when {
-                state is LoadableState.Loading && albums.isEmpty() && !isRefreshing -> CenteredLoading()
-                state is LoadableState.Failure && albums.isEmpty() -> CenteredError(
-                    error = (state as LoadableState.Failure).error,
-                    onRetry = viewModel::retry,
+                displayedState is LoadableState.Loading && albums.isEmpty() && !isRefreshing -> CenteredLoading()
+                displayedState is LoadableState.Failure && albums.isEmpty() -> CenteredError(
+                    error = (displayedState as LoadableState.Failure).error,
+                    onRetry = if (searchActive) viewModel::retrySearch else viewModel::retry,
                 )
 
-                albums.isEmpty() && artistId == null -> Box(
+                albums.isEmpty() && (artistId == null || searchActive) -> Box(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(stringResource(Res.string.albums_not_found))
+                    Text(stringResource(if (searchActive && searchQuery.length >= 2) Res.string.nothing_found else Res.string.albums_not_found))
                 }
 
                 else -> AlbumsGrid(
                     albums = albums,
-                    error = (state as? LoadableState.Failure)?.error,
-                    onRetry = viewModel::retry,
+                    error = (displayedState as? LoadableState.Failure)?.error,
+                    onRetry = if (searchActive) viewModel::retrySearch else viewModel::retry,
                     onAlbumClick = onAlbumClick,
                     pendingIds = pending,
                     onFavoriteClick = viewModel::toggleFavorite,
-                    onAllTracksClick = onAllTracksClick.takeIf { artistId != null },
+                    onAllTracksClick = onAllTracksClick.takeIf { artistId != null && !searchActive },
                     showEmptyMessage = albums.isEmpty(),
-                    hasMore = hasMore,
-                    isLoadingMore = loadingOrigin == LoadingOrigin.Pagination,
-                    onLoadMore = viewModel::loadMore,
+                    hasMore = if (searchActive) searchHasMore else hasMore,
+                    isLoadingMore = if (searchActive) searchState is LoadableState.Loading && albums.isNotEmpty() else loadingOrigin == LoadingOrigin.Pagination,
+                    onLoadMore = if (searchActive) viewModel::loadMoreSearch else viewModel::loadMore,
+                    gridState = if (searchActive) searchGridState else browseGridState,
                     artworkUris = artworkUris,
                     selectionMode = selectionState.isActive,
                     selectedIds = selectionState.selectedIds,
@@ -197,8 +217,10 @@ fun AlbumsGrid(
     selectionMode: Boolean = false,
     selectedIds: Set<String> = emptySet(),
     onSelectionChange: (String, Boolean) -> Unit = { _, _ -> },
+    gridState: LazyGridState = rememberLazyGridState(),
 ) {
     LazyVerticalGrid(
+        state = gridState,
         columns = GridCells.Adaptive(minSize = 180.dp),
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Padding.small).withPlayerBottomInset(),

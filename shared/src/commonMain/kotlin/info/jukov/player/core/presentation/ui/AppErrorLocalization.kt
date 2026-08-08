@@ -20,6 +20,7 @@ fun AppError.localizedMessage(): String = when (this) {
     AppError.PlaylistsLoadFailed -> stringResource(Res.string.error_playlists_load_failed)
     AppError.PlaylistLoadFailed -> stringResource(Res.string.error_playlist_load_failed)
     AppError.PlaylistUpdateFailed -> stringResource(Res.string.error_playlist_update_failed)
+    AppError.SearchFailed -> stringResource(Res.string.error_search_failed)
     is AppError.OpenSubsonic -> stringResource(Res.string.error_opensubsonic, code)
     is AppError.Http -> stringResource(Res.string.error_http, statusCode)
     AppError.InvalidServerResponse -> stringResource(Res.string.error_invalid_server_response)

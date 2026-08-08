@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -62,6 +64,7 @@ import coil3.compose.AsyncImage
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
+import info.jukov.player.core.presentation.ui.SearchAction
 import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBar
 import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBarState
 import info.jukov.player.core.presentation.ui.rememberAppCollapsingTopAppBarState
@@ -108,6 +111,10 @@ fun TracksScreen(
 ) {
     LaunchedEffect(filter, albumIsFavorite) { viewModel.load(filter, albumIsFavorite) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchState by viewModel.searchState.collectAsStateWithLifecycle()
+    val searchHasMore by viewModel.searchHasMore.collectAsStateWithLifecycle()
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val currentAlbumIsFavorite by viewModel.albumIsFavorite.collectAsStateWithLifecycle()
@@ -123,7 +130,15 @@ fun TracksScreen(
         snackbarMessage?.let { snackbarHostState.showSnackbar(it) }
         snackbarError = null
     }
-    val tracks = state.content.orEmpty()
+    val displayedState = if (searchActive && searchQuery.trim().length >= 2) searchState else state
+    val tracks = displayedState.content.orEmpty()
+    val browseListState = rememberLazyListState()
+    val searchListState = rememberLazyListState()
+    LaunchedEffect(searchQuery) {
+        if (searchActive) {
+            searchListState.scrollToItem(0)
+        }
+    }
     val selectionState = rememberTrackSelectionState(tracks, key = filter)
     val collectionOrigin = when (filter) {
         is TracksFilter.ByAlbum -> PlaybackOrigin.Album(filter.albumId)
@@ -204,7 +219,13 @@ fun TracksScreen(
                                     enabled = tracks.isNotEmpty(),
                                 )
                             }
+                            if (filter !is TracksFilter.ByAlbum) {
+                                SearchAction(viewModel::openSearch)
+                            }
                         },
+                        searchQuery = searchQuery.takeIf { searchActive },
+                        onSearchQueryChange = viewModel::updateSearchQuery,
+                        onSearchClose = viewModel::closeSearch,
                     )
                 } else {
                     AlbumTracksTopAppBar(
@@ -249,7 +270,7 @@ fun TracksScreen(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             state = pullToRefreshState,
-            enabled = isPullToRefreshEnabled,
+            enabled = isPullToRefreshEnabled && !searchActive,
             indicator = {
                 PullToRefreshDefaults.LoadingIndicator(
                     state = pullToRefreshState,
@@ -260,25 +281,25 @@ fun TracksScreen(
             modifier = Modifier.fillMaxSize().padding(scaffoldPadding),
         ) {
             when {
-                state is LoadableState.Loading && tracks.isEmpty() && !isRefreshing -> CenteredLoading()
+                displayedState is LoadableState.Loading && tracks.isEmpty() && !isRefreshing -> CenteredLoading()
 
-                state is LoadableState.Failure && tracks.isEmpty() -> CenteredError(
-                    error = (state as LoadableState.Failure).error,
-                    onRetry = viewModel::retry,
+                displayedState is LoadableState.Failure && tracks.isEmpty() -> CenteredError(
+                    error = (displayedState as LoadableState.Failure).error,
+                    onRetry = if (searchActive) viewModel::retrySearch else viewModel::retry,
                 )
 
                 tracks.isEmpty() -> Box(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(stringResource(Res.string.tracks_not_found))
+                    Text(stringResource(if (searchActive && searchQuery.length >= 2) Res.string.nothing_found else Res.string.tracks_not_found))
                 }
 
                 else -> TracksList(
                     tracks = tracks,
                     showArtwork = filter !is TracksFilter.ByAlbum,
                     showTrackNumber = filter is TracksFilter.ByAlbum,
-                    error = (state as? LoadableState.Failure)?.error,
+                    error = (displayedState as? LoadableState.Failure)?.error,
                     onPlayClick = { queue, index ->
                         onPlayClick(queue, index, PlaybackOrigin.TrackList)
                     },
@@ -295,9 +316,10 @@ fun TracksScreen(
                     selectedIds = selectionState.selectedIds,
                     onSelectionChange = selectionState::setSelected,
                     artworkUris = artworkUris,
-                    hasMore = hasMore,
-                    isLoadingMore = loadingOrigin == LoadingOrigin.Pagination,
-                    onLoadMore = viewModel::loadMore,
+                    hasMore = if (searchActive) searchHasMore else hasMore,
+                    isLoadingMore = if (searchActive) searchState is LoadableState.Loading && tracks.isNotEmpty() else loadingOrigin == LoadingOrigin.Pagination,
+                    onLoadMore = if (searchActive) viewModel::loadMoreSearch else viewModel::loadMore,
+                    listState = if (searchActive) searchListState else browseListState,
                 )
             }
         }
@@ -552,8 +574,10 @@ fun TracksList(
     selectionKey: (Int, Track) -> String = { _, track -> track.id },
     trailingAction: TrackTrailingAction = TrackTrailingAction.Favorite,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = Padding.medium)
             .withPlayerBottomInset(),

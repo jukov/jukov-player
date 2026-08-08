@@ -3,7 +3,6 @@ package info.jukov.player.feature.artist.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import info.jukov.player.core.domain.AppError
-import info.jukov.player.core.domain.toAppError
 import info.jukov.player.feature.artist.domain.Artist
 import info.jukov.player.feature.artist.domain.GetArtistsUseCase
 import info.jukov.player.feature.auth.domain.AuthRepository
@@ -19,11 +18,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
+import info.jukov.player.feature.search.domain.SearchUseCase
+import info.jukov.player.feature.search.presentation.PagedSearchDelegate
 
 class ArtistsViewModel(
     private val getArtistsUseCase: GetArtistsUseCase,
     authRepository: AuthRepository,
     private val favoriteDelegate: FavoriteDelegate,
+    search: SearchUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Artist>>>(
         LoadableState.Loading(content = null),
@@ -33,6 +35,11 @@ class ArtistsViewModel(
     val loadingOrigin: StateFlow<LoadingOrigin?> = _loadingOrigin.asStateFlow()
     val pending = favoriteDelegate.pending
     val messages = favoriteDelegate.messages
+    private val searchDelegate = PagedSearchDelegate(viewModelScope, search::artists)
+    val searchActive = searchDelegate.active
+    val searchQuery = searchDelegate.query
+    val searchState = searchDelegate.state
+    val searchHasMore = searchDelegate.hasMore
     private var loadJob: Job? = null
 
     init {
@@ -42,6 +49,7 @@ class ArtistsViewModel(
                     is AuthState.LoggedIn -> loadArtists(forceRefresh = false)
                     AuthState.LoggedOut -> _state.update {
                         loadJob?.cancel()
+                        closeSearch()
                         _loadingOrigin.value = null
                         LoadableState.Content(emptyList())
                     }
@@ -59,6 +67,12 @@ class ArtistsViewModel(
     fun retry() = loadArtists(forceRefresh = true)
     fun refresh() = loadArtists(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
 
+    fun openSearch() = searchDelegate.open()
+    fun updateSearchQuery(value: String) = searchDelegate.updateQuery(value)
+    fun loadMoreSearch() = searchDelegate.loadMore()
+    fun retrySearch() = searchDelegate.retry()
+    fun closeSearch() = searchDelegate.close()
+
     fun toggleFavorite(artist: Artist) {
         viewModelScope.launch {
             favoriteDelegate.toggle(FavoriteTarget.Artist(artist.id), artist.isFavorite) {
@@ -69,6 +83,7 @@ class ArtistsViewModel(
 
     private fun updateFavorite(id: String, isFavorite: Boolean) {
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }
+        searchDelegate.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }
     }
 
     private fun loadArtists(forceRefresh: Boolean, requestedOrigin: LoadingOrigin? = null) {

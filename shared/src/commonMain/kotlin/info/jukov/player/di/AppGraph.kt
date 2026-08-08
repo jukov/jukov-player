@@ -31,6 +31,8 @@ import info.jukov.player.feature.playlist.di.PlaylistsModule
 import info.jukov.player.feature.playlist.presentation.PlaylistPickerViewModel
 import info.jukov.player.feature.playlist.presentation.PlaylistViewModel
 import info.jukov.player.feature.playlist.presentation.PlaylistsViewModel
+import info.jukov.player.feature.search.di.SearchModule
+import info.jukov.player.feature.library.presentation.LibraryViewModel
 
 @DependencyGraph(
     scope = AppScope::class,
@@ -44,6 +46,7 @@ import info.jukov.player.feature.playlist.presentation.PlaylistsViewModel
         FavoritesModule::class,
         DownloadsModule::class,
         PlaylistsModule::class,
+        SearchModule::class,
     ],
 )
 interface AppGraph {
@@ -63,6 +66,7 @@ interface AppGraph {
     val playlistsViewModel: PlaylistsViewModel
     val playlistViewModel: PlaylistViewModel
     val playlistPickerViewModel: PlaylistPickerViewModel
+    val libraryViewModel: LibraryViewModel
 
     @DependencyGraph.Factory
     fun interface Factory {

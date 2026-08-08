@@ -27,39 +27,54 @@ class DefaultDownloadsRepository(
     override fun observeLibrary(): Flow<OfflineLibrary> = authRepository.authState.flatMapLatest { state ->
         val accountKey = (state as? AuthState.LoggedIn)?.session?.accountKey
             ?: return@flatMapLatest flowOf(OfflineLibrary())
-        observeLibrary(accountKey)
+        observeLibrary(accountKey, query = null)
     }
 
-    private fun observeLibrary(accountKey: String): Flow<OfflineLibrary> {
+    override fun searchLibrary(query: String): Flow<OfflineLibrary> = authRepository.authState.flatMapLatest { state ->
+        val accountKey = (state as? AuthState.LoggedIn)?.session?.accountKey
+            ?: return@flatMapLatest flowOf(OfflineLibrary())
+        observeLibrary(accountKey, query.trim())
+    }
+
+    private fun observeLibrary(accountKey: String, query: String?) : Flow<OfflineLibrary> {
         val metadata = combine(
             dao.observeAccountTracks(accountKey),
             dao.observeAccountAlbums(accountKey),
         ) { tracks, albums -> tracks to albums }
+        val downloads = if (query == null) {
+            dao.observeOfflineTracks(accountKey).map { it to it }
+        } else {
+            combine(
+                dao.observeOfflineTracksSearch(accountKey, query),
+                dao.observeOfflineTracks(accountKey),
+            ) { visible, all -> visible to all }
+        }
         return combine(
-            dao.observeOfflineTracks(accountKey),
-            dao.observeOfflineAlbums(accountKey),
+            downloads,
+            query?.let { dao.observeOfflineAlbumsSearch(accountKey, it) } ?: dao.observeOfflineAlbums(accountKey),
             dao.observeDownloadOwnerships(accountKey),
             dao.observeOfflineArtworks(accountKey),
             metadata,
-        ) { downloads, offlineAlbums, ownerships, artworks, (tracks, albums) ->
+        ) { (visibleDownloads, allDownloads), offlineAlbums, ownerships, artworks, (tracks, albums) ->
             val tracksById = tracks.associateBy(TrackEntity::id)
             val albumsById = albums.associateBy(AlbumEntity::id)
             val artworkPaths = artworks.filter { it.state == DownloadState.Completed.name }
                 .associate { it.coverArtId to it.relativePath }
-            val offlineTracks = downloads.mapNotNull { download ->
+            val allOfflineTracks = allDownloads.mapNotNull { download ->
                 val track = tracksById[download.trackId] ?: return@mapNotNull null
                 download.trackId to download.toOfflineTrack(
                     track, accountKey, platform, artworkPaths[track.coverArtId],
                 )
             }.toMap()
+            val visibleTrackIds = visibleDownloads.mapTo(hashSetOf()) { it.trackId }
             OfflineLibrary(
-                tracks = offlineTracks.values.toList(),
+                tracks = allOfflineTracks.filterKeys { it in visibleTrackIds }.values.toList(),
                 albums = offlineAlbums.mapNotNull { offlineAlbum ->
                     val album = albumsById[offlineAlbum.albumId] ?: return@mapNotNull null
                     val albumTracks = ownerships.asSequence()
                         .filter { it.ownerType == OWNER_ALBUM && it.ownerId == offlineAlbum.albumId }
                         .sortedBy { it.position }
-                        .mapNotNull { offlineTracks[it.trackId] }
+                        .mapNotNull { allOfflineTracks[it.trackId] }
                         .toList()
                     OfflineAlbum(
                         album.toDomain(accountKey, platform, artworkPaths[album.coverArtId]),

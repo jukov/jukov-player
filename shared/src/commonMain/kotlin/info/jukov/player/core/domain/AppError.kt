@@ -15,6 +15,7 @@ sealed interface AppError {
     data object PlaylistsLoadFailed : AppError
     data object PlaylistLoadFailed : AppError
     data object PlaylistUpdateFailed : AppError
+    data object SearchFailed : AppError
 
     data class OpenSubsonic(val code: Int) : AppError
     data class Http(val statusCode: Int) : AppError

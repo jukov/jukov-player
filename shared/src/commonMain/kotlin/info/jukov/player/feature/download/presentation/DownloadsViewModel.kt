@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import info.jukov.player.feature.download.domain.OfflineTrack
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.favoriteStateForSelection
@@ -17,6 +19,7 @@ import info.jukov.player.feature.track.domain.Track
 
 enum class DownloadsTab { Tracks, Albums }
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class DownloadsViewModel(
     private val repository: DownloadsRepository,
     private val favoriteDelegate: FavoriteDelegate,
@@ -27,14 +30,24 @@ class DownloadsViewModel(
     val state = _state.asStateFlow()
     private val _selectedTab = MutableStateFlow(DownloadsTab.Tracks)
     val selectedTab = _selectedTab.asStateFlow()
+    private val _searchActive = MutableStateFlow(false)
+    val searchActive = _searchActive.asStateFlow()
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery = _searchQuery.asStateFlow()
 
     init {
         viewModelScope.launch {
-            repository.observeLibrary().collect { _state.value = LoadableState.Content(it) }
+            combine(_searchActive, _searchQuery) { active, query -> active to query }
+                .flatMapLatest { (active, query) ->
+                    if (active && query.isNotBlank()) repository.searchLibrary(query) else repository.observeLibrary()
+                }.collect { _state.value = LoadableState.Content(it) }
         }
     }
 
     fun selectTab(tab: DownloadsTab) { _selectedTab.value = tab }
+    fun openSearch() { _searchActive.value = true }
+    fun updateSearchQuery(value: String) { _searchQuery.value = value }
+    fun closeSearch() { _searchActive.value = false; _searchQuery.value = "" }
     fun removeTrack(id: String) = viewModelScope.launch { repository.cancelTrack(id) }
     fun removeAlbum(id: String) = viewModelScope.launch { repository.cancelAlbum(id) }
     fun retryTrack(id: String) = viewModelScope.launch { repository.retryTrack(id) }

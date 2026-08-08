@@ -1,4 +1,5 @@
 <resources>
+    <string name="search">Поиск</string><string name="close_search">Закрыть поиск</string><string name="nothing_found">Ничего не найдено</string><string name="error_search_failed">Не удалось выполнить поиск</string>
     <string name="app_name">Jukov Player</string>
     <string name="login_subtitle">Подключитесь к своему Subsonic-серверу</string>
     <string name="server">Сервер</string>

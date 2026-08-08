@@ -20,8 +20,37 @@ interface CacheDao {
     @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND EXISTS (SELECT 1 FROM DownloadOwnershipEntity o WHERE o.accountKey=OfflineTrackEntity.accountKey AND o.trackId=OfflineTrackEntity.trackId) ORDER BY requestedAtMs DESC")
     fun observeOfflineTracks(accountKey: String): Flow<List<OfflineTrackEntity>>
 
+    @Query("""
+        SELECT d.* FROM OfflineTrackEntity d
+        JOIN TrackEntity t ON t.accountKey=d.accountKey AND t.id=d.trackId
+        WHERE d.accountKey=:accountKey
+          AND EXISTS (
+              SELECT 1 FROM DownloadOwnershipEntity o
+              WHERE o.accountKey=d.accountKey AND o.trackId=d.trackId
+          )
+          AND (
+              t.title LIKE '%' || :query || '%' COLLATE NOCASE
+              OR t.artist LIKE '%' || :query || '%' COLLATE NOCASE
+              OR COALESCE(t.album, '') LIKE '%' || :query || '%' COLLATE NOCASE
+          )
+        ORDER BY d.requestedAtMs DESC
+    """)
+    fun observeOfflineTracksSearch(accountKey: String, query: String): Flow<List<OfflineTrackEntity>>
+
     @Query("SELECT * FROM OfflineAlbumEntity WHERE accountKey=:accountKey ORDER BY requestedAtMs DESC")
     fun observeOfflineAlbums(accountKey: String): Flow<List<OfflineAlbumEntity>>
+
+    @Query("""
+        SELECT d.* FROM OfflineAlbumEntity d
+        JOIN AlbumEntity a ON a.accountKey=d.accountKey AND a.id=d.albumId
+        WHERE d.accountKey=:accountKey
+          AND (
+              a.name LIKE '%' || :query || '%' COLLATE NOCASE
+              OR a.artist LIKE '%' || :query || '%' COLLATE NOCASE
+          )
+        ORDER BY d.requestedAtMs DESC
+    """)
+    fun observeOfflineAlbumsSearch(accountKey: String, query: String): Flow<List<OfflineAlbumEntity>>
 
     @Query("SELECT * FROM DownloadOwnershipEntity WHERE accountKey=:accountKey")
     fun observeDownloadOwnerships(accountKey: String): Flow<List<DownloadOwnershipEntity>>

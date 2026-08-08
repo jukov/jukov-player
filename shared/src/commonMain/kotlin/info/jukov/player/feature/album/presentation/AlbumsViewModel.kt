@@ -22,12 +22,15 @@ import info.jukov.player.feature.track.domain.GetTracksUseCase
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import kotlinx.coroutines.flow.first
+import info.jukov.player.feature.search.domain.SearchUseCase
+import info.jukov.player.feature.search.presentation.PagedSearchDelegate
 
 class AlbumsViewModel(
     private val getAlbumsUseCase: GetAlbumsUseCase,
     private val favoriteDelegate: FavoriteDelegate,
     private val downloadDelegate: DownloadDelegate,
     private val getTracksUseCase: GetTracksUseCase,
+    search: SearchUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Album>>>(
         LoadableState.Loading(content = null),
@@ -40,6 +43,13 @@ class AlbumsViewModel(
     val artworkUris = downloadDelegate.artworkUris
     private val _hasMore = MutableStateFlow(false)
     val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+    private val searchDelegate = PagedSearchDelegate<Album>(viewModelScope) { query, offset, size ->
+        search.albums(query, offset, size, artistId)
+    }
+    val searchActive = searchDelegate.active
+    val searchQuery = searchDelegate.query
+    val searchState = searchDelegate.state
+    val searchHasMore = searchDelegate.hasMore
 
     private var artistId: String? = null
     private var initialized = false
@@ -56,6 +66,7 @@ class AlbumsViewModel(
 
     fun load(artistId: String?) {
         if (initialized && this.artistId == artistId) return
+        closeSearch()
         this.artistId = artistId
         initialized = true
         _hasMore.value = false
@@ -80,6 +91,12 @@ class AlbumsViewModel(
             loadPage(forceRefresh = false, append = true, requestedOrigin = LoadingOrigin.Pagination)
         }
     }
+
+    fun openSearch() = searchDelegate.open()
+    fun updateSearchQuery(value: String) = searchDelegate.updateQuery(value)
+    fun loadMoreSearch() = searchDelegate.loadMore()
+    fun retrySearch() = searchDelegate.retry()
+    fun closeSearch() = searchDelegate.close()
 
     fun toggleFavorite(album: Album) {
         viewModelScope.launch {
@@ -112,6 +129,7 @@ class AlbumsViewModel(
 
     private fun updateFavorite(id: String, isFavorite: Boolean) {
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }
+        searchDelegate.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }
     }
 
     private fun loadAlbums(forceRefresh: Boolean, requestedOrigin: LoadingOrigin? = null) {

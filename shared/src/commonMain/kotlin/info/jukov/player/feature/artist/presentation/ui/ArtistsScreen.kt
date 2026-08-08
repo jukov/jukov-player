@@ -3,6 +3,9 @@ package info.jukov.player.feature.artist.presentation.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +31,7 @@ import info.jukov.player.feature.artist.domain.Artist
 import info.jukov.player.feature.artist.presentation.ArtistsViewModel
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
+import info.jukov.player.core.presentation.ui.SearchAction
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.FavoriteToggleButton
 import info.jukov.player.core.presentation.ui.localizedMessage
@@ -47,8 +51,20 @@ fun ArtistsScreen(
     onAllAlbumsClick: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchState by viewModel.searchState.collectAsStateWithLifecycle()
+    val searchHasMore by viewModel.searchHasMore.collectAsStateWithLifecycle()
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
-    val artists = state.content.orEmpty()
+    val displayedState = if (searchActive && searchQuery.trim().length >= 2) searchState else state
+    val artists = displayedState.content.orEmpty()
+    val browseListState = rememberLazyListState()
+    val searchListState = rememberLazyListState()
+    LaunchedEffect(searchQuery) {
+        if (searchActive) {
+            searchListState.scrollToItem(0)
+        }
+    }
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
@@ -76,7 +92,16 @@ fun ArtistsScreen(
         modifier = Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
         topBar = {
             Column {
-                ArtistsTopAppBar(onLogout, onBack, onAllAlbumsClick, topAppBarScrollBehavior)
+                ArtistsTopAppBar(
+                    onLogout = onLogout,
+                    onBack = onBack,
+                    onAllAlbumsClick = onAllAlbumsClick,
+                    onSearchClick = viewModel::openSearch,
+                    searchQuery = searchQuery.takeIf { searchActive },
+                    onSearchQueryChange = viewModel::updateSearchQuery,
+                    onSearchClose = viewModel::closeSearch,
+                    scrollBehavior = topAppBarScrollBehavior,
+                )
                 if (loadingOrigin == LoadingOrigin.Automatic && artists.isNotEmpty()) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
@@ -88,7 +113,7 @@ fun ArtistsScreen(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             state = pullToRefreshState,
-            enabled = isPullToRefreshEnabled,
+            enabled = isPullToRefreshEnabled && !searchActive,
             indicator = {
                 PullToRefreshDefaults.LoadingIndicator(
                     state = pullToRefreshState,
@@ -99,17 +124,20 @@ fun ArtistsScreen(
             modifier = Modifier.fillMaxSize().padding(it),
         ) {
             when {
-                state is LoadableState.Loading && artists.isEmpty() && !isRefreshing -> LoadingContent()
-                state is LoadableState.Failure && artists.isEmpty() ->
-                    ErrorContent((state as LoadableState.Failure).error, viewModel::retry)
-                artists.isEmpty() -> EmptyContent()
+                displayedState is LoadableState.Loading && artists.isEmpty() && !isRefreshing -> LoadingContent()
+                displayedState is LoadableState.Failure && artists.isEmpty() ->
+                    ErrorContent((displayedState as LoadableState.Failure).error, if (searchActive) viewModel::retrySearch else viewModel::retry)
+                artists.isEmpty() -> if (searchActive && searchQuery.length >= 2) SearchEmptyContent() else EmptyContent()
                 else -> ArtistsContent(
                     artists = artists,
-                    error = (state as? LoadableState.Failure)?.error,
-                    onRetry = viewModel::retry,
+                    error = (displayedState as? LoadableState.Failure)?.error,
+                    onRetry = if (searchActive) viewModel::retrySearch else viewModel::retry,
                     onArtistClick = onArtistClick,
                     pendingIds = pending,
                     onFavoriteClick = viewModel::toggleFavorite,
+                    hasMore = searchActive && searchHasMore,
+                    onLoadMore = viewModel::loadMoreSearch,
+                    listState = if (searchActive) searchListState else browseListState,
                 )
             }
         }
@@ -122,6 +150,10 @@ private fun ArtistsTopAppBar(
     onLogout: () -> Unit,
     onBack: () -> Unit,
     onAllAlbumsClick: () -> Unit,
+    onSearchClick: () -> Unit,
+    searchQuery: String?,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchClose: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -129,6 +161,9 @@ private fun ArtistsTopAppBar(
     AppFlexibleTopAppBar(
         title = stringResource(Res.string.artists),
         scrollBehavior = scrollBehavior,
+        searchQuery = searchQuery,
+        onSearchQueryChange = onSearchQueryChange,
+        onSearchClose = onSearchClose,
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(
@@ -138,6 +173,7 @@ private fun ArtistsTopAppBar(
             }
         },
         actions = {
+            SearchAction(onSearchClick)
             IconButton(
                 onClick = { menuExpanded = true },
             ) {
@@ -177,6 +213,9 @@ fun ArtistsContent(
     onArtistClick: (Artist) -> Unit,
     pendingIds: Set<String> = emptySet(),
     onFavoriteClick: (Artist) -> Unit = {},
+    hasMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
+    listState: LazyListState = rememberLazyListState(),
 ) {
     Column(Modifier.fillMaxSize()) {
         error?.let {
@@ -185,11 +224,15 @@ fun ArtistsContent(
             }
         }
         LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = Padding.small).withPlayerBottomInset(),
                 verticalArrangement = Arrangement.spacedBy(Padding.xSmall),
             ) {
-                items(artists, key = { it.id }) { artist ->
+                itemsIndexed(artists, key = { _, it -> it.id }) { index, artist ->
+                    if (hasMore && index >= artists.lastIndex - 8) {
+                        LaunchedEffect(artists.size) { onLoadMore() }
+                    }
                     ArtistRow(
                         artist = artist,
                         onClick = { onArtistClick(artist) },
@@ -241,5 +284,12 @@ private fun ErrorContent(error: AppError, onRetry: () -> Unit) {
 private fun EmptyContent() {
     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
         Text(stringResource(Res.string.artists_not_found))
+    }
+}
+
+@Composable
+private fun SearchEmptyContent() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(stringResource(Res.string.nothing_found))
     }
 }

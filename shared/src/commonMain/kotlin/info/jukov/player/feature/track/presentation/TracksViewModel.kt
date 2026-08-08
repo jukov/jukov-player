@@ -21,11 +21,14 @@ import info.jukov.player.core.presentation.LoadingOrigin
 import kotlinx.coroutines.launch
 import info.jukov.player.feature.download.presentation.DownloadDelegate
 import info.jukov.player.feature.album.domain.Album
+import info.jukov.player.feature.search.domain.SearchUseCase
+import info.jukov.player.feature.search.presentation.PagedSearchDelegate
 
 class TracksViewModel(
     private val getTracksUseCase: GetTracksUseCase,
     private val favoriteDelegate: FavoriteDelegate,
     private val downloadDelegate: DownloadDelegate,
+    search: SearchUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Track>>>(
         LoadableState.Loading(content = null),
@@ -42,6 +45,13 @@ class TracksViewModel(
     val artworkUris = downloadDelegate.artworkUris
     private val _hasMore = MutableStateFlow(false)
     val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+    private val searchDelegate = PagedSearchDelegate<Track>(viewModelScope) { query, offset, size ->
+        search.tracks(query, offset, size, (filter as? TracksFilter.ByArtist)?.artistId)
+    }
+    val searchActive = searchDelegate.active
+    val searchQuery = searchDelegate.query
+    val searchState = searchDelegate.state
+    val searchHasMore = searchDelegate.hasMore
 
     private var filter: TracksFilter? = null
     private var loadJob: Job? = null
@@ -64,6 +74,7 @@ class TracksViewModel(
 
     fun load(filter: TracksFilter, albumIsFavorite: Boolean = false) {
         if (this.filter == filter) return
+        closeSearch()
         loadJob?.cancel()
         this.filter = filter
         _hasMore.value = false
@@ -89,6 +100,12 @@ class TracksViewModel(
             loadPage(forceRefresh = false, append = true, requestedOrigin = LoadingOrigin.Pagination)
         }
     }
+
+    fun openSearch() = searchDelegate.open()
+    fun updateSearchQuery(value: String) = searchDelegate.updateQuery(value)
+    fun loadMoreSearch() = searchDelegate.loadMore()
+    fun retrySearch() = searchDelegate.retry()
+    fun closeSearch() = searchDelegate.close()
 
     fun toggleFavorite(track: Track) {
         viewModelScope.launch {
@@ -130,6 +147,7 @@ class TracksViewModel(
 
     private fun updateFavorite(id: String, isFavorite: Boolean) {
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }
+        searchDelegate.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }
     }
 
     private fun loadTracks(forceRefresh: Boolean, requestedOrigin: LoadingOrigin? = null) {

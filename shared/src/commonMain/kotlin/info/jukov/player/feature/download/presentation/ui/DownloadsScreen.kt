@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
+import info.jukov.player.core.presentation.ui.SearchAction
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
@@ -44,8 +46,20 @@ fun DownloadsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val tab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val library = state.content ?: OfflineLibrary()
     val tracks = library.tracks.map { it.track }
+    val browseTracksListState = rememberLazyListState()
+    val searchTracksListState = rememberLazyListState()
+    val browseAlbumsListState = rememberLazyListState()
+    val searchAlbumsListState = rememberLazyListState()
+    LaunchedEffect(searchQuery) {
+        if (searchActive) {
+            searchTracksListState.scrollToItem(0)
+            searchAlbumsListState.scrollToItem(0)
+        }
+    }
     val selectionState = rememberTrackSelectionState(
         tracks = tracks,
         active = tab == DownloadsTab.Tracks,
@@ -70,6 +84,10 @@ fun DownloadsScreen(
                                 Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.back))
                             }
                         },
+                        actions = { SearchAction(viewModel::openSearch) },
+                        searchQuery = searchQuery.takeIf { searchActive },
+                        onSearchQueryChange = viewModel::updateSearchQuery,
+                        onSearchClose = viewModel::closeSearch,
                     )
                 }
                 PrimaryTabRow(selectedTabIndex = tab.ordinal) {
@@ -89,7 +107,7 @@ fun DownloadsScreen(
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
             } else when (tab) {
                 DownloadsTab.Tracks -> {
-                    if (library.tracks.isEmpty()) EmptyDownloads(Res.string.no_downloaded_tracks)
+                    if (library.tracks.isEmpty()) EmptyDownloads(if (searchActive && searchQuery.isNotBlank()) Res.string.nothing_found else Res.string.no_downloaded_tracks)
                     else {
                         TracksList(
                             tracks = tracks,
@@ -106,12 +124,14 @@ fun DownloadsScreen(
                             selectedIds = selectionState.selectedIds,
                             onSelectionChange = selectionState::setSelected,
                             trailingAction = TrackTrailingAction.RemoveDownload,
+                            listState = if (searchActive) searchTracksListState else browseTracksListState,
                         )
                     }
                 }
                 DownloadsTab.Albums -> {
-                    if (library.albums.isEmpty()) EmptyDownloads(Res.string.no_downloaded_albums)
+                    if (library.albums.isEmpty()) EmptyDownloads(if (searchActive && searchQuery.isNotBlank()) Res.string.nothing_found else Res.string.no_downloaded_albums)
                     else LazyColumn(
+                        state = if (searchActive) searchAlbumsListState else browseAlbumsListState,
                         contentPadding = PaddingValues(Padding.small).withPlayerBottomInset(),
                     ) {
                         items(library.albums, key = { it.album.id }) { album ->

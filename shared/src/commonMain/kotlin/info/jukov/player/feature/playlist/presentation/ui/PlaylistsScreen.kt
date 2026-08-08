@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -31,6 +32,8 @@ fun PlaylistsScreen(
 ) {
     LaunchedEffect(viewModel) { viewModel.load() }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     var creating by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     var error by remember { mutableStateOf<AppError?>(null) }
@@ -41,6 +44,13 @@ fun PlaylistsScreen(
         error = null
     }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val browseListState = rememberLazyListState()
+    val searchListState = rememberLazyListState()
+    LaunchedEffect(searchQuery) {
+        if (searchActive) {
+            searchListState.scrollToItem(0)
+        }
+    }
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
@@ -49,6 +59,7 @@ fun PlaylistsScreen(
                 scrollBehavior = scroll,
                 navigationIcon = { PlaylistBackButton(onBack) },
                 actions = {
+                    SearchAction(viewModel::openSearch)
                     IconButton(onClick = { creating = true }) {
                         Icon(
                             painterResource(Res.drawable.add),
@@ -56,6 +67,9 @@ fun PlaylistsScreen(
                         )
                     }
                 },
+                searchQuery = searchQuery.takeIf { searchActive },
+                onSearchQueryChange = viewModel::updateSearchQuery,
+                onSearchClose = viewModel::closeSearch,
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -76,10 +90,11 @@ fun PlaylistsScreen(
                     }
                 }
                 playlists.isEmpty() -> PlaylistCentered {
-                    Text(stringResource(Res.string.playlists_not_found))
+                    Text(stringResource(if (searchActive && searchQuery.isNotBlank()) Res.string.nothing_found else Res.string.playlists_not_found))
                 }
                 else -> LazyColumn(
-                    Modifier.fillMaxSize(),
+                    state = if (searchActive) searchListState else browseListState,
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = Padding.small)
                         .withPlayerBottomInset(),
                 ) {
