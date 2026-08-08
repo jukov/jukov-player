@@ -103,6 +103,7 @@ fun TracksScreen(
     isPlaying: Boolean = false,
     activeOrigin: PlaybackOrigin = PlaybackOrigin.TrackList,
     onAddToQueue: (List<Track>) -> Unit = {},
+    onAddToPlaylist: (List<Track>, () -> Unit) -> Unit = { _, _ -> },
     onArtistClick: (String, String) -> Unit = { _, _ -> },
 ) {
     LaunchedEffect(filter, albumIsFavorite) { viewModel.load(filter, albumIsFavorite) }
@@ -186,6 +187,9 @@ fun TracksScreen(
                         onFavorite = { selectionState.finish(tracks, viewModel::toggleFavorites) },
                         onDownload = { selectionState.finish(tracks, viewModel::downloadTracks) },
                         onAddToQueue = { selectionState.finish(tracks, onAddToQueue) },
+                        onAddToPlaylist = {
+                            onAddToPlaylist(selectionState.selectedTracks(tracks), selectionState::clear)
+                        },
                     )
                 } else if (albumHeader == null) {
                     AppFlexibleTopAppBar(
@@ -545,6 +549,7 @@ fun TracksList(
     selectionMode: Boolean = false,
     selectedIds: Set<String> = emptySet(),
     onSelectionChange: (String, Boolean) -> Unit = { _, _ -> },
+    selectionKey: (Int, Track) -> String = { _, track -> track.id },
     trailingAction: TrackTrailingAction = TrackTrailingAction.Favorite,
     modifier: Modifier = Modifier,
 ) {
@@ -557,7 +562,7 @@ fun TracksList(
         error?.let { message ->
             item { Text(message.localizedMessage(), color = MaterialTheme.colorScheme.error) }
         }
-        itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+        itemsIndexed(tracks, key = selectionKey) { index, track ->
             if (hasMore && index >= tracks.lastIndex - LOAD_MORE_THRESHOLD) {
                 LaunchedEffect(tracks.size) { onLoadMore() }
             }
@@ -578,8 +583,8 @@ fun TracksList(
                 onRetryDownload = { onRetryDownload(track.id) },
                 artworkUrl = track.coverArtId?.let(artworkUris::get) ?: track.coverArtUrl,
                 selectionMode = selectionMode,
-                selected = track.id in selectedIds,
-                onSelectedChange = { onSelectionChange(track.id, it) },
+                selected = selectionKey(index, track) in selectedIds,
+                onSelectedChange = { onSelectionChange(selectionKey(index, track), it) },
                 trailingAction = trailingAction,
             )
         }
@@ -737,6 +742,7 @@ fun TrackSelectionTopAppBar(
     onFavorite: () -> Unit,
     onDownload: () -> Unit,
     onAddToQueue: () -> Unit,
+    onAddToPlaylist: (() -> Unit)? = null,
 ) {
     TopAppBar(
         title = { Text(stringResource(Res.string.selected_tracks, selectedCount)) },
@@ -769,6 +775,11 @@ fun TrackSelectionTopAppBar(
             }
             IconButton(onClick = onAddToQueue) {
                 Icon(painterResource(Res.drawable.playlist_play), stringResource(Res.string.add_selected_to_queue))
+            }
+            onAddToPlaylist?.let { action ->
+                IconButton(onClick = action) {
+                    Icon(painterResource(Res.drawable.playlist_plus), stringResource(Res.string.add_to_playlist))
+                }
             }
         },
     )

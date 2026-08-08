@@ -27,6 +27,10 @@ import info.jukov.player.feature.download.domain.DownloadsRepository
 import info.jukov.player.feature.download.domain.OfflinePlatform
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.feature.download.presentation.DownloadsViewModel
+import info.jukov.player.feature.playlist.di.PlaylistsModule
+import info.jukov.player.feature.playlist.presentation.PlaylistPickerViewModel
+import info.jukov.player.feature.playlist.presentation.PlaylistViewModel
+import info.jukov.player.feature.playlist.presentation.PlaylistsViewModel
 
 @DependencyGraph(
     scope = AppScope::class,
@@ -39,6 +43,7 @@ import info.jukov.player.feature.download.presentation.DownloadsViewModel
         PlaybackModule::class,
         FavoritesModule::class,
         DownloadsModule::class,
+        PlaylistsModule::class,
     ],
 )
 interface AppGraph {
@@ -55,6 +60,9 @@ interface AppGraph {
     val authRepository: AuthRepository
     val subsonicApiClient: SubsonicApiClient
     val downloadsViewModel: DownloadsViewModel
+    val playlistsViewModel: PlaylistsViewModel
+    val playlistViewModel: PlaylistViewModel
+    val playlistPickerViewModel: PlaylistPickerViewModel
 
     @DependencyGraph.Factory
     fun interface Factory {

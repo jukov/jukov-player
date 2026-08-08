@@ -13,6 +13,9 @@ sealed interface PlaybackOrigin {
 
     @Serializable
     data class Artist(val artistId: String) : PlaybackOrigin
+
+    @Serializable
+    data class Playlist(val playlistId: String) : PlaybackOrigin
 }
 
 data class PlaybackSnapshot(

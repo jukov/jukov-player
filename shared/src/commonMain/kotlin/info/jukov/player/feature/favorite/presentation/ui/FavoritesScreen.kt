@@ -79,6 +79,7 @@ fun FavoritesScreen(
     activeTrackId: String?,
     isPlaying: Boolean,
     onAddToQueue: (List<Track>) -> Unit,
+    onAddToPlaylist: (List<Track>, () -> Unit) -> Unit = { _, _ -> },
 ) {
     LaunchedEffect(viewModel) { viewModel.load() }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -137,6 +138,9 @@ fun FavoritesScreen(
                         onFavorite = { selectionState.finish(visibleTracks, viewModel::toggleFavorites) },
                         onDownload = { selectionState.finish(visibleTracks, viewModel::downloadTracks) },
                         onAddToQueue = { selectionState.finish(visibleTracks, onAddToQueue) },
+                        onAddToPlaylist = {
+                            onAddToPlaylist(selectionState.selectedTracks(visibleTracks), selectionState::clear)
+                        },
                     )
                 } else {
                     AppFlexibleTopAppBar(

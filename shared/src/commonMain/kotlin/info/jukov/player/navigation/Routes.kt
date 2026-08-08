@@ -23,6 +23,12 @@ object Routes {
     data object Artists : NavKey
 
     @Serializable
+    data object Playlists : NavKey
+
+    @Serializable
+    data class Playlist(val id: String, val name: String) : NavKey
+
+    @Serializable
     data class Albums(
         val artistId: String? = null,
         val artistName: String? = null,

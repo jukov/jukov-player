@@ -55,6 +55,7 @@ fun AlbumsScreen(
     onAlbumClick: (Album) -> Unit,
     onAllTracksClick: () -> Unit,
     onAddToQueue: (List<Track>) -> Unit = {},
+    onAddToPlaylist: (List<Track>, () -> Unit) -> Unit = { _, _ -> },
 ) {
     LaunchedEffect(artistId) { viewModel.load(artistId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -98,6 +99,12 @@ fun AlbumsScreen(
                         onAddToQueue = {
                             selectionState.finish(albums) {
                                 viewModel.addAlbumsToQueue(it, onAddToQueue)
+                            }
+                        },
+                        onAddToPlaylist = {
+                            val selectedAlbums = selectionState.selectedAlbums(albums)
+                            viewModel.addAlbumsToQueue(selectedAlbums) { tracks ->
+                                onAddToPlaylist(tracks, selectionState::clear)
                             }
                         },
                     )
@@ -380,6 +387,7 @@ private fun AlbumSelectionTopAppBar(
     onFavorite: () -> Unit,
     onDownload: () -> Unit,
     onAddToQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
 ) {
     TopAppBar(
         title = { Text(stringResource(Res.string.selected_albums, selectedCount)) },
@@ -414,6 +422,9 @@ private fun AlbumSelectionTopAppBar(
                     painterResource(Res.drawable.playlist_play),
                     stringResource(Res.string.add_selected_albums_to_queue),
                 )
+            }
+            IconButton(onClick = onAddToPlaylist) {
+                Icon(painterResource(Res.drawable.playlist_plus), stringResource(Res.string.add_to_playlist))
             }
         },
     )

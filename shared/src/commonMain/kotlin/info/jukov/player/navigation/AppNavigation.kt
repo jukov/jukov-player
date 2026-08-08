@@ -35,6 +35,9 @@ import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import info.jukov.player.feature.download.presentation.ui.DownloadsScreen
 import info.jukov.player.feature.download.presentation.ui.OfflineAlbumTracksScreen
+import info.jukov.player.feature.playlist.presentation.ui.PlaylistPickerHost
+import info.jukov.player.feature.playlist.presentation.ui.PlaylistScreen
+import info.jukov.player.feature.playlist.presentation.ui.PlaylistsScreen
 
 @Composable
 fun AppNavigation(
@@ -52,6 +55,7 @@ fun AppNavigation(
         is AuthState.LoggedIn -> Routes.Library
     }
     val backStack = rememberNavBackStack(NAV_SAVED_STATE_CONFIGURATION, destination)
+    val playlistPickerViewModel = viewModel { graph.playlistPickerViewModel }
 
     LaunchedEffect(destination) {
         if (backStack.lastOrNull() != destination) {
@@ -89,6 +93,7 @@ fun AppNavigation(
                         onArtistsClick = { backStack.add(Routes.Artists) },
                         onAlbumsClick = { backStack.add(Routes.Albums()) },
                         onDownloadsClick = { backStack.add(Routes.Downloads) },
+                        onPlaylistsClick = { backStack.add(Routes.Playlists) },
                     )
                 }
                 entry<Routes.Downloads> {
@@ -120,6 +125,27 @@ fun AppNavigation(
                         onAddToQueue = playerViewModel::addToQueue,
                     )
                 }
+                entry<Routes.Playlists> {
+                    val playlistsViewModel = viewModel { graph.playlistsViewModel }
+                    PlaylistsScreen(
+                        viewModel = playlistsViewModel,
+                        onBack = { backStack.removeLastOrNull() },
+                        onPlaylistClick = { backStack.add(Routes.Playlist(it.id, it.name)) },
+                    )
+                }
+                entry<Routes.Playlist> { route ->
+                    val playlistViewModel = viewModel { graph.playlistViewModel }
+                    PlaylistScreen(
+                        id = route.id, title = route.name, viewModel = playlistViewModel,
+                        onBack = { backStack.removeLastOrNull() },
+                        onDeleted = {
+                            graph.playlistsViewModel.load(forceRefresh = true)
+                            backStack.removeLastOrNull()
+                        },
+                        onPlay = playerViewModel::play,
+                        onAddToQueue = playerViewModel::addToQueue,
+                    )
+                }
                 entry<Routes.Favorites> {
                     val favoritesViewModel = viewModel { graph.favoritesViewModel }
                     FavoritesScreen(
@@ -134,6 +160,7 @@ fun AppNavigation(
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
                         onAddToQueue = playerViewModel::addToQueue,
+                        onAddToPlaylist = playlistPickerViewModel::open,
                     )
                 }
                 entry<Routes.Artists> {
@@ -174,6 +201,7 @@ fun AppNavigation(
                             }
                         },
                         onAddToQueue = playerViewModel::addToQueue,
+                        onAddToPlaylist = playlistPickerViewModel::open,
                     )
                 }
                 entry<Routes.Tracks> { route ->
@@ -202,6 +230,7 @@ fun AppNavigation(
                         isPlaying = playbackState.content?.isPlaying == true,
                         activeOrigin = playbackState.content?.origin ?: PlaybackOrigin.TrackList,
                         onAddToQueue = playerViewModel::addToQueue,
+                        onAddToPlaylist = playlistPickerViewModel::open,
                         onArtistClick = { artistId, artistName ->
                             backStack.add(Routes.Albums(artistId, artistName))
                         },
@@ -235,6 +264,7 @@ fun AppNavigation(
                 },
                 content = navigationContent,
             )
+            PlaylistPickerHost(playlistPickerViewModel)
         } else {
             navigationContent()
         }
@@ -252,6 +282,8 @@ private val NAV_SAVED_STATE_CONFIGURATION = SavedStateConfiguration {
             subclass(Routes.Artists.serializer())
             subclass(Routes.Albums.serializer())
             subclass(Routes.Tracks.serializer())
+            subclass(Routes.Playlists.serializer())
+            subclass(Routes.Playlist.serializer())
         }
     }
 }

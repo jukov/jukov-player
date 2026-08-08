@@ -1,4 +1,3 @@
-- Playlists
 - History
 - Load state
 - Scroll between downloaded pages
@@ -9,3 +8,4 @@
 - Cancel loading from notification
 - Long loading of all tracks list even if cache is presented
 - Clear queue
+- List scroll jank
