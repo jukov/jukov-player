@@ -67,6 +67,9 @@ interface CacheDao {
     @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND trackId IN (:trackIds)")
     suspend fun offlineTracks(accountKey: String, trackIds: List<String>): List<OfflineTrackEntity>
 
+    @Query("SELECT * FROM TrackEntity WHERE accountKey=:accountKey AND id IN (:trackIds)")
+    suspend fun tracks(accountKey: String, trackIds: List<String>): List<TrackEntity>
+
     @Query("SELECT * FROM OfflineArtworkEntity WHERE accountKey=:accountKey AND coverArtId=:coverArtId")
     suspend fun offlineArtwork(accountKey: String, coverArtId: String): OfflineArtworkEntity?
 
@@ -111,17 +114,29 @@ interface CacheDao {
     @Query("DELETE FROM DownloadOwnershipEntity WHERE accountKey=:accountKey AND trackId=:trackId")
     suspend fun deleteTrackOwnerships(accountKey: String, trackId: String)
 
+    @Query("DELETE FROM DownloadOwnershipEntity WHERE accountKey=:accountKey AND trackId IN (:trackIds)")
+    suspend fun deleteTrackOwnerships(accountKey: String, trackIds: List<String>)
+
     @Query("DELETE FROM DownloadOwnershipEntity WHERE accountKey=:accountKey AND ownerType='album' AND ownerId=:albumId")
     suspend fun deleteAlbumOwnerships(accountKey: String, albumId: String)
 
     @Query("DELETE FROM OfflineTrackEntity WHERE accountKey=:accountKey AND trackId=:trackId")
     suspend fun deleteOfflineTrack(accountKey: String, trackId: String)
 
+    @Query("DELETE FROM OfflineTrackEntity WHERE accountKey=:accountKey AND trackId IN (:trackIds)")
+    suspend fun deleteOfflineTracks(accountKey: String, trackIds: List<String>)
+
     @Query("DELETE FROM OfflineAlbumEntity WHERE accountKey=:accountKey AND albumId=:albumId")
     suspend fun deleteOfflineAlbum(accountKey: String, albumId: String)
 
     @Query("DELETE FROM OfflineArtworkEntity WHERE accountKey=:accountKey AND coverArtId=:coverArtId")
     suspend fun deleteOfflineArtwork(accountKey: String, coverArtId: String)
+
+    @Query("DELETE FROM OfflineArtworkEntity WHERE accountKey=:accountKey AND coverArtId IN (:coverArtIds)")
+    suspend fun deleteOfflineArtworks(accountKey: String, coverArtIds: List<String>)
+
+    @Query("SELECT * FROM OfflineArtworkEntity a WHERE a.accountKey=:accountKey AND a.coverArtId IN (:coverArtIds) AND NOT EXISTS (SELECT 1 FROM OfflineTrackEntity d JOIN TrackEntity t ON t.accountKey=d.accountKey AND t.id=d.trackId WHERE d.accountKey=a.accountKey AND t.coverArtId=a.coverArtId AND EXISTS (SELECT 1 FROM DownloadOwnershipEntity o WHERE o.accountKey=d.accountKey AND o.trackId=d.trackId))")
+    suspend fun unreferencedOfflineArtworks(accountKey: String, coverArtIds: List<String>): List<OfflineArtworkEntity>
 
     @Query("DELETE FROM DownloadOwnershipEntity WHERE accountKey=:accountKey")
     suspend fun deleteOfflineOwnerships(accountKey: String)
@@ -305,4 +320,29 @@ interface CacheDao {
         deleteOfflineAlbums(accountKey)
         deleteOfflineArtworks(accountKey)
     }
+
+    @Transaction
+    suspend fun removeOfflineTracks(accountKey: String, trackIds: List<String>): RemovedOfflineFiles {
+        val downloads = offlineTracks(accountKey, trackIds)
+        val coverArtIds = tracks(accountKey, trackIds).mapNotNull(TrackEntity::coverArtId).distinct()
+        deleteTrackOwnerships(accountKey, trackIds)
+        deleteOfflineTracks(accountKey, trackIds)
+        val artworks = if (coverArtIds.isEmpty()) {
+            emptyList()
+        } else {
+            unreferencedOfflineArtworks(accountKey, coverArtIds)
+        }
+        if (artworks.isNotEmpty()) {
+            deleteOfflineArtworks(accountKey, artworks.map(OfflineArtworkEntity::coverArtId))
+        }
+        return RemovedOfflineFiles(
+            trackPaths = downloads.mapNotNull(OfflineTrackEntity::relativePath),
+            artworkPaths = artworks.mapNotNull(OfflineArtworkEntity::relativePath),
+        )
+    }
 }
+
+data class RemovedOfflineFiles(
+    val trackPaths: List<String>,
+    val artworkPaths: List<String>,
+)

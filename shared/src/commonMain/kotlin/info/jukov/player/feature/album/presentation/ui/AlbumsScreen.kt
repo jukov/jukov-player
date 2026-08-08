@@ -435,7 +435,7 @@ private fun AlbumSelectionTopAppBar(
             }
             IconButton(onClick = onDownload) {
                 Icon(
-                    painterResource(Res.drawable.download_circle),
+                    painterResource(Res.drawable.download),
                     stringResource(Res.string.download_selected_albums),
                 )
             }

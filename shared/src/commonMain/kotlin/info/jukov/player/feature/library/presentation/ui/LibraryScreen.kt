@@ -59,7 +59,7 @@ fun LibraryScreen(
         LibraryItem(stringResource(Res.string.tracks), Res.drawable.music_box_multiple, onTracksClick),
         LibraryItem(stringResource(Res.string.artists), Res.drawable.account_multiple, onArtistsClick),
         LibraryItem(stringResource(Res.string.albums), Res.drawable.album, onAlbumsClick),
-        LibraryItem(stringResource(Res.string.downloads), Res.drawable.download_circle, onDownloadsClick),
+        LibraryItem(stringResource(Res.string.downloads), Res.drawable.download, onDownloadsClick),
     )
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 

@@ -49,7 +49,11 @@ class DownloadsViewModel(
     fun updateSearchQuery(value: String) { _searchQuery.value = value }
     fun closeSearch() { _searchActive.value = false; _searchQuery.value = "" }
     fun removeTrack(id: String) = viewModelScope.launch { repository.cancelTrack(id) }
+    fun removeTracks(tracks: List<Track>) = viewModelScope.launch {
+        repository.removeTracks(tracks.map(Track::id))
+    }
     fun removeAlbum(id: String) = viewModelScope.launch { repository.cancelAlbum(id) }
+    fun removeAll() = viewModelScope.launch { repository.clearCurrentAccount() }
     fun retryTrack(id: String) = viewModelScope.launch { repository.retryTrack(id) }
     fun albumTracks(id: String): Flow<List<OfflineTrack>> = repository.observeAlbumTracks(id)
     fun toggleFavorite(track: Track) = viewModelScope.launch {

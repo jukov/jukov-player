@@ -24,6 +24,10 @@
     <string name="cancel_all_downloads">Cancel all</string>
     <string name="retry_download">Retry download</string>
     <string name="remove_download">Remove download</string>
+    <string name="remove_all_downloads">Remove all downloads</string>
+    <string name="remove_all_downloads_title">Remove all downloads?</string>
+    <string name="remove_all_downloads_message">All downloaded tracks will be removed from this device.</string>
+    <string name="remove_selected_downloads">Remove selected downloads</string>
     <string name="no_downloaded_tracks">No downloaded tracks</string>
     <string name="no_downloaded_albums">No downloaded albums</string>
     <string name="more_actions">More actions</string>

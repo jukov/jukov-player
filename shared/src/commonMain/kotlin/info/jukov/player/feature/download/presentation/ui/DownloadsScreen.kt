@@ -50,6 +50,7 @@ fun DownloadsScreen(
     val tab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    var confirmRemoveAll by remember { mutableStateOf(false) }
     val library = state.content ?: OfflineLibrary()
     val tracks = library.tracks.map { it.track }
     val browseTracksListState = rememberLazyListState()
@@ -89,8 +90,9 @@ fun DownloadsScreen(
                         allSelectedFavorite = selectionState.areAllSelectedFavorite(tracks),
                         onClose = selectionState::clear,
                         onFavorite = { selectionState.finish(tracks, viewModel::toggleFavorites) },
-                        onDownload = selectionState::clear,
+                        onDownload = { selectionState.finish(tracks, viewModel::removeTracks) },
                         onAddToQueue = { selectionState.finish(tracks, onAddToQueue) },
+                        removesDownloads = true,
                     )
                 } else {
                     AppFlexibleTopAppBar(
@@ -100,7 +102,15 @@ fun DownloadsScreen(
                                 Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.back))
                             }
                         },
-                        actions = { SearchAction(viewModel::openSearch) },
+                        actions = {
+                            IconButton(onClick = { confirmRemoveAll = true }) {
+                                Icon(
+                                    painterResource(Res.drawable.download_off),
+                                    stringResource(Res.string.remove_all_downloads),
+                                )
+                            }
+                            SearchAction(viewModel::openSearch)
+                        },
                         searchQuery = searchQuery.takeIf { searchActive },
                         onSearchQueryChange = viewModel::updateSearchQuery,
                         onSearchClose = viewModel::closeSearch,
@@ -168,6 +178,28 @@ fun DownloadsScreen(
             }
         }
     }
+    if (confirmRemoveAll) {
+        AlertDialog(
+            onDismissRequest = { confirmRemoveAll = false },
+            title = { Text(stringResource(Res.string.remove_all_downloads_title)) },
+            text = { Text(stringResource(Res.string.remove_all_downloads_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmRemoveAll = false
+                        viewModel.removeAll()
+                    },
+                ) {
+                    Text(stringResource(Res.string.delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemoveAll = false }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -193,8 +225,9 @@ fun OfflineAlbumTracksScreen(
                     allSelectedFavorite = selectionState.areAllSelectedFavorite(tracks),
                     onClose = selectionState::clear,
                     onFavorite = { selectionState.finish(tracks, viewModel::toggleFavorites) },
-                    onDownload = selectionState::clear,
+                    onDownload = { selectionState.finish(tracks, viewModel::removeTracks) },
                     onAddToQueue = { selectionState.finish(tracks, onAddToQueue) },
+                    removesDownloads = true,
                 )
             } else {
                 AppFlexibleTopAppBar(

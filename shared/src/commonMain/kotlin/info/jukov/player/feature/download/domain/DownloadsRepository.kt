@@ -22,6 +22,7 @@ interface DownloadsRepository : LocalMediaResolver, PersistentArtworkResolver {
     suspend fun downloadTrack(track: Track)
     suspend fun downloadAlbum(album: Album)
     suspend fun cancelTrack(trackId: String)
+    suspend fun removeTracks(trackIds: List<String>)
     suspend fun cancelAlbum(albumId: String)
     suspend fun retryTrack(trackId: String)
     suspend fun clearCurrentAccount()
@@ -32,9 +33,12 @@ interface OfflinePlatform {
     fun enqueue(accountKey: String)
     fun recover(accountKey: String)
     fun cancelTrack(accountKey: String, trackId: String)
+    fun cancelTracks(accountKey: String, trackIds: List<String>)
     fun cancelAccount(accountKey: String)
     fun deleteTrack(accountKey: String, relativePath: String?)
+    fun deleteTracks(accountKey: String, relativePaths: List<String>)
     fun deleteArtwork(accountKey: String, relativePath: String?)
+    fun deleteArtworks(accountKey: String, relativePaths: List<String>)
     fun deleteAccount(accountKey: String)
     fun fileUri(accountKey: String, relativePath: String): String
     fun exists(accountKey: String, relativePath: String): Boolean

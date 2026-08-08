@@ -125,10 +125,16 @@ class DefaultDownloadsRepository(
     }
 
     override suspend fun cancelTrack(trackId: String) {
+        removeTracks(listOf(trackId))
+    }
+
+    override suspend fun removeTracks(trackIds: List<String>) {
         val key = accountKey() ?: return
-        platform.cancelTrack(key, trackId)
-        dao.deleteTrackOwnerships(key, trackId)
-        removeTrackIfUnowned(key, trackId)
+        if (trackIds.isEmpty()) return
+        platform.cancelTracks(key, trackIds)
+        val removed = dao.removeOfflineTracks(key, trackIds)
+        platform.deleteTracks(key, removed.trackPaths)
+        platform.deleteArtworks(key, removed.artworkPaths)
     }
 
     override suspend fun cancelAlbum(albumId: String) {

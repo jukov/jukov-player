@@ -166,7 +166,7 @@ private fun PlaylistSelectionActions(
         )
     }
     IconButton(onClick = onDownload) {
-        Icon(painterResource(Res.drawable.download_circle), stringResource(Res.string.download))
+        Icon(painterResource(Res.drawable.download), stringResource(Res.string.download))
     }
     IconButton(onClick = onAddToQueue) {
         Icon(
@@ -194,7 +194,7 @@ private fun PlaylistActions(
 ) {
     IconButton(onClick = onDownload, enabled = tracks.isNotEmpty()) {
         Icon(
-            painterResource(Res.drawable.download_circle),
+            painterResource(Res.drawable.download),
             stringResource(Res.string.download_playlist),
         )
     }

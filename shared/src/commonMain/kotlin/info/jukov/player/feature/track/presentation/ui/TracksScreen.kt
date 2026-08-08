@@ -767,6 +767,7 @@ fun TrackSelectionTopAppBar(
     onDownload: () -> Unit,
     onAddToQueue: () -> Unit,
     onAddToPlaylist: (() -> Unit)? = null,
+    removesDownloads: Boolean = false,
 ) {
     TopAppBar(
         title = { Text(stringResource(Res.string.selected_tracks, selectedCount)) },
@@ -795,7 +796,22 @@ fun TrackSelectionTopAppBar(
                 )
             }
             IconButton(onClick = onDownload) {
-                Icon(painterResource(Res.drawable.download_circle), stringResource(Res.string.download_selected_tracks))
+                Icon(
+                    painterResource(
+                        if (removesDownloads) {
+                            Res.drawable.download_off
+                        } else {
+                            Res.drawable.download
+                        },
+                    ),
+                    stringResource(
+                        if (removesDownloads) {
+                            Res.string.remove_selected_downloads
+                        } else {
+                            Res.string.download_selected_tracks
+                        },
+                    ),
+                )
             }
             IconButton(onClick = onAddToQueue) {
                 Icon(painterResource(Res.drawable.playlist_play), stringResource(Res.string.add_selected_to_queue))
@@ -853,7 +869,7 @@ private val AlbumHeader.artistAndYear: String
 private fun DownloadIconButton(status: DownloadStatus?, onClick: () -> Unit) {
     Box {
         IconButton(onClick = onClick) {
-            Icon(painterResource(Res.drawable.download_circle), stringResource(Res.string.downloads))
+            Icon(painterResource(Res.drawable.download), stringResource(Res.string.downloads))
         }
         DownloadBadge(status, Modifier.align(Alignment.BottomEnd))
     }
