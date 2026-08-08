@@ -1,6 +1,5 @@
 # MVP
 - Load state
-- Scroll between downloaded pages
 - Add artist tab on downloads
 - Styling
 - App icon

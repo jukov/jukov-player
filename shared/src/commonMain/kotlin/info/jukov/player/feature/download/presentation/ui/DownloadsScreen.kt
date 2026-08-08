@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,6 +56,20 @@ fun DownloadsScreen(
     val searchTracksListState = rememberLazyListState()
     val browseAlbumsListState = rememberLazyListState()
     val searchAlbumsListState = rememberLazyListState()
+    val pagerState = rememberPagerState(
+        initialPage = tab.ordinal,
+        pageCount = { DownloadsTab.entries.size },
+    )
+    LaunchedEffect(tab) {
+        if (pagerState.currentPage != tab.ordinal) {
+            pagerState.animateScrollToPage(tab.ordinal)
+        }
+    }
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { page ->
+            viewModel.selectTab(DownloadsTab.entries[page])
+        }
+    }
     LaunchedEffect(searchQuery) {
         if (searchActive) {
             searchTracksListState.scrollToItem(0)
@@ -105,38 +121,46 @@ fun DownloadsScreen(
         Box(Modifier.fillMaxSize().padding(padding)) {
             if (state is LoadableState.Loading && state.content == null) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
-            } else when (tab) {
-                DownloadsTab.Tracks -> {
-                    if (library.tracks.isEmpty()) EmptyDownloads(if (searchActive && searchQuery.isNotBlank()) Res.string.nothing_found else Res.string.no_downloaded_tracks)
-                    else {
-                        TracksList(
-                            tracks = tracks,
-                            error = null,
-                            onPlayClick = onPlayClick,
-                            onActiveTrackClick = onActiveTrackClick,
-                            activeTrackId = activeTrackId,
-                            isPlaying = isPlaying,
-                            downloadStatuses = library.tracks.associate { it.track.id to it.status },
-                            onCancelDownload = viewModel::removeTrack,
-                            onRetryDownload = viewModel::retryTrack,
-                            onFavoriteClick = viewModel::toggleFavorite,
-                            selectionMode = selectionState.isActive,
-                            selectedIds = selectionState.selectedIds,
-                            onSelectionChange = selectionState::setSelected,
-                            trailingAction = TrackTrailingAction.RemoveDownload,
-                            listState = if (searchActive) searchTracksListState else browseTracksListState,
-                        )
-                    }
-                }
-                DownloadsTab.Albums -> {
-                    if (library.albums.isEmpty()) EmptyDownloads(if (searchActive && searchQuery.isNotBlank()) Res.string.nothing_found else Res.string.no_downloaded_albums)
-                    else LazyColumn(
-                        state = if (searchActive) searchAlbumsListState else browseAlbumsListState,
-                        contentPadding = PaddingValues(Padding.small).withPlayerBottomInset(),
-                    ) {
-                        items(library.albums, key = { it.album.id }) { album ->
-                            OfflineAlbumRow(album, { onAlbumClick(album) }) {
-                                viewModel.removeAlbum(album.album.id)
+            } else {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.Top,
+                ) { page ->
+                    when (DownloadsTab.entries[page]) {
+                        DownloadsTab.Tracks -> {
+                            if (library.tracks.isEmpty()) EmptyDownloads(if (searchActive && searchQuery.isNotBlank()) Res.string.nothing_found else Res.string.no_downloaded_tracks)
+                            else {
+                                TracksList(
+                                    tracks = tracks,
+                                    error = null,
+                                    onPlayClick = onPlayClick,
+                                    onActiveTrackClick = onActiveTrackClick,
+                                    activeTrackId = activeTrackId,
+                                    isPlaying = isPlaying,
+                                    downloadStatuses = library.tracks.associate { it.track.id to it.status },
+                                    onCancelDownload = viewModel::removeTrack,
+                                    onRetryDownload = viewModel::retryTrack,
+                                    onFavoriteClick = viewModel::toggleFavorite,
+                                    selectionMode = selectionState.isActive,
+                                    selectedIds = selectionState.selectedIds,
+                                    onSelectionChange = selectionState::setSelected,
+                                    trailingAction = TrackTrailingAction.RemoveDownload,
+                                    listState = if (searchActive) searchTracksListState else browseTracksListState,
+                                )
+                            }
+                        }
+                        DownloadsTab.Albums -> {
+                            if (library.albums.isEmpty()) EmptyDownloads(if (searchActive && searchQuery.isNotBlank()) Res.string.nothing_found else Res.string.no_downloaded_albums)
+                            else LazyColumn(
+                                state = if (searchActive) searchAlbumsListState else browseAlbumsListState,
+                                contentPadding = PaddingValues(Padding.small).withPlayerBottomInset(),
+                            ) {
+                                items(library.albums, key = { it.album.id }) { album ->
+                                    OfflineAlbumRow(album, { onAlbumClick(album) }) {
+                                        viewModel.removeAlbum(album.album.id)
+                                    }
+                                }
                             }
                         }
                     }
