@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Checkbox
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -81,6 +83,10 @@ fun QueueScreen(
     onMoveSelectedToTop: (Set<Int>) -> Unit,
 ) {
     var selectedIds by remember { mutableStateOf(emptySet<String>()) }
+    PlayerBackHandler(
+        enabled = selectedIds.isNotEmpty(),
+        onBack = { selectedIds = emptySet() },
+    )
     var draggedItemId by remember { mutableStateOf<String?>(null) }
     val visibleItems = state.queue.drop(state.currentIndex.coerceAtLeast(0))
     val validFutureIds = state.queue.drop(state.currentIndex + 1).mapTo(mutableSetOf()) { it.uiId }
@@ -134,7 +140,7 @@ fun QueueScreen(
                 modifier = Modifier.fillMaxSize().padding(contentPadding),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(Padding.small)
                     .withPlayerBottomInset(),
-                verticalArrangement = Arrangement.spacedBy(Padding.xSmall),
+                verticalArrangement = Arrangement.spacedBy(Padding.small),
             ) {
                 itemsIndexed(
                     items = visibleItems,
@@ -237,10 +243,12 @@ private fun DismissibleQueueTrackRow(
         enableDismissFromEndToStart = true,
         backgroundContent = {
             Row(
-                Modifier.fillMaxSize().background(
-                    if (isDragging) MaterialTheme.colorScheme.surface
-                    else MaterialTheme.colorScheme.errorContainer,
-                )
+                Modifier.fillMaxSize()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        if (isDragging) MaterialTheme.colorScheme.surface
+                        else MaterialTheme.colorScheme.errorContainer,
+                    )
                     .padding(horizontal = Padding.large),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
@@ -329,9 +337,18 @@ private fun QueueTrackRow(
 ) {
     Row(
         modifier = modifier.fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                if (isCurrent) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else if (selected) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow
+                },
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = Padding.small, vertical = Padding.xSmall),
+            .padding(horizontal = Padding.small, vertical = Padding.small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (isCurrent) {
@@ -344,7 +361,8 @@ private fun QueueTrackRow(
             )
         }
         Box(
-            modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.surface),
+            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center,
         ) {
             track.coverArtUrl?.let { url ->

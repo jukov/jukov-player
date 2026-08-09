@@ -5,6 +5,9 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import jukovplayer.shared.generated.resources.Res
 import jukovplayer.shared.generated.resources.pause
 import jukovplayer.shared.generated.resources.play
@@ -18,6 +21,7 @@ fun PlayPauseButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    iconSize: Dp = 24.dp,
 ) {
     FilledIconButton(
         onClick = onClick,
@@ -32,6 +36,7 @@ fun PlayPauseButton(
             contentDescription = stringResource(
                 if (isPlaying) Res.string.pause else Res.string.play,
             ),
+            modifier = Modifier.size(iconSize),
         )
     }
 }

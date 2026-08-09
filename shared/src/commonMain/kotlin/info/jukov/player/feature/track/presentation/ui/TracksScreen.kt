@@ -24,13 +24,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -52,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
@@ -80,6 +83,7 @@ import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.core.presentation.LoadingOrigin
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
+import info.jukov.player.feature.playback.presentation.ui.PlayerBackHandler
 import info.jukov.player.feature.download.domain.DownloadState
 import info.jukov.player.feature.download.domain.DownloadStatus
 import info.jukov.player.feature.album.domain.Album
@@ -140,6 +144,10 @@ fun TracksScreen(
         }
     }
     val selectionState = rememberTrackSelectionState(tracks, key = filter)
+    PlayerBackHandler(
+        enabled = selectionState.isActive,
+        onBack = selectionState::clear,
+    )
     val collectionOrigin = when (filter) {
         is TracksFilter.ByAlbum -> PlaybackOrigin.Album(filter.albumId)
         is TracksFilter.ByArtist -> PlaybackOrigin.Artist(filter.artistId)
@@ -402,8 +410,16 @@ private fun ExpandedAlbumTracksHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                ),
+            )
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(top = Padding.small, bottom = Padding.medium),
+            .padding(top = Padding.small, bottom = Padding.large),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -451,7 +467,7 @@ private fun ExpandedAlbumTracksHeader(
             }
             Spacer(Modifier.size(Padding.medium))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
+                FilledTonalIconButton(
                     onClick = onFavoriteClick,
                     enabled = favoriteEnabled,
                 ) {
@@ -476,7 +492,12 @@ private fun ExpandedAlbumTracksHeader(
                     modifier = Modifier.size(48.dp),
                 )
                 Spacer(Modifier.width(Padding.small))
-                DownloadIconButton(downloadStatus, onDownloadClick)
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                ) {
+                    DownloadIconButton(downloadStatus, onDownloadClick)
+                }
             }
         }
     }
@@ -650,6 +671,11 @@ fun TrackRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                if (isPlaying) MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.surface,
+            )
             .combinedClickable(
                 onClick = {
                     if (selectionMode) {
@@ -663,8 +689,8 @@ fun TrackRow(
             .padding(
                 start = Padding.medium,
                 end = Padding.small,
-                top = Padding.xSmall,
-                bottom = Padding.xSmall,
+                top = Padding.small,
+                bottom = Padding.small,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -707,8 +733,12 @@ fun TrackRow(
         Column(Modifier.weight(1f)) {
             Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                text = track.artist,
+                text = listOfNotNull(
+                    track.artist.takeIf(String::isNotBlank),
+                    track.album?.takeIf(String::isNotBlank),
+                ).distinct().joinToString(" · "),
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -884,9 +914,10 @@ private fun DownloadBadge(status: DownloadStatus?, modifier: Modifier = Modifier
                 modifier = modifier.size(14.dp),
                 strokeWidth = 2.dp,
             )
-        } ?: run {
-            CircularProgressIndicator(modifier = modifier.size(14.dp), strokeWidth = 2.dp)
-        }
+        } ?: CircularProgressIndicator(
+            modifier = modifier.size(14.dp),
+            strokeWidth = 2.dp,
+        )
         DownloadState.Completed -> Text("✓", modifier = modifier, color = MaterialTheme.colorScheme.primary)
         else -> Unit
     }

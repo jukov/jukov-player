@@ -62,6 +62,7 @@ import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.presentation.ui.TracksList
 import info.jukov.player.feature.track.presentation.ui.TrackSelectionTopAppBar
 import info.jukov.player.feature.track.presentation.ui.rememberTrackSelectionState
+import info.jukov.player.feature.playback.presentation.ui.PlayerBackHandler
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -92,6 +93,10 @@ fun FavoritesScreen(
     val selectionState = rememberTrackSelectionState(
         tracks = visibleTracks,
         active = selectedTab == FavoritesTab.Tracks,
+    )
+    PlayerBackHandler(
+        enabled = selectionState.isActive,
+        onBack = selectionState::clear,
     )
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }

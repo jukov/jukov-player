@@ -30,6 +30,7 @@ import info.jukov.player.feature.track.presentation.ui.TracksList
 import info.jukov.player.feature.track.presentation.ui.TrackSelectionTopAppBar
 import info.jukov.player.feature.track.presentation.ui.TrackTrailingAction
 import info.jukov.player.feature.track.presentation.ui.rememberTrackSelectionState
+import info.jukov.player.feature.playback.presentation.ui.PlayerBackHandler
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -81,6 +82,10 @@ fun DownloadsScreen(
         tracks = tracks,
         active = tab == DownloadsTab.Tracks,
     )
+    PlayerBackHandler(
+        enabled = selectionState.isActive,
+        onBack = selectionState::clear,
+    )
     Scaffold(
         topBar = {
             Column {
@@ -130,7 +135,7 @@ fun DownloadsScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             if (state is LoadableState.Loading && state.content == null) {
-                CircularProgressIndicator(Modifier.align(Alignment.Center))
+                LoadingIndicator(Modifier.align(Alignment.Center).size(96.dp))
             } else {
                 HorizontalPager(
                     state = pagerState,
@@ -217,6 +222,10 @@ fun OfflineAlbumTracksScreen(
     val offlineTracks by viewModel.albumTracks(albumId).collectAsStateWithLifecycle(emptyList())
     val tracks = offlineTracks.map { it.track }
     val selectionState = rememberTrackSelectionState(tracks, key = albumId)
+    PlayerBackHandler(
+        enabled = selectionState.isActive,
+        onBack = selectionState::clear,
+    )
     Scaffold(
         topBar = {
             if (selectionState.isActive) {
@@ -280,15 +289,7 @@ private fun OfflineAlbumRow(album: OfflineAlbum, onClick: () -> Unit, onRemove: 
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when (album.status.state) {
-                    DownloadState.Queued, DownloadState.Downloading -> album.status.progress?.let { progress ->
-                        CircularProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } ?: run {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    }
+                    DownloadState.Queued, DownloadState.Downloading -> LoadingIndicator(Modifier.size(22.dp))
                     DownloadState.Completed -> Text("✓", color = MaterialTheme.colorScheme.primary)
                     DownloadState.Failed -> Text("!", color = MaterialTheme.colorScheme.error)
                 }

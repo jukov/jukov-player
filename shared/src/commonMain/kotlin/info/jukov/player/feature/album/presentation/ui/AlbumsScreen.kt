@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,6 +35,7 @@ import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.album.presentation.AlbumsViewModel
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.playback.presentation.ui.PlayerBackHandler
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.SearchAction
@@ -78,6 +80,10 @@ fun AlbumsScreen(
         }
     }
     val selectionState = rememberAlbumSelectionState(albums, key = artistId)
+    PlayerBackHandler(
+        enabled = selectionState.isActive,
+        onBack = selectionState::clear,
+    )
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -223,9 +229,7 @@ fun AlbumsGrid(
         state = gridState,
         columns = GridCells.Adaptive(minSize = 180.dp),
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(Padding.small).withPlayerBottomInset(),
-        horizontalArrangement = Arrangement.spacedBy(Padding.small),
-        verticalArrangement = Arrangement.spacedBy(Padding.small),
+        contentPadding = PaddingValues().withPlayerBottomInset(),
     ) {
         onAllTracksClick?.let { onClick ->
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -307,7 +311,9 @@ fun AlbumCard(
     onSelectedChange: (Boolean) -> Unit = {},
 ) {
     Column(
-        Modifier.fillMaxWidth().combinedClickable(
+        Modifier.fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .combinedClickable(
             onClick = {
                 if (selectionMode) {
                     onSelectedChange(!selected)
@@ -316,7 +322,8 @@ fun AlbumCard(
                 }
             },
             onLongClick = { onSelectedChange(true) },
-        ),
+        )
+            .padding(Padding.small),
     ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(1f)
@@ -336,10 +343,24 @@ fun AlbumCard(
                     contentScale = ContentScale.Crop,
                 )
             } else {
-                Text(
-                    stringResource(Res.string.no_cover),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                MaterialTheme.colorScheme.tertiaryContainer,
+                            ),
+                        ),
+                    ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(Res.drawable.album),
+                        contentDescription = stringResource(Res.string.no_cover),
+                        modifier = Modifier.size(56.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
             }
             if (selectionMode) {
                 AlbumSelectionBadge(

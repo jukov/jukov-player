@@ -16,6 +16,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import info.jukov.player.core.presentation.ui.AndroidArtworkPaletteExtractor
+import info.jukov.player.core.presentation.ui.LocalArtworkPaletteExtractor
 import info.jukov.player.feature.download.DownloadForegroundService
 import kotlinx.coroutines.launch
 
@@ -44,11 +48,14 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            App(
-                graph = (application as JukovApplication).graph,
-                openDownloads = openDownloads,
-                onOpenDownloadsConsumed = { openDownloads = false },
-            )
+            val paletteExtractor = remember { AndroidArtworkPaletteExtractor(applicationContext) }
+            CompositionLocalProvider(LocalArtworkPaletteExtractor provides paletteExtractor) {
+                App(
+                    graph = (application as JukovApplication).graph,
+                    openDownloads = openDownloads,
+                    onOpenDownloadsConsumed = { openDownloads = false },
+                )
+            }
         }
     }
 

@@ -6,6 +6,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -77,18 +83,43 @@ fun LibraryScreen(
         },
     ) { padding ->
         if (!searchActive || query.trim().length < 2) {
-            LazyColumn(
-                state = browseListState,
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(vertical = Padding.small).withPlayerBottomInset(),
-                verticalArrangement = Arrangement.spacedBy(Padding.small),
+                contentPadding = PaddingValues(Padding.medium).withPlayerBottomInset(),
+                verticalArrangement = Arrangement.spacedBy(Padding.medium),
+                horizontalArrangement = Arrangement.spacedBy(Padding.medium),
             ) {
                 items(items, key = LibraryItem::title) { item ->
-                    ListItem(
-                        modifier = Modifier.clickable(onClick = item.onClick),
-                        headlineContent = { Text(item.title, style = MaterialTheme.typography.titleLarge) },
-                        leadingContent = { Icon(painterResource(item.icon), null) },
-                    )
+                    val index = items.indexOf(item)
+                    val container = when (index % 3) {
+                        0 -> MaterialTheme.colorScheme.primaryContainer
+                        1 -> MaterialTheme.colorScheme.secondaryContainer
+                        else -> MaterialTheme.colorScheme.tertiaryContainer
+                    }
+                    Card(
+                        onClick = item.onClick,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(1.15f),
+                        shape = RoundedCornerShape(28.dp),
+                        colors = CardDefaults.cardColors(containerColor = container),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(Padding.medium),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = .55f),
+                            ) {
+                                Icon(
+                                    painterResource(item.icon),
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(12.dp).size(32.dp),
+                                )
+                            }
+                            Text(item.title, style = MaterialTheme.typography.titleLarge)
+                        }
+                    }
                 }
             }
         } else {
@@ -121,7 +152,7 @@ private fun LibrarySearchResults(
 ) {
     val items = state.content.orEmpty()
     when {
-        state is LoadableState.Loading && items.isEmpty() -> Box(modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        state is LoadableState.Loading && items.isEmpty() -> Box(modifier, contentAlignment = Alignment.Center) { LoadingIndicator(Modifier.size(96.dp)) }
         state is LoadableState.Failure && items.isEmpty() -> Box(modifier, contentAlignment = Alignment.Center) {
             Button(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
         }
@@ -160,7 +191,7 @@ private fun LibrarySearchResults(
                 }
             }
             if (state is LoadableState.Loading) {
-                item { Box(Modifier.fillMaxWidth().padding(Padding.medium), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                item { Box(Modifier.fillMaxWidth().padding(Padding.medium), contentAlignment = Alignment.Center) { LoadingIndicator() } }
             }
         }
     }

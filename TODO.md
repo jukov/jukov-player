@@ -1,5 +1,5 @@
 # MVP
-- Load state
+- Track load state
 - Add artist tab on downloads
 - Styling
 - App icon

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.BottomSheetScaffold
@@ -42,10 +43,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +68,8 @@ import info.jukov.player.core.presentation.ui.PlayPauseButton
 import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.LARGE_ARTWORK_SIZE
 import info.jukov.player.core.presentation.ui.Padding
+import info.jukov.player.core.presentation.ui.ArtworkPalette
+import info.jukov.player.core.presentation.ui.LocalArtworkPaletteExtractor
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.feature.playback.presentation.PlayerUiState
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
@@ -167,8 +173,29 @@ private val Track.artistAndYear: String
     get() = year?.let { "$artist · $it" } ?: artist
 
 private val MINI_PLAYER_HEIGHT = 64.dp
-private val MINI_PLAYER_VERTICAL_PADDING = 8.dp
-private val MINI_PLAYER_CONTENT_INSET = MINI_PLAYER_HEIGHT + MINI_PLAYER_VERTICAL_PADDING * 2
+private val MINI_PLAYER_CONTENT_INSET = MINI_PLAYER_HEIGHT
+
+@Composable
+private fun rememberArtworkPalette(
+    key: String?,
+    url: String?,
+): ArtworkPalette {
+    val extractor = LocalArtworkPaletteExtractor.current
+    val hash = key.orEmpty().fold(17) { result, char -> result * 31 + char.code }
+    val hue = ((hash.toLong() and 0x7fffffff) % 360).toFloat()
+    val fallback = ArtworkPalette(
+        primary = Color.hsv(hue, .45f, .68f),
+        secondary = Color.hsv((hue + 42f) % 360f, .35f, .55f),
+    )
+    var extracted by remember(key) { mutableStateOf<ArtworkPalette?>(null) }
+    LaunchedEffect(key, url, extractor) {
+        extracted = if (key != null && url != null) extractor?.extract(key, url) else null
+    }
+    val target = extracted ?: fallback
+    val primary by animateColorAsState(target.primary)
+    val secondary by animateColorAsState(target.secondary)
+    return ArtworkPalette(primary, secondary)
+}
 
 @Composable
 private fun PlayerSheetContent(
@@ -184,6 +211,12 @@ private fun PlayerSheetContent(
     onAlbumClick: (Track) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        val track = snapshot.currentTrack ?: return@BoxWithConstraints
+        val paletteKey = track.coverArtId ?: track.coverArtUrl ?: track.albumId
+        val palette = rememberArtworkPalette(
+            key = paletteKey,
+            url = track.coverArtUrl,
+        )
         val density = LocalDensity.current
         val containerHeightPx = with(density) { maxHeight.toPx() }
         val peekHeightPx = with(density) { peekHeight.toPx() }
@@ -197,6 +230,7 @@ private fun PlayerSheetContent(
 
         FullPlayer(
             snapshot = snapshot,
+            palette = palette,
             error = error,
             viewModel = viewModel,
             favoriteEnabled = favoriteEnabled,
@@ -210,16 +244,15 @@ private fun PlayerSheetContent(
         )
         MiniPlayer(
             snapshot = snapshot,
+            palette = palette,
+            containerHeight = peekHeight,
             onOpen = onExpand,
             onPlayPause = viewModel::playPause,
             onFavorite = viewModel::toggleFavorite,
             favoriteEnabled = favoriteEnabled,
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = MINI_PLAYER_VERTICAL_PADDING)
                 .graphicsLayer { alpha = 1f - expansionProgress }
-                .zIndex(1f - expansionProgress),
         )
     }
 }
@@ -227,6 +260,8 @@ private fun PlayerSheetContent(
 @Composable
 private fun MiniPlayer(
     snapshot: PlayerUiState,
+    palette: ArtworkPalette,
+    containerHeight: Dp,
     onOpen: () -> Unit,
     onPlayPause: () -> Unit,
     onFavorite: () -> Unit,
@@ -234,15 +269,24 @@ private fun MiniPlayer(
     modifier: Modifier = Modifier,
 ) {
     val track = snapshot.currentTrack ?: return
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(MINI_PLAYER_HEIGHT)
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onOpen)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        modifier = modifier.fillMaxWidth().height(containerHeight)
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        palette.primary.copy(alpha = .44f),
+                        palette.secondary.copy(alpha = .22f),
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ),
+                ),
+            )
+            .clickable(onClick = onOpen),
     ) {
+      Row(
+        modifier = Modifier.fillMaxWidth().height(MINI_PLAYER_HEIGHT).padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
         Artwork(
             url = track.coverArtUrl,
             albumId = track.albumId,
@@ -273,12 +317,29 @@ private fun MiniPlayer(
             onClick = onPlayPause,
             modifier = Modifier.size(48.dp),
         )
+      }
+      Box(
+          Modifier.align(Alignment.TopStart).padding(top = MINI_PLAYER_HEIGHT - 3.dp)
+              .fillMaxWidth().height(3.dp)
+              .background(MaterialTheme.colorScheme.onSurface.copy(alpha = .12f)),
+      ) {
+          val progress = if (snapshot.durationMs > 0) {
+              (snapshot.positionMs.toFloat() / snapshot.durationMs).coerceIn(0f, 1f)
+          } else {
+              0f
+          }
+          Box(
+              Modifier.fillMaxWidth(progress).fillMaxHeight()
+                  .background(palette.primary),
+          )
+      }
     }
 }
 
 @Composable
 private fun FullPlayer(
     snapshot: PlayerUiState,
+    palette: ArtworkPalette,
     error: AppError?,
     viewModel: PlayerViewModel,
     favoriteEnabled: Boolean,
@@ -297,12 +358,20 @@ private fun FullPlayer(
 
     Column(
         modifier = modifier
+            .background(
+                Brush.verticalGradient(
+                    0f to palette.primary.copy(alpha = .72f),
+                    .48f to palette.secondary.copy(alpha = .35f),
+                    1f to MaterialTheme.colorScheme.surface,
+                ),
+            )
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(start = 20.dp, top = 16.dp, end = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceEvenly,
+        verticalArrangement = Arrangement.Top,
     ) {
+        Spacer(Modifier.weight(.25f))
         Artwork(
             url = track.coverArtUrl,
             albumId = track.albumId,
@@ -312,8 +381,13 @@ private fun FullPlayer(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(8.dp)),
+                .graphicsLayer {
+                    shadowElevation = 28.dp.toPx()
+                    shape = RoundedCornerShape(24.dp)
+                    clip = true
+                },
         )
+        Spacer(Modifier.weight(.45f))
         Text(
             text = track.title,
             modifier = Modifier.clickable(
@@ -325,6 +399,7 @@ private fun FullPlayer(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        Spacer(Modifier.height(4.dp))
         Text(
             text = track.artistAndYear,
             modifier = Modifier.clickable(
@@ -336,6 +411,7 @@ private fun FullPlayer(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        Spacer(Modifier.weight(.3f))
         Slider(
             value = sliderPosition.coerceIn(0f, duration.toFloat()),
             onValueChange = {
@@ -361,6 +437,7 @@ private fun FullPlayer(
                 textAlign = TextAlign.Center,
             )
         }
+        Spacer(Modifier.weight(.3f))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -371,15 +448,23 @@ private fun FullPlayer(
                 description = stringResource(Res.string.previous_track),
                 enabled = snapshot.hasPrevious,
                 onClick = viewModel::previous,
+                modifier = Modifier.size(56.dp),
             )
-            PlayPauseButton(snapshot.isPlaying, viewModel::playPause, Modifier.size(64.dp))
+            PlayPauseButton(
+                isPlaying = snapshot.isPlaying,
+                onClick = viewModel::playPause,
+                modifier = Modifier.size(64.dp),
+                iconSize = 36.dp,
+            )
             PlayerIconButton(
                 resource = Res.drawable.skip_next,
                 description = stringResource(Res.string.next_track),
                 enabled = snapshot.hasNext,
                 onClick = viewModel::next,
+                modifier = Modifier.size(56.dp),
             )
         }
+        Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -407,6 +492,7 @@ private fun FullPlayer(
                 onClick = onOpenQueue,
             )
         }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
