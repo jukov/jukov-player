@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.BottomSheetScaffold
@@ -42,6 +44,8 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.Alignment
@@ -79,6 +83,7 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,7 +181,6 @@ private val Track.artistAndYear: String
 
 private val MINI_PLAYER_HEIGHT = 64.dp
 private val MINI_PLAYER_CONTENT_INSET = MINI_PLAYER_HEIGHT
-
 @Composable
 private fun rememberArtworkPalette(
     key: String?,
@@ -360,6 +364,37 @@ private fun FullPlayer(
         if (!isDragging) sliderPosition = snapshot.positionMs.toFloat()
     }
     val duration = snapshot.durationMs.coerceAtLeast(1)
+    val titleMinHeight = with(LocalDensity.current) {
+        MaterialTheme.typography.headlineSmall.lineHeight.toDp() * 2
+    }
+    val pagerState = rememberPagerState(
+        initialPage = snapshot.currentIndex.coerceAtLeast(0),
+        pageCount = { snapshot.queue.size },
+    )
+    val currentIndex by rememberUpdatedState(snapshot.currentIndex)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                when (page) {
+                    currentIndex - 1 -> viewModel.previous()
+                    currentIndex + 1 -> viewModel.next()
+                    else -> {
+                        if (page > currentIndex) {
+                            viewModel.playAt(page)
+                        }
+                    }
+                }
+            }
+    }
+    LaunchedEffect(snapshot.currentIndex) {
+        if (
+            snapshot.currentIndex in snapshot.queue.indices &&
+            pagerState.currentPage != snapshot.currentIndex
+        ) {
+            pagerState.animateScrollToPage(snapshot.currentIndex)
+        }
+    }
 
     Column(
         modifier = modifier
@@ -372,45 +407,65 @@ private fun FullPlayer(
             )
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(start = 20.dp, top = 16.dp, end = 20.dp),
+            .padding(top = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
     ) {
         Spacer(Modifier.weight(.25f))
-        Artwork(
-            url = track.coverArtUrl,
-            albumId = track.albumId,
-            requestedSize = LARGE_ARTWORK_SIZE,
-            description = stringResource(Res.string.track_cover, track.title),
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(maxWidth - 72.dp),
+                key = { page -> snapshot.queue[page].uiId },
+            ) { page ->
+                val displayedTrack = snapshot.queue[page].track
+                Artwork(
+                    url = displayedTrack.coverArtUrl,
+                    albumId = displayedTrack.albumId,
+                    requestedSize = LARGE_ARTWORK_SIZE,
+                    description = stringResource(Res.string.track_cover, displayedTrack.title),
+                    modifier = Modifier
+                        .padding(horizontal = 36.dp)
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            shadowElevation = 28.dp.toPx()
+                            shape = RoundedCornerShape(24.dp)
+                            clip = true
+                        },
+                )
+            }
+        }
+        Spacer(Modifier.weight(.45f))
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .aspectRatio(1f)
-                .graphicsLayer {
-                    shadowElevation = 28.dp.toPx()
-                    shape = RoundedCornerShape(24.dp)
-                    clip = true
-                },
-        )
-        Spacer(Modifier.weight(.45f))
-        Text(
-            text = track.title,
-            modifier = Modifier.clickable(
-                enabled = track.albumId != null,
-                onClick = { onAlbumClick(track) },
-            ),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+                .padding(horizontal = 20.dp)
+                .height(titleMinHeight)
+                .clickable(
+                    enabled = track.albumId != null,
+                    onClick = { onAlbumClick(track) },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = track.title,
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Spacer(Modifier.height(4.dp))
         Text(
             text = track.artistAndYear,
-            modifier = Modifier.clickable(
-                enabled = track.artistId != null,
-                onClick = { onArtistClick(track) },
-            ),
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .clickable(
+                    enabled = track.artistId != null,
+                    onClick = { onArtistClick(track) },
+                ),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -428,9 +483,12 @@ private fun FullPlayer(
                 isDragging = false
             },
             valueRange = 0f..duration.toFloat(),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             Text(formatDuration(sliderPosition.toLong()), style = MaterialTheme.typography.bodySmall)
             Text(formatDuration(snapshot.durationMs), style = MaterialTheme.typography.bodySmall)
         }
@@ -440,11 +498,12 @@ private fun FullPlayer(
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 20.dp),
             )
         }
         Spacer(Modifier.weight(.3f))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -471,7 +530,7 @@ private fun FullPlayer(
         }
         Spacer(Modifier.height(16.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             PlayerIconButton(
