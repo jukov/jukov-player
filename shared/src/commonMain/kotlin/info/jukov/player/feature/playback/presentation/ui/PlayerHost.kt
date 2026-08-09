@@ -41,6 +41,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -370,35 +371,6 @@ private fun FullPlayer(
     }
     val titleMinHeight = titleLineHeight * 2 + 4.dp
     val titleMaxHeight = titleLineHeight * 4 + 4.dp
-    val pagerState = rememberPagerState(
-        initialPage = snapshot.currentIndex.coerceAtLeast(0),
-        pageCount = { snapshot.queue.size },
-    )
-    val currentIndex by rememberUpdatedState(snapshot.currentIndex)
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.settledPage }
-            .distinctUntilChanged()
-            .collect { page ->
-                when (page) {
-                    currentIndex - 1 -> viewModel.previous()
-                    currentIndex + 1 -> viewModel.next()
-                    else -> {
-                        if (page > currentIndex) {
-                            viewModel.playAt(page)
-                        }
-                    }
-                }
-            }
-    }
-    LaunchedEffect(snapshot.currentIndex) {
-        if (
-            snapshot.currentIndex in snapshot.queue.indices &&
-            pagerState.currentPage != snapshot.currentIndex
-        ) {
-            pagerState.animateScrollToPage(snapshot.currentIndex)
-        }
-    }
-
     Column(
         modifier = modifier
             .background(
@@ -414,30 +386,8 @@ private fun FullPlayer(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(maxWidth - 72.dp),
-                key = { page -> snapshot.queue[page].uiId },
-            ) { page ->
-                val displayedTrack = snapshot.queue[page].track
-                Artwork(
-                    url = displayedTrack.coverArtUrl,
-                    albumId = displayedTrack.albumId,
-                    requestedSize = LARGE_ARTWORK_SIZE,
-                    description = stringResource(Res.string.track_cover, displayedTrack.title),
-                    modifier = Modifier
-                        .padding(horizontal = 36.dp)
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            shadowElevation = 28.dp.toPx()
-                            shape = RoundedCornerShape(24.dp)
-                            clip = true
-                        },
-                )
-            }
+        key(snapshot.queue) {
+            PlayerArtworkPager(snapshot = snapshot, viewModel = viewModel)
         }
         Spacer(Modifier.height(24.dp))
         Box(
@@ -572,6 +522,64 @@ private fun FullPlayer(
             )
         }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun PlayerArtworkPager(
+    snapshot: PlayerUiState,
+    viewModel: PlayerViewModel,
+) {
+    val pagerState = rememberPagerState(
+        initialPage = snapshot.currentIndex,
+        pageCount = { snapshot.queue.size },
+    )
+    val currentIndex by rememberUpdatedState(snapshot.currentIndex)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                when (page) {
+                    currentIndex - 1 -> viewModel.previous()
+                    currentIndex + 1 -> viewModel.next()
+                    else -> {
+                        if (page > currentIndex) {
+                            viewModel.playAt(page)
+                        }
+                    }
+                }
+            }
+    }
+    LaunchedEffect(snapshot.currentIndex) {
+        if (pagerState.currentPage != snapshot.currentIndex) {
+            pagerState.animateScrollToPage(snapshot.currentIndex)
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(maxWidth - 72.dp),
+            key = { page -> snapshot.queue[page].uiId },
+        ) { page ->
+            val displayedTrack = snapshot.queue[page].track
+            Artwork(
+                url = displayedTrack.coverArtUrl,
+                albumId = displayedTrack.albumId,
+                requestedSize = LARGE_ARTWORK_SIZE,
+                description = stringResource(Res.string.track_cover, displayedTrack.title),
+                modifier = Modifier
+                    .padding(horizontal = 36.dp)
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        shadowElevation = 28.dp.toPx()
+                        shape = RoundedCornerShape(24.dp)
+                        clip = true
+                    },
+            )
+        }
     }
 }
 
