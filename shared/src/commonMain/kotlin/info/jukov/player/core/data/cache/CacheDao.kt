@@ -108,6 +108,15 @@ interface CacheDao {
     @Upsert suspend fun upsertDownloadOwnership(items: List<DownloadOwnershipEntity>)
     @Upsert suspend fun upsertOfflineArtwork(item: OfflineArtworkEntity)
 
+    @Transaction
+    suspend fun upsertOfflineArtworkIfReferenced(item: OfflineArtworkEntity): Boolean {
+        if (artworkReferenceCount(item.accountKey, item.coverArtId) == 0) {
+            return false
+        }
+        upsertOfflineArtwork(item)
+        return true
+    }
+
     @Query("UPDATE OfflineTrackEntity SET state=:state, downloadedBytes=:downloadedBytes, expectedSize=:expectedSize, relativePath=:relativePath, error=:error, completedAtMs=:completedAtMs WHERE accountKey=:accountKey AND trackId=:trackId")
     suspend fun updateOfflineTrackState(accountKey: String, trackId: String, state: String, downloadedBytes: Long, expectedSize: Long?, relativePath: String?, error: String?, completedAtMs: Long?)
 

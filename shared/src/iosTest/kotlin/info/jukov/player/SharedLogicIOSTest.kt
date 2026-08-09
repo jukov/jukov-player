@@ -3,6 +3,7 @@ package info.jukov.player
 import info.jukov.player.feature.download.safeComponent
 import info.jukov.player.feature.download.isSafeRelativePath
 import info.jukov.player.feature.download.iosTaskDescription
+import info.jukov.player.feature.download.isActiveDownloadAttempt
 import info.jukov.player.feature.download.isCurrentDownloadGeneration
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
@@ -79,6 +80,14 @@ class SharedLogicIOSTest {
     fun cancellationInvalidatesPreviouslySubmittedSchedulingWork() {
         assertTrue(isCurrentDownloadGeneration(submitted = 7, current = 7))
         assertFalse(isCurrentDownloadGeneration(submitted = 7, current = 8))
+    }
+
+    @Test
+    fun delayedCancellationCallbackCannotFailReplacementAttempt() {
+        val cancelledAttempts = setOf<ULong>(41u)
+
+        assertFalse(isActiveDownloadAttempt(41u, cancelledAttempts))
+        assertTrue(isActiveDownloadAttempt(42u, cancelledAttempts))
     }
 
     @OptIn(ExperimentalForeignApi::class)

@@ -78,6 +78,7 @@ class IosOfflinePlatform internal constructor(
     private var cancellationGeneration = 0L
     private val cancelledAccountTokens = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskDescriptions = MutableStateFlow<Set<String>>(emptySet())
+    private val cancelledTaskIdentifiers = MutableStateFlow<Set<ULong>>(emptySet())
     private var backgroundCompletionHandler: (() -> Unit)? = null
     private var backgroundEventsFinished = false
     private var processingCallbacks = 0
@@ -256,7 +257,7 @@ class IosOfflinePlatform internal constructor(
 
     internal fun didComplete(task: NSURLSessionTask, error: NSError?) {
         val metadata = parseIosTaskDescription(task.taskDescription) ?: return
-        if (!isTaskActive(metadata)) {
+        if (!isTaskActive(metadata, task.taskIdentifier)) {
             completedLocations.remove(task.taskIdentifier)
             return
         }
@@ -363,7 +364,7 @@ class IosOfflinePlatform internal constructor(
         metadata: IosDownloadTaskMetadata,
     ) {
         val accountKey = accountKeyFor(metadata) ?: return
-        if (!isTaskActive(metadata)) {
+        if (!isTaskActive(metadata, task.taskIdentifier)) {
             return
         }
         val response = task.response as? NSHTTPURLResponse
@@ -393,7 +394,7 @@ class IosOfflinePlatform internal constructor(
             safeComponent(accountKey),
             trackId,
         )
-        if (!isTaskActive(metadata)) {
+        if (!isTaskActive(metadata, task.taskIdentifier)) {
             return
         }
         val destination = trackUrl(accountKey, trackId)
@@ -406,7 +407,7 @@ class IosOfflinePlatform internal constructor(
             )
             return
         }
-        if (!isTaskActive(metadata)) {
+        if (!isTaskActive(metadata, task.taskIdentifier)) {
             destination.removeIfPresent()
             return
         }
@@ -416,7 +417,7 @@ class IosOfflinePlatform internal constructor(
             task.countOfBytesExpectedToReceive.takeIf { it > 0 }, relative(destination, accountKey),
             null, Clock.System.now().toEpochMilliseconds(),
         )
-        if (!isTaskActive(metadata)) {
+        if (!isTaskActive(metadata, task.taskIdentifier)) {
             destination.removeIfPresent()
             return
         }
@@ -499,7 +500,7 @@ class IosOfflinePlatform internal constructor(
             safeComponent(accountKey),
             coverArtId,
         )
-        if (!isTaskActive(metadata)) {
+        if (!isTaskActive(metadata, task.taskIdentifier)) {
             return
         }
         val destination = artworkUrl(accountKey, coverArtId)
@@ -512,18 +513,18 @@ class IosOfflinePlatform internal constructor(
             )
             return
         }
-        if (!isTaskActive(metadata)) {
+        if (!isTaskActive(metadata, task.taskIdentifier)) {
             destination.removeIfPresent()
             return
         }
-        dao.upsertOfflineArtwork(
+        val committed = dao.upsertOfflineArtworkIfReferenced(
             OfflineArtworkEntity(
                 accountKey, coverArtId, relative(destination, accountKey), contentType,
                 task.countOfBytesReceived.coerceAtLeast(0), DownloadState.Completed.name,
                 null, Clock.System.now().toEpochMilliseconds(),
             ),
         )
-        if (!isTaskActive(metadata)) {
+        if (!committed || !isTaskActive(metadata, task.taskIdentifier)) {
             destination.removeIfPresent()
         }
     }
@@ -548,7 +549,11 @@ class IosOfflinePlatform internal constructor(
     }
 
     private suspend fun cancelTasks(predicate: (String?) -> Boolean) {
-        currentTasks().filter { predicate(it.taskDescription) }.forEach(NSURLSessionTask::cancel)
+        val matchingTasks = currentTasks().filter { predicate(it.taskDescription) }
+        cancelledTaskIdentifiers.update { identifiers ->
+            identifiers + matchingTasks.map { it.taskIdentifier }
+        }
+        matchingTasks.forEach(NSURLSessionTask::cancel)
     }
 
     private fun submitOperation(operation: suspend () -> Unit) {
@@ -596,7 +601,11 @@ class IosOfflinePlatform internal constructor(
                 metadata.accountToken !in cancelledAccountTokens.value
         }
 
-    private fun isTaskActive(metadata: IosDownloadTaskMetadata): Boolean =
+    private fun isTaskActive(
+        metadata: IosDownloadTaskMetadata,
+        taskIdentifier: ULong,
+    ): Boolean =
+        isActiveDownloadAttempt(taskIdentifier, cancelledTaskIdentifiers.value) &&
         metadata.accountToken !in cancelledAccountTokens.value &&
             metadata.description !in cancelledTaskDescriptions.value
 
@@ -810,6 +819,11 @@ internal fun isSafeRelativePath(value: String): Boolean =
 
 internal fun isCurrentDownloadGeneration(submitted: Long, current: Long): Boolean =
     submitted == current
+
+internal fun isActiveDownloadAttempt(
+    taskIdentifier: ULong,
+    cancelledTaskIdentifiers: Set<ULong>,
+): Boolean = taskIdentifier !in cancelledTaskIdentifiers
 
 private const val BACKGROUND_SESSION_IDENTIFIER = "info.jukov.player.offline-downloads"
 private const val NOTIFICATION_OPEN_DOWNLOADS_KEY = "openDownloads"

@@ -40,6 +40,8 @@ import platform.MediaPlayer.MPRemoteCommandHandlerStatusNoSuchContent
 import platform.MediaPlayer.MPRemoteCommandHandlerStatusSuccess
 import platform.MediaPlayer.MPChangePlaybackPositionCommandEvent
 import platform.UIKit.*
+import platform.darwin.dispatch_get_main_queue
+import platform.darwin.dispatch_sync
 import kotlin.math.roundToLong
 
 object IosPlaybackControllerFactory : PlaybackControllerFactory {
@@ -74,7 +76,7 @@ internal class IosPlaybackController(
         installRemoteCommands()
         timeObserver = player.addPeriodicTimeObserverForInterval(
             interval = CMTimeMakeWithSeconds(0.5, preferredTimescale = 600),
-            queue = null,
+            queue = dispatch_get_main_queue(),
         ) { updatePlaybackState() }
         val saved = playbackStore.read()
         if (saved != null && saved.queue.isNotEmpty() && saved.currentIndex in saved.queue.indices) {
@@ -371,12 +373,25 @@ internal class IosPlaybackController(
     }
 
     private fun installRemoteCommands() {
-        remoteCommands.playCommand.addTargetWithHandler { remotePlay() }
-        remoteCommands.pauseCommand.addTargetWithHandler { remotePause() }
-        remoteCommands.togglePlayPauseCommand.addTargetWithHandler { remoteToggle() }
-        remoteCommands.nextTrackCommand.addTargetWithHandler { remoteNext() }
-        remoteCommands.previousTrackCommand.addTargetWithHandler { remotePrevious() }
-        remoteCommands.changePlaybackPositionCommand.addTargetWithHandler { event -> remoteSeek(event) }
+        remoteCommands.playCommand.addTargetWithHandler { onMainQueue { remotePlay() } }
+        remoteCommands.pauseCommand.addTargetWithHandler { onMainQueue { remotePause() } }
+        remoteCommands.togglePlayPauseCommand.addTargetWithHandler { onMainQueue { remoteToggle() } }
+        remoteCommands.nextTrackCommand.addTargetWithHandler { onMainQueue { remoteNext() } }
+        remoteCommands.previousTrackCommand.addTargetWithHandler { onMainQueue { remotePrevious() } }
+        remoteCommands.changePlaybackPositionCommand.addTargetWithHandler { event ->
+            onMainQueue { remoteSeek(event) }
+        }
+    }
+
+    private fun onMainQueue(command: () -> Long): Long {
+        if (NSThread.isMainThread) {
+            return command()
+        }
+        var result = MPRemoteCommandHandlerStatusCommandFailed
+        dispatch_sync(dispatch_get_main_queue()) {
+            result = command()
+        }
+        return result
     }
 
     private fun remotePlay(): Long {
