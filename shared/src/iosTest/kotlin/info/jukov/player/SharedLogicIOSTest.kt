@@ -4,6 +4,7 @@ import info.jukov.player.feature.download.safeComponent
 import info.jukov.player.feature.download.isSafeRelativePath
 import info.jukov.player.feature.download.iosTaskDescription
 import info.jukov.player.feature.download.parseIosTaskDescription
+import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.core.data.cache.migrateLegacyDatabaseIfNeeded
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSFileManager
@@ -51,6 +52,26 @@ class SharedLogicIOSTest {
         assertFalse(description.contains("secret"))
         assertNull(parseIosTaskDescription("track:missing-id"))
         assertNull(parseIosTaskDescription("unknown:token:id"))
+    }
+
+    @Test
+    fun appendAfterExhaustionSelectsFirstNewTrack() {
+        assertEquals(
+            3,
+            indexAfterQueueAppend(
+                previousQueueSize = 3,
+                currentIndex = 2,
+                playerWasExhausted = true,
+            ),
+        )
+        assertEquals(
+            1,
+            indexAfterQueueAppend(
+                previousQueueSize = 3,
+                currentIndex = 1,
+                playerWasExhausted = false,
+            ),
+        )
     }
 
     @OptIn(ExperimentalForeignApi::class)

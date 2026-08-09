@@ -121,7 +121,9 @@ internal class IosPlaybackController(
             rebuildPlayer(autoplay = true, positionMs = 0)
             return
         }
-        activateAudioSession()
+        if (!activateAudioSession()) {
+            return
+        }
         player.play()
         updatePlaybackState()
     }
@@ -134,10 +136,16 @@ internal class IosPlaybackController(
             fail(AppError.MissingTrackStreamUrl)
             return
         }
+        val previousQueueSize = queue.size
         val wasEmpty = queue.isEmpty()
+        val playerWasExhausted = !wasEmpty && player.currentItem == null && playerItems.isEmpty()
         queue = appendQueueItems(queue, tracks)
-        if (wasEmpty) {
-            currentIndex = 0
+        if (wasEmpty || playerWasExhausted) {
+            currentIndex = indexAfterQueueAppend(
+                previousQueueSize = previousQueueSize,
+                currentIndex = currentIndex,
+                playerWasExhausted = playerWasExhausted,
+            )
             rebuildPlayer(autoplay = false, positionMs = 0)
         } else {
             tracks.forEach { track ->
@@ -267,7 +275,9 @@ internal class IosPlaybackController(
             player.seekToTime(CMTimeMakeWithSeconds(positionMs / 1_000.0, preferredTimescale = 600))
         }
         if (autoplay) {
-            activateAudioSession()
+            if (!activateAudioSession()) {
+                return
+            }
             player.play()
         }
         updatePlaybackState(positionOverrideMs = positionMs)
@@ -279,13 +289,15 @@ internal class IosPlaybackController(
         return AVPlayerItem(uRL = url)
     }
 
-    private fun activateAudioSession() {
+    private fun activateAudioSession(): Boolean {
         val audioSession = AVAudioSession.sharedInstance()
         if (!audioSession.setCategory(AVAudioSessionCategoryPlayback, error = null) ||
             !audioSession.setActive(active = true, error = null)
         ) {
             fail(AppError.PlayerConnectionFailed)
+            return false
         }
+        return true
     }
 
     private fun installNotifications() {
@@ -334,7 +346,10 @@ internal class IosPlaybackController(
                 if (wasPlayingBeforeInterruption &&
                     options and AVAudioSessionInterruptionOptionShouldResume != 0uL
                 ) {
-                    activateAudioSession()
+                    if (!activateAudioSession()) {
+                        wasPlayingBeforeInterruption = false
+                        return
+                    }
                     player.play()
                 }
                 wasPlayingBeforeInterruption = false
@@ -507,6 +522,16 @@ internal class IosPlaybackController(
         _state.update { LoadableState.Failure(error, it.content) }
     }
 
+}
+
+internal fun indexAfterQueueAppend(
+    previousQueueSize: Int,
+    currentIndex: Int,
+    playerWasExhausted: Boolean,
+): Int = if (previousQueueSize == 0 || playerWasExhausted) {
+    previousQueueSize
+} else {
+    currentIndex
 }
 
 private const val PREVIOUS_RESTART_THRESHOLD_MS = 3_000L
