@@ -1,0 +1,22 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+file_include_globs = [
+    "local.properties",
+]
+
+[scripts]
+setup = "./scripts/check-env.sh"
+run_mode = "concurrent"
+
+[scripts.run.fast-check]
+command = "./scripts/check-fast.sh"
+icon = "test-tube"
+
+[scripts.run.full-check]
+command = "./scripts/check-full.sh"
+icon = "shield-check"
+
+[scripts.run.ios-check]
+available_in = [ "local" ]
+command = "./scripts/check-ios.sh"
+icon = "smartphone"
