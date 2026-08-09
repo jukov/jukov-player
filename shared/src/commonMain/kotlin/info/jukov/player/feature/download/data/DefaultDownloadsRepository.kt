@@ -121,9 +121,11 @@ class DefaultDownloadsRepository(
     }
 
     override suspend fun downloadAlbum(album: Album) {
-        mutations.run {
-            val session = session() ?: return@run
-            val tracks = tracksApi.getTracks(session, TracksFilter.ByAlbum(album.id))
+        val (generation, requestedSession) = mutations.snapshot(::session) ?: return
+        val tracks = tracksApi.getTracks(requestedSession, TracksFilter.ByAlbum(album.id))
+        mutations.runIfCurrent(generation) {
+            val session = session()?.takeIf { it.accountKey == requestedSession.accountKey }
+                ?: return@runIfCurrent
             val now = Clock.System.now().toEpochMilliseconds()
             dao.upsertAlbums(listOf(album.toEntity(session.accountKey)))
             dao.upsertTracks(tracks.map { it.toEntity(session.accountKey) })
@@ -144,10 +146,10 @@ class DefaultDownloadsRepository(
     }
 
     override suspend fun removeTracks(trackIds: List<String>) {
-        mutations.run {
-            val key = accountKey() ?: return@run
+        mutations.invalidateAndRun {
+            val key = accountKey() ?: return@invalidateAndRun
             if (trackIds.isEmpty()) {
-                return@run
+                return@invalidateAndRun
             }
             withContext(NonCancellable) {
                 platform.cancelTracks(key, trackIds)
@@ -159,8 +161,8 @@ class DefaultDownloadsRepository(
     }
 
     override suspend fun cancelAlbum(albumId: String) {
-        mutations.run {
-            val key = accountKey() ?: return@run
+        mutations.invalidateAndRun {
+            val key = accountKey() ?: return@invalidateAndRun
             withContext(NonCancellable) {
                 val tracks = dao.offlineAlbumTracks(key, albumId)
                 dao.deleteAlbumOwnerships(key, albumId)
@@ -188,8 +190,8 @@ class DefaultDownloadsRepository(
     }
 
     override suspend fun clearCurrentAccount() {
-        mutations.run {
-            val key = accountKey() ?: return@run
+        mutations.invalidateAndRun {
+            val key = accountKey() ?: return@invalidateAndRun
             withContext(NonCancellable) {
                 platform.cancelAccount(key)
                 platform.deleteAccount(key)
@@ -306,8 +308,28 @@ class DefaultDownloadsRepository(
 
 internal class DownloadMutationCoordinator {
     private val mutex = Mutex()
+    private var generation = 0L
 
     suspend fun <T> run(block: suspend () -> T): T = mutex.withLock {
+        block()
+    }
+
+    suspend fun <T : Any> snapshot(value: () -> T?): Pair<Long, T>? = mutex.withLock {
+        value()?.let { generation to it }
+    }
+
+    suspend fun runIfCurrent(expectedGeneration: Long, block: suspend () -> Unit): Boolean =
+        mutex.withLock {
+            if (generation != expectedGeneration) {
+                false
+            } else {
+                block()
+                true
+            }
+        }
+
+    suspend fun <T> invalidateAndRun(block: suspend () -> T): T = mutex.withLock {
+        generation++
         block()
     }
 }

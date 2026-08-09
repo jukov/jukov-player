@@ -38,4 +38,34 @@ class DownloadMutationCoordinatorTest {
 
         assertEquals(listOf("remove-start", "remove-finish", "enqueue"), events)
     }
+
+    @Test
+    fun destructiveMutationDoesNotWaitForFetchAndRejectsItsLateCommit() = runTest {
+        val coordinator = DownloadMutationCoordinator()
+        val (generation, _) = coordinator.snapshot { "account" }!!
+        val releaseFetch = CompletableDeferred<Unit>()
+        val events = mutableListOf<String>()
+
+        val fetch = launch {
+            releaseFetch.await()
+            val committed = coordinator.runIfCurrent(generation) {
+                events += "late-commit"
+            }
+            events += "committed=$committed"
+        }
+        val removal = launch {
+            coordinator.invalidateAndRun {
+                events += "removed"
+            }
+        }
+
+        runCurrent()
+        removal.join()
+        assertEquals(listOf("removed"), events)
+
+        releaseFetch.complete(Unit)
+        fetch.join()
+
+        assertEquals(listOf("removed", "committed=false"), events)
+    }
 }
