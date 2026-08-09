@@ -12,6 +12,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         return true
     }
 
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        IosAppRuntime.shared.startRecovery()
+    }
+
     func application(
         _ application: UIApplication,
         handleEventsForBackgroundURLSession identifier: String,

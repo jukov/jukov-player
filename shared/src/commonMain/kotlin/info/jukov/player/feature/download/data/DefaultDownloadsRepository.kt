@@ -165,14 +165,13 @@ class DefaultDownloadsRepository(
             val key = accountKey() ?: return@invalidateAndRun
             withContext(NonCancellable) {
                 val tracks = dao.offlineAlbumTracks(key, albumId)
-                dao.deleteAlbumOwnerships(key, albumId)
-                dao.deleteOfflineAlbum(key, albumId)
-                tracks.forEach { track ->
-                    if (dao.ownershipCount(key, track.trackId) == 0) {
-                        platform.cancelTrack(key, track.trackId)
-                        removeTrackIfUnowned(key, track.trackId)
-                    }
+                val unownedTrackIds = tracks.mapNotNull { track ->
+                    track.trackId.takeIf { dao.ownershipCount(key, it) == 1 }
                 }
+                platform.cancelTracks(key, unownedTrackIds)
+                val removed = dao.removeOfflineAlbumDownload(key, albumId, unownedTrackIds)
+                platform.deleteTracks(key, removed.trackPaths)
+                platform.deleteArtworks(key, removed.artworkPaths)
             }
         }
     }
@@ -280,21 +279,6 @@ class DefaultDownloadsRepository(
         dao.upsertDownloadOwnership(
             listOf(DownloadOwnershipEntity(key, ownerType, ownerId, track.id, position)),
         )
-    }
-
-    private suspend fun removeTrackIfUnowned(key: String, trackId: String) {
-        if (dao.ownershipCount(key, trackId) != 0) return
-        val download = dao.offlineTrack(key, trackId) ?: return
-        val track = dao.track(key, trackId)
-        platform.deleteTrack(key, download.relativePath)
-        dao.deleteOfflineTrack(key, trackId)
-        track?.coverArtId?.let { coverId ->
-            if (dao.artworkReferenceCount(key, coverId) == 0) {
-                val artwork = dao.offlineArtwork(key, coverId)
-                platform.deleteArtwork(key, artwork?.relativePath)
-                dao.deleteOfflineArtwork(key, coverId)
-            }
-        }
     }
 
     private fun session() = (authRepository.authState.value as? AuthState.LoggedIn)?.session

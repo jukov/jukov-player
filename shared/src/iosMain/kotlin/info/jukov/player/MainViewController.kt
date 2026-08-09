@@ -20,22 +20,18 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import platform.Foundation.NSLock
 
 object IosAppRuntime {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val recoveryLock = NSLock()
+    private var recoveryStarted = false
     val graph by lazy {
         createAppGraph(
             IosPlaybackControllerFactory,
             cacheDatabaseBuilder(),
             IosOfflinePlatformFactory(),
-        ).also { appGraph ->
-            appGraph.playbackController
-            scope.launch {
-                appGraph.downloadsRepository.reconcile()
-                val authState = appGraph.authRepository.authState.value as? AuthState.LoggedIn
-                authState?.session?.accountKey?.let(appGraph.offlinePlatform::recover)
-            }
-        }
+        ).also { it.playbackController }
     }
 
     private val _openDownloads = MutableStateFlow(value = false)
@@ -49,6 +45,28 @@ object IosAppRuntime {
         graph
     }
 
+    fun startRecovery() {
+        recoveryLock.lock()
+        val shouldStart = try {
+            if (recoveryStarted) {
+                false
+            } else {
+                recoveryStarted = true
+                true
+            }
+        } finally {
+            recoveryLock.unlock()
+        }
+        if (!shouldStart) {
+            return
+        }
+        scope.launch {
+            graph.downloadsRepository.reconcile()
+            val authState = graph.authRepository.authState.value as? AuthState.LoggedIn
+            authState?.session?.accountKey?.let(graph.offlinePlatform::recover)
+        }
+    }
+
     fun handleEventsForBackgroundSession(
         identifier: String,
         completionHandler: () -> Unit,
@@ -56,6 +74,7 @@ object IosAppRuntime {
         (graph.offlinePlatform as IosOfflinePlatform).handleEventsForBackgroundSession(
             identifier,
             completionHandler,
+            ::startRecovery,
         )
     }
 

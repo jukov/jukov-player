@@ -374,6 +374,7 @@ internal class IosPlaybackController(
         }
         playWhenReady = false
         player.pause()
+        publish(isLoading = false)
         fail(AppError.PlaybackFailed)
     }
 
@@ -501,6 +502,7 @@ internal class IosPlaybackController(
         ) {
             playWhenReady = false
             player.pause()
+            publish(isLoading = false)
             fail(AppError.PlaybackFailed)
             return
         }

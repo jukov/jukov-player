@@ -357,6 +357,21 @@ interface CacheDao {
             artworkPaths = artworks.mapNotNull(OfflineArtworkEntity::relativePath),
         )
     }
+
+    @Transaction
+    suspend fun removeOfflineAlbumDownload(
+        accountKey: String,
+        albumId: String,
+        unownedTrackIds: List<String>,
+    ): RemovedOfflineFiles {
+        deleteAlbumOwnerships(accountKey, albumId)
+        deleteOfflineAlbum(accountKey, albumId)
+        return if (unownedTrackIds.isEmpty()) {
+            RemovedOfflineFiles(emptyList(), emptyList())
+        } else {
+            removeOfflineTracks(accountKey, unownedTrackIds)
+        }
+    }
 }
 
 data class RemovedOfflineFiles(

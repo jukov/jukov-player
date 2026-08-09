@@ -195,6 +195,7 @@ class IosOfflinePlatform internal constructor(
     fun handleEventsForBackgroundSession(
         identifier: String,
         completionHandler: () -> Unit,
+        onRegistered: () -> Unit,
     ) {
         if (identifier != BACKGROUND_SESSION_IDENTIFIER) {
             completionHandler()
@@ -204,6 +205,7 @@ class IosOfflinePlatform internal constructor(
             backgroundCompletionHandler = completionHandler
             completeBackgroundEventsIfReady()
             session.getAllTasksWithCompletionHandler { }
+            onRegistered()
         }
     }
 
