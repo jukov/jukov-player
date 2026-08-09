@@ -1,12 +1,9 @@
 # MVP
-- Add artist tab on downloads
-- Styling
 - App icon
 - App name
-- Long loading of all tracks list even if cache is presented
-- Clear queue
 
 # V2
+- Add artist tab on downloads
 - History
 - Download status (available/occupied storage, show size per track)
 - Android auto
