@@ -324,6 +324,7 @@ private fun MiniPlayer(
         Spacer(Modifier.width(Padding.small))
         PlayPauseButton(
             isPlaying = snapshot.isPlaying,
+            isLoading = snapshot.isLoading,
             onClick = onPlayPause,
             modifier = Modifier.size(48.dp),
         )
@@ -473,6 +474,7 @@ private fun FullPlayer(
             )
             PlayPauseButton(
                 isPlaying = snapshot.isPlaying,
+                isLoading = snapshot.isLoading,
                 onClick = viewModel::playPause,
                 modifier = Modifier.size(64.dp),
                 iconSize = 36.dp,

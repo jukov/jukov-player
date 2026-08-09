@@ -26,6 +26,10 @@ fun PlaylistScreen(
     onBack: () -> Unit,
     onDeleted: () -> Unit,
     onPlay: (List<Track>, Int, PlaybackOrigin) -> Unit,
+    onActiveTrackClick: () -> Unit,
+    activeTrackId: String?,
+    isPlaying: Boolean,
+    loadingTrackId: String? = null,
     onAddToQueue: (List<Track>) -> Unit,
 ) {
     LaunchedEffect(id) { viewModel.load(id) }
@@ -117,9 +121,10 @@ fun PlaylistScreen(
                 onPlayClick = { list, index ->
                     onPlay(list, index, PlaybackOrigin.Playlist(id))
                 },
-                onActiveTrackClick = {},
-                activeTrackId = null,
-                isPlaying = false,
+                onActiveTrackClick = onActiveTrackClick,
+                activeTrackId = activeTrackId,
+                isPlaying = isPlaying,
+                loadingTrackId = loadingTrackId,
                 downloadStatuses = downloadStatuses,
                 onDownloadClick = viewModel::download,
                 onCancelDownload = viewModel::cancelDownload,

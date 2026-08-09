@@ -99,6 +99,17 @@ private class AndroidPlaybackController(
             return
         }
         playbackStore.write(queue, 0, origin)
+        _state.update {
+            LoadableState.Content(
+                PlaybackSnapshot(
+                    queue = queue,
+                    currentIndex = 0,
+                    durationMs = queue.first().durationMs,
+                    isLoading = true,
+                    origin = origin,
+                ),
+            )
+        }
         withController { player ->
             player.setMediaItems(queue.map(Track::toMediaItem), 0, 0)
             player.prepare()
@@ -107,7 +118,7 @@ private class AndroidPlaybackController(
     }
 
     override fun playPause() = withController { player ->
-        if (player.isPlaying) {
+        if (player.playWhenReady) {
             player.pause()
         } else if (player.mediaItemCount > 0) {
             if (player.playbackState == Player.STATE_ENDED) player.seekToDefaultPosition()
@@ -226,6 +237,7 @@ private class AndroidPlaybackController(
                     durationMs = player.duration.validDuration()
                         ?: saved.queue[index].durationMs,
                     isPlaying = player.isPlaying,
+                    isLoading = player.playWhenReady && player.playbackState.isLoadingPlayback(),
                     origin = saved.origin,
                 ),
             )
@@ -245,7 +257,16 @@ private class AndroidPlaybackController(
     }
 
     private fun updatePlaying(isPlaying: Boolean) {
-        _state.update { it.mapContent { snapshot -> snapshot.copy(isPlaying = isPlaying) } }
+        val player = controller
+        _state.update {
+            it.mapContent { snapshot ->
+                snapshot.copy(
+                    isPlaying = isPlaying,
+                    isLoading = player?.playWhenReady == true &&
+                        player.playbackState.isLoadingPlayback(),
+                )
+            }
+        }
     }
 
     private fun updateCurrentItem(player: Player) {
@@ -275,6 +296,14 @@ private class AndroidPlaybackController(
 
         override fun onIsPlayingChanged(isPlaying: Boolean) = updatePlaying(isPlaying)
 
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            updatePlaying(controller?.isPlaying == true)
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            updatePlaying(controller?.isPlaying == true)
+        }
+
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             controller?.let(::updateCurrentItem)
         }
@@ -286,6 +315,7 @@ private class AndroidPlaybackController(
         ) = updatePosition()
 
         override fun onPlayerError(error: PlaybackException) {
+            _state.update { it.mapContent { snapshot -> snapshot.copy(isLoading = false) } }
             fail(AppError.PlaybackFailed)
         }
     }
@@ -299,6 +329,9 @@ private class AndroidPlaybackController(
     }
 
     private fun Long.validDuration(): Long? = takeUnless { it == C.TIME_UNSET }?.coerceAtLeast(0)
+
+    private fun Int.isLoadingPlayback(): Boolean =
+        this == Player.STATE_IDLE || this == Player.STATE_BUFFERING
 
     private inline fun <T> List<T>.indexOfFirstFrom(
         startIndex: Int,

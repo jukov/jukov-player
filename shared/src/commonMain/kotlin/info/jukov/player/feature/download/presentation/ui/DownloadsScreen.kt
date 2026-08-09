@@ -50,6 +50,7 @@ fun DownloadsScreen(
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
     isPlaying: Boolean,
+    loadingTrackId: String? = null,
     onAddToQueue: (List<Track>) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -158,6 +159,7 @@ fun DownloadsScreen(
                                     onActiveTrackClick = onActiveTrackClick,
                                     activeTrackId = activeTrackId,
                                     isPlaying = isPlaying,
+                                    loadingTrackId = loadingTrackId,
                                     downloadStatuses = library.tracks.associate { it.track.id to it.status },
                                     onCancelDownload = viewModel::removeTrack,
                                     onRetryDownload = viewModel::retryTrack,
@@ -190,6 +192,7 @@ fun DownloadsScreen(
                                         },
                                         isPlaying = isPlaying &&
                                             album.tracks.any { it.track.id == activeTrackId },
+                                        isLoading = album.tracks.any { it.track.id == loadingTrackId },
                                     )
                                 }
                             }
@@ -233,6 +236,7 @@ fun OfflineAlbumTracksScreen(
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
     isPlaying: Boolean,
+    loadingTrackId: String? = null,
     onAddToQueue: (List<Track>) -> Unit,
 ) {
     val offlineTracks by viewModel.albumTracks(albumId).collectAsStateWithLifecycle(emptyList())
@@ -273,6 +277,7 @@ fun OfflineAlbumTracksScreen(
             onActiveTrackClick = onActiveTrackClick,
             activeTrackId = activeTrackId,
             isPlaying = isPlaying,
+            loadingTrackId = loadingTrackId,
             downloadStatuses = offlineTracks.associate { it.track.id to it.status },
             onCancelDownload = viewModel::removeTrack,
             onRetryDownload = viewModel::retryTrack,
@@ -293,6 +298,7 @@ private fun OfflineAlbumRow(
     onRemove: () -> Unit,
     onPlay: () -> Unit,
     isPlaying: Boolean,
+    isLoading: Boolean,
 ) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
@@ -333,6 +339,7 @@ private fun OfflineAlbumRow(
                 }
                 DownloadPlayButton(
                     isPlaying = isPlaying,
+                    isLoading = isLoading,
                     onClick = onPlay,
                     status = album.status,
                 )

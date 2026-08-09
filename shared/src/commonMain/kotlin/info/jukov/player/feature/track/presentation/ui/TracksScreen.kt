@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -55,6 +56,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
@@ -108,6 +111,8 @@ fun TracksScreen(
     onActiveTrackClick: () -> Unit = {},
     activeTrackId: String? = null,
     isPlaying: Boolean = false,
+    isPlaybackLoading: Boolean = false,
+    loadingTrackId: String? = null,
     activeOrigin: PlaybackOrigin = PlaybackOrigin.TrackList,
     onAddToQueue: (List<Track>) -> Unit = {},
     onAddToPlaylist: (List<Track>, () -> Unit) -> Unit = { _, _ -> },
@@ -226,6 +231,7 @@ fun TracksScreen(
                             if (filter is TracksFilter.ByArtist) {
                                 PlayPauseButton(
                                     isPlaying = isCollectionActive && isPlaying,
+                                    isLoading = isCollectionActive && isPlaybackLoading,
                                     onClick = onCollectionPlayClick,
                                     enabled = tracks.isNotEmpty(),
                                 )
@@ -242,6 +248,7 @@ fun TracksScreen(
                         onBack = onBack,
                         onPlayClick = onCollectionPlayClick,
                         isPlaying = isCollectionActive && isPlaying,
+                        isLoading = isCollectionActive && isPlaybackLoading,
                         isFavorite = currentAlbumIsFavorite,
                         favoriteEnabled = albumHeader.albumId !in pending,
                         onFavoriteClick = { viewModel.toggleAlbumFavorite(albumHeader.albumId) },
@@ -325,6 +332,7 @@ fun TracksScreen(
                     onActiveTrackClick = onActiveTrackClick,
                     activeTrackId = activeTrackId,
                     isPlaying = isPlaying,
+                    loadingTrackId = loadingTrackId,
                     pendingIds = pending,
                     onFavoriteClick = viewModel::toggleFavorite,
                     downloadStatuses = downloadStatuses,
@@ -354,6 +362,7 @@ private fun AlbumTracksTopAppBar(
     onBack: () -> Unit,
     onPlayClick: () -> Unit,
     isPlaying: Boolean,
+    isLoading: Boolean,
     isFavorite: Boolean,
     favoriteEnabled: Boolean,
     onFavoriteClick: () -> Unit,
@@ -375,6 +384,7 @@ private fun AlbumTracksTopAppBar(
                     onPlayClick = onPlayClick,
                     playEnabled = tracks.isNotEmpty(),
                     isPlaying = isPlaying,
+                    isLoading = isLoading,
                     isFavorite = isFavorite,
                     favoriteEnabled = favoriteEnabled,
                     onFavoriteClick = onFavoriteClick,
@@ -391,6 +401,7 @@ private fun AlbumTracksTopAppBar(
                     onPlayClick = onPlayClick,
                     playEnabled = tracks.isNotEmpty(),
                     isPlaying = isPlaying,
+                    isLoading = isLoading,
                     onArtistClick = onArtistClick,
                 )
             },
@@ -415,6 +426,7 @@ private fun ExpandedAlbumTracksHeader(
     onPlayClick: () -> Unit,
     playEnabled: Boolean,
     isPlaying: Boolean,
+    isLoading: Boolean,
     isFavorite: Boolean,
     favoriteEnabled: Boolean,
     onFavoriteClick: () -> Unit,
@@ -516,6 +528,7 @@ private fun ExpandedAlbumTracksHeader(
                 Spacer(Modifier.width(Padding.small))
                 PlayPauseButton(
                     isPlaying = isPlaying,
+                    isLoading = isLoading,
                     onClick = onPlayClick,
                     enabled = playEnabled,
                     modifier = Modifier.size(48.dp),
@@ -543,6 +556,7 @@ private fun CollapsedAlbumTracksHeader(
     onPlayClick: () -> Unit,
     playEnabled: Boolean,
     isPlaying: Boolean,
+    isLoading: Boolean,
     onArtistClick: (String, String) -> Unit,
 ) {
     Row(
@@ -595,6 +609,7 @@ private fun CollapsedAlbumTracksHeader(
         }
         PlayPauseButton(
             isPlaying = isPlaying,
+            isLoading = isLoading,
             onClick = onPlayClick,
             enabled = playEnabled,
             modifier = Modifier.size(48.dp),
@@ -613,6 +628,7 @@ fun TracksList(
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
     isPlaying: Boolean,
+    loadingTrackId: String? = null,
     pendingIds: Set<String> = emptySet(),
     onFavoriteClick: (Track) -> Unit = {},
     downloadStatuses: Map<String, DownloadStatus> = emptyMap(),
@@ -654,6 +670,7 @@ fun TracksList(
                     else onPlayClick(tracks, index)
                 },
                 isPlaying = track.id == activeTrackId && isPlaying,
+                isLoading = track.id == loadingTrackId,
                 favoriteEnabled = track.id !in pendingIds,
                 onFavoriteClick = { onFavoriteClick(track) },
                 downloadStatus = downloadStatuses[track.id],
@@ -690,6 +707,7 @@ fun TrackRow(
     showTrackNumber: Boolean = false,
     onPlayClick: () -> Unit,
     isPlaying: Boolean,
+    isLoading: Boolean = false,
     favoriteEnabled: Boolean = true,
     onFavoriteClick: () -> Unit = {},
     downloadStatus: DownloadStatus? = null,
@@ -791,6 +809,7 @@ fun TrackRow(
         }
         DownloadPlayButton(
             isPlaying = isPlaying,
+            isLoading = isLoading,
             onClick = onPlayClick,
             status = downloadStatus,
         )
@@ -800,15 +819,30 @@ fun TrackRow(
 @Composable
 fun DownloadPlayButton(
     isPlaying: Boolean,
+    isLoading: Boolean = false,
     onClick: () -> Unit,
     status: DownloadStatus?,
 ) {
+    val loadingDescription = stringResource(Res.string.pause)
     Box {
         IconButton(onClick = onClick) {
-            Icon(
-                painter = painterResource(if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow),
-                contentDescription = stringResource(if (isPlaying) Res.string.pause else Res.string.play),
-            )
+            if (isLoading) {
+                LoadingIndicator(
+                    modifier = Modifier.size(24.dp).semantics {
+                        contentDescription = loadingDescription
+                    },
+                    color = LocalContentColor.current,
+                )
+            } else {
+                Icon(
+                    painter = painterResource(
+                        if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow,
+                    ),
+                    contentDescription = stringResource(
+                        if (isPlaying) Res.string.pause else Res.string.play,
+                    ),
+                )
+            }
         }
         DownloadBadge(
             status = status,

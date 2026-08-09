@@ -79,6 +79,7 @@ fun FavoritesScreen(
     onActiveTrackClick: () -> Unit,
     activeTrackId: String?,
     isPlaying: Boolean,
+    loadingTrackId: String? = null,
     onAddToQueue: (List<Track>) -> Unit,
     onAddToPlaylist: (List<Track>, () -> Unit) -> Unit = { _, _ -> },
 ) {
@@ -224,6 +225,7 @@ fun FavoritesScreen(
                             onActiveTrackClick = onActiveTrackClick,
                             activeTrackId = activeTrackId,
                             isPlaying = isPlaying,
+                            loadingTrackId = loadingTrackId,
                             pendingIds = pending.filterIsInstance<FavoriteTarget.Track>()
                                 .mapTo(mutableSetOf()) { it.id },
                             onFavoriteClick = {

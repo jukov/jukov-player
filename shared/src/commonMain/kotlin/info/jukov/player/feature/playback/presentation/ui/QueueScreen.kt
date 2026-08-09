@@ -160,6 +160,7 @@ fun QueueScreen(
                             dragHandle = {
                                 PlayPauseButton(
                                     isPlaying = state.isPlaying,
+                                    isLoading = state.isLoading,
                                     onClick = onPlayPause,
                                     modifier = Modifier.size(48.dp),
                                 )

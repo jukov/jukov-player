@@ -26,6 +26,8 @@ data class PlayerUiState(
     val positionMs: Long = 0,
     val durationMs: Long = 0,
     val isPlaying: Boolean = false,
+    val isLoading: Boolean = false,
+    val loadingTrackId: String? = null,
     val hasPrevious: Boolean = false,
     val hasNext: Boolean = false,
     val origin: PlaybackOrigin = PlaybackOrigin.TrackList,
@@ -45,12 +47,14 @@ class PlayerViewModel(
     private var nextQueueItemId = 0L
     private var queueItems = emptyList<PlayerQueueItem>()
     private val favoriteOverrides = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    private val pendingPlayback = MutableStateFlow<PendingPlayback?>(null)
 
     val state: StateFlow<LoadableState<PlayerUiState>> = combine(
         controller.state,
         favoriteOverrides,
-    ) { loadable, overrides ->
-        loadable.mapContent { it.toUiState(overrides) }
+        pendingPlayback,
+    ) { loadable, overrides, pending ->
+        loadable.mapContent { it.toUiState(overrides).withPendingPlayback(pending) }
     }
         .stateIn(
             scope = viewModelScope,
@@ -76,10 +80,22 @@ class PlayerViewModel(
         origin: PlaybackOrigin = PlaybackOrigin.TrackList,
     ) {
         if (tracks.isEmpty() || startIndex !in tracks.indices) return
+        val requested = PendingPlayback(tracks[startIndex], origin)
+        if (pendingPlayback.value?.matches(requested) == true) {
+            cancelPendingPlayback()
+            return
+        }
         playJob?.cancel()
+        pendingPlayback.value = requested
         playJob = viewModelScope.launch {
-            val queue = queueResolver.resolve(tracks.drop(startIndex))
-            controller.play(queue, startIndex = 0, origin = origin)
+            try {
+                val queue = queueResolver.resolve(tracks.drop(startIndex))
+                controller.play(queue, startIndex = 0, origin = origin)
+            } finally {
+                pendingPlayback.update { pending ->
+                    pending?.takeUnless { it.matches(requested) }
+                }
+            }
         }
     }
     fun addToQueue(tracks: List<Track>) {
@@ -88,7 +104,16 @@ class PlayerViewModel(
             controller.addToQueue(queueResolver.resolve(tracks))
         }
     }
-    fun playPause() = controller.playPause()
+    fun playPause() {
+        if (pendingPlayback.value != null) {
+            cancelPendingPlayback()
+            if (controller.state.value.content?.isPlaying == true) {
+                controller.playPause()
+            }
+        } else {
+            controller.playPause()
+        }
+    }
     fun next() = controller.next()
     fun previous() = controller.previous()
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
@@ -128,7 +153,7 @@ class PlayerViewModel(
         controller.moveQueueItemsToTop(indices)
     }
     fun stopAndClear() {
-        playJob?.cancel()
+        cancelPendingPlayback()
         queueItems = emptyList()
         controller.stopAndClear()
     }
@@ -154,10 +179,36 @@ class PlayerViewModel(
         positionMs = positionMs,
         durationMs = durationMs,
         isPlaying = isPlaying,
+        isLoading = isLoading,
+        loadingTrackId = currentTrack?.id.takeIf { isLoading },
         hasPrevious = hasPrevious,
         hasNext = hasNext,
         origin = origin,
     )
+
+    private fun PlayerUiState.withPendingPlayback(pending: PendingPlayback?): PlayerUiState {
+        if (pending == null) return this
+        val track = pending.track
+        return copy(
+            queue = listOf(PlayerQueueItem(uiId = "pending-${track.id}", track = track)),
+            currentIndex = 0,
+            currentTrack = track,
+            positionMs = 0,
+            durationMs = track.durationMs,
+            isPlaying = false,
+            isLoading = true,
+            loadingTrackId = track.id,
+            hasPrevious = false,
+            hasNext = false,
+            origin = pending.origin,
+        )
+    }
+
+    private fun cancelPendingPlayback() {
+        playJob?.cancel()
+        playJob = null
+        pendingPlayback.value = null
+    }
 
     private fun reconcileQueue(tracks: List<Track>): List<PlayerQueueItem> {
         if (
@@ -184,4 +235,12 @@ class PlayerViewModel(
             is LoadableState.Loading -> LoadableState.Loading(content?.let(transform))
             is LoadableState.Failure -> LoadableState.Failure(error, content?.let(transform))
         }
+}
+
+private data class PendingPlayback(
+    val track: Track,
+    val origin: PlaybackOrigin,
+) {
+    fun matches(other: PendingPlayback): Boolean =
+        track.id == other.track.id && origin == other.origin
 }

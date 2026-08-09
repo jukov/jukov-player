@@ -116,6 +116,7 @@ fun AppNavigation(
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
+                        loadingTrackId = playbackState.content?.loadingTrackId,
                         onAddToQueue = playerViewModel::addToQueue,
                     )
                 }
@@ -130,6 +131,7 @@ fun AppNavigation(
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
+                        loadingTrackId = playbackState.content?.loadingTrackId,
                         onAddToQueue = playerViewModel::addToQueue,
                     )
                 }
@@ -151,6 +153,10 @@ fun AppNavigation(
                             backStack.removeLastOrNull()
                         },
                         onPlay = playerViewModel::play,
+                        onActiveTrackClick = playerViewModel::playPause,
+                        activeTrackId = playbackState.content?.currentTrack?.id,
+                        isPlaying = playbackState.content?.isPlaying == true,
+                        loadingTrackId = playbackState.content?.loadingTrackId,
                         onAddToQueue = playerViewModel::addToQueue,
                     )
                 }
@@ -167,6 +173,7 @@ fun AppNavigation(
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
+                        loadingTrackId = playbackState.content?.loadingTrackId,
                         onAddToQueue = playerViewModel::addToQueue,
                         onAddToPlaylist = playlistPickerViewModel::open,
                     )
@@ -235,6 +242,8 @@ fun AppNavigation(
                         onActiveTrackClick = playerViewModel::playPause,
                         activeTrackId = playbackState.content?.currentTrack?.id,
                         isPlaying = playbackState.content?.isPlaying == true,
+                        isPlaybackLoading = playbackState.content?.isLoading == true,
+                        loadingTrackId = playbackState.content?.loadingTrackId,
                         activeOrigin = playbackState.content?.origin ?: PlaybackOrigin.TrackList,
                         onAddToQueue = playerViewModel::addToQueue,
                         onAddToPlaylist = playlistPickerViewModel::open,

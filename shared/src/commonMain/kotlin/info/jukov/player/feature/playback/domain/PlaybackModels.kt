@@ -24,6 +24,7 @@ data class PlaybackSnapshot(
     val positionMs: Long = 0,
     val durationMs: Long = 0,
     val isPlaying: Boolean = false,
+    val isLoading: Boolean = false,
     val origin: PlaybackOrigin = PlaybackOrigin.TrackList,
 ) {
     val currentTrack: Track? get() = queue.getOrNull(currentIndex)
