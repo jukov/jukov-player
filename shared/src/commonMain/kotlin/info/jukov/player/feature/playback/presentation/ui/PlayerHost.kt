@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -364,9 +365,11 @@ private fun FullPlayer(
         if (!isDragging) sliderPosition = snapshot.positionMs.toFloat()
     }
     val duration = snapshot.durationMs.coerceAtLeast(1)
-    val titleMinHeight = with(LocalDensity.current) {
-        MaterialTheme.typography.headlineSmall.lineHeight.toDp() * 2
+    val titleLineHeight = with(LocalDensity.current) {
+        MaterialTheme.typography.headlineSmall.lineHeight.toDp()
     }
+    val titleMinHeight = titleLineHeight * 2 + 4.dp
+    val titleMaxHeight = titleLineHeight * 4 + 4.dp
     val pagerState = rememberPagerState(
         initialPage = snapshot.currentIndex.coerceAtLeast(0),
         pageCount = { snapshot.queue.size },
@@ -409,9 +412,8 @@ private fun FullPlayer(
             .navigationBarsPadding()
             .padding(top = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Spacer(Modifier.weight(.25f))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             HorizontalPager(
                 state = pagerState,
@@ -437,12 +439,12 @@ private fun FullPlayer(
                 )
             }
         }
-        Spacer(Modifier.weight(.45f))
+        Spacer(Modifier.height(24.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .height(titleMinHeight)
+                .heightIn(min = titleMinHeight, max = titleMaxHeight)
                 .clickable(
                     enabled = track.albumId != null,
                     onClick = { onAlbumClick(track) },
@@ -451,9 +453,11 @@ private fun FullPlayer(
         ) {
             Text(
                 text = track.title,
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
-                maxLines = 2,
+                softWrap = true,
+                maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -471,7 +475,7 @@ private fun FullPlayer(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.weight(.3f))
+        Spacer(Modifier.height(16.dp))
         Slider(
             value = sliderPosition.coerceIn(0f, duration.toFloat()),
             onValueChange = {
@@ -501,10 +505,13 @@ private fun FullPlayer(
                 modifier = Modifier.padding(horizontal = 20.dp),
             )
         }
-        Spacer(Modifier.weight(.3f))
+        Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(
+                space = 32.dp,
+                alignment = Alignment.CenterHorizontally,
+            ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PlayerIconButton(
@@ -531,7 +538,10 @@ private fun FullPlayer(
         Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(
+                space = 16.dp,
+                alignment = Alignment.CenterHorizontally,
+            ),
         ) {
             PlayerIconButton(
                 Res.drawable.shuffle,
