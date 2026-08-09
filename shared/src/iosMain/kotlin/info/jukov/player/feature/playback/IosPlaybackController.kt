@@ -62,6 +62,7 @@ internal class IosPlaybackController(
     private var origin: PlaybackOrigin = PlaybackOrigin.TrackList
     private var wasPlayingBeforeInterruption = false
     private var artworkTrackId: String? = null
+    private var nowPlayingArtwork: MPMediaItemArtwork? = null
     private var playerItems = emptyList<AVPlayerItem>()
     private var timeObserver: Any? = null
     private val notificationTokens = mutableListOf<Any>()
@@ -243,6 +244,7 @@ internal class IosPlaybackController(
         currentIndex = -1
         origin = PlaybackOrigin.TrackList
         artworkTrackId = null
+        nowPlayingArtwork = null
         playbackStore.clear()
         nowPlayingCenter.nowPlayingInfo = null
         runCatching { AVAudioSession.sharedInstance().setActive(active = false, error = null) }
@@ -484,7 +486,12 @@ internal class IosPlaybackController(
             nowPlayingCenter.nowPlayingInfo = null
             return
         }
-        nowPlayingCenter.nowPlayingInfo = mutableMapOf<Any?, Any?>(
+        val trackChanged = artworkTrackId != track.id
+        if (trackChanged) {
+            artworkTrackId = track.id
+            nowPlayingArtwork = null
+        }
+        val info = mutableMapOf<Any?, Any?>(
             MPMediaItemPropertyTitle to track.title,
             MPMediaItemPropertyArtist to track.artist,
             MPMediaItemPropertyAlbumTitle to (track.album ?: ""),
@@ -492,10 +499,11 @@ internal class IosPlaybackController(
             MPNowPlayingInfoPropertyElapsedPlaybackTime to snapshot.positionMs / 1_000.0,
             MPNowPlayingInfoPropertyPlaybackRate to if (snapshot.isPlaying) 1.0 else 0.0,
         )
+        nowPlayingArtwork?.let { info[MPMediaItemPropertyArtwork] = it }
+        nowPlayingCenter.nowPlayingInfo = info
         remoteCommands.nextTrackCommand.enabled = snapshot.hasNext
         remoteCommands.previousTrackCommand.enabled = snapshot.hasPrevious || snapshot.positionMs > 0
-        if (artworkTrackId != track.id) {
-            artworkTrackId = track.id
+        if (trackChanged) {
             loadNowPlayingArtwork(track)
         }
     }
@@ -509,6 +517,7 @@ internal class IosPlaybackController(
                     return@addOperationWithBlock
                 }
                 val artwork = MPMediaItemArtwork(boundsSize = image.size) { image }
+                nowPlayingArtwork = artwork
                 val info = nowPlayingCenter.nowPlayingInfo?.toMutableMap() ?: return@addOperationWithBlock
                 info[MPMediaItemPropertyArtwork] = artwork
                 nowPlayingCenter.nowPlayingInfo = info

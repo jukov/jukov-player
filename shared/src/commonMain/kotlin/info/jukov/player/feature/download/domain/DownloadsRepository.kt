@@ -36,9 +36,9 @@ interface DownloadsRepository : LocalMediaResolver, PersistentArtworkResolver {
 interface OfflinePlatform {
     fun enqueue(accountKey: String)
     fun recover(accountKey: String)
-    fun cancelTrack(accountKey: String, trackId: String)
-    fun cancelTracks(accountKey: String, trackIds: List<String>)
-    fun cancelAccount(accountKey: String)
+    suspend fun cancelTrack(accountKey: String, trackId: String)
+    suspend fun cancelTracks(accountKey: String, trackIds: List<String>)
+    suspend fun cancelAccount(accountKey: String)
     fun deleteTrack(accountKey: String, relativePath: String?)
     fun deleteTracks(accountKey: String, relativePaths: List<String>)
     fun deleteArtwork(accountKey: String, relativePath: String?)

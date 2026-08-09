@@ -108,35 +108,35 @@ class IosOfflinePlatform internal constructor(
         submitOperation { schedulePending(accountKey, generation, allowCancelledRetry = true) }
     }
 
-    override fun cancelTrack(accountKey: String, trackId: String) {
+    override suspend fun cancelTrack(accountKey: String, trackId: String) {
         val generation = advanceCancellationGeneration()
         val description = iosTaskDescription(TASK_TRACK, accountKey, trackId)
         cancelledTaskDescriptions.update { it + description }
-        submitOperation {
+        runOperationAndWait {
             cancelTasks { it == description }
             schedulePending(accountKey, generation, allowCancelledRetry = false)
         }
         partUrl(accountKey, trackId).removeIfPresent()
     }
 
-    override fun cancelTracks(accountKey: String, trackIds: List<String>) {
+    override suspend fun cancelTracks(accountKey: String, trackIds: List<String>) {
         val generation = advanceCancellationGeneration()
         val descriptions = trackIds.mapTo(hashSetOf()) {
             iosTaskDescription(TASK_TRACK, accountKey, it)
         }
         cancelledTaskDescriptions.update { it + descriptions }
-        submitOperation {
+        runOperationAndWait {
             cancelTasks { it in descriptions }
             schedulePending(accountKey, generation, allowCancelledRetry = false)
         }
         trackIds.forEach { partUrl(accountKey, it).removeIfPresent() }
     }
 
-    override fun cancelAccount(accountKey: String) {
+    override suspend fun cancelAccount(accountKey: String) {
         advanceCancellationGeneration()
         val accountToken = safeComponent(accountKey)
         cancelledAccountTokens.update { it + accountToken }
-        submitOperation {
+        runOperationAndWait {
             cancelTasks { parseIosTaskDescription(it)?.accountToken == accountToken }
         }
     }
@@ -158,7 +158,6 @@ class IosOfflinePlatform internal constructor(
     }
 
     override fun deleteAccount(accountKey: String) {
-        cancelAccount(accountKey)
         accountUrl(accountKey).removeIfPresent()
     }
 
@@ -213,8 +212,11 @@ class IosOfflinePlatform internal constructor(
         if (metadata.kind != TASK_TRACK) {
             return
         }
-        val accountKey = accountKeyFor(metadata) ?: return
-        scope.launch {
+        submitOperation {
+            val accountKey = accountKeyFor(metadata) ?: return@submitOperation
+            if (!isTaskActive(metadata, downloadTask.taskIdentifier)) {
+                return@submitOperation
+            }
             dao.updateOfflineTrackProgress(
                 accountKey = accountKey,
                 trackId = metadata.id,
@@ -234,9 +236,13 @@ class IosOfflinePlatform internal constructor(
         durableLocation.removeIfPresent()
         if (!fileManager.moveItemAtURL(location, durableLocation, error = null)) {
             beginCallbackProcessing()
-            scope.launch {
+            submitOperation {
                 try {
-                    markTaskFailed(metadata, "Cannot retain temporary download")
+                    markTaskFailed(
+                        metadata,
+                        "Cannot retain temporary download",
+                        downloadTask.taskIdentifier,
+                    )
                 } finally {
                     endCallbackProcessing()
                 }
@@ -245,7 +251,7 @@ class IosOfflinePlatform internal constructor(
         }
         completedLocations += downloadTask.taskIdentifier
         beginCallbackProcessing()
-        scope.launch {
+        submitOperation {
             try {
                 processCompletedDownload(downloadTask, durableLocation, metadata)
             } finally {
@@ -257,10 +263,6 @@ class IosOfflinePlatform internal constructor(
 
     internal fun didComplete(task: NSURLSessionTask, error: NSError?) {
         val metadata = parseIosTaskDescription(task.taskDescription) ?: return
-        if (!isTaskActive(metadata, task.taskIdentifier)) {
-            completedLocations.remove(task.taskIdentifier)
-            return
-        }
         if (error == null) {
             completedLocations.remove(task.taskIdentifier)
             return
@@ -269,9 +271,9 @@ class IosOfflinePlatform internal constructor(
             return
         }
         beginCallbackProcessing()
-        scope.launch {
+        submitOperation {
             try {
-                markTaskFailed(metadata, error.localizedDescription)
+                markTaskFailed(metadata, error.localizedDescription, task.taskIdentifier)
             } finally {
                 endCallbackProcessing()
             }
@@ -279,6 +281,8 @@ class IosOfflinePlatform internal constructor(
     }
 
     internal fun didFinishBackgroundEvents() {
+        beginCallbackProcessing()
+        submitOperation { endCallbackProcessing() }
         backgroundEventsFinished = true
         completeBackgroundEventsIfReady()
     }
@@ -373,7 +377,7 @@ class IosOfflinePlatform internal constructor(
             ?.firstOrNull { it.key.toString().equals("Content-Type", ignoreCase = true) }
             ?.value?.toString()
         if (statusCode !in 200..299 || contentType?.contains("json", ignoreCase = true) == true) {
-            markTaskFailed(metadata, "HTTP $statusCode")
+            markTaskFailed(metadata, "HTTP $statusCode", task.taskIdentifier)
             return
         }
         when (metadata.kind) {
@@ -404,6 +408,7 @@ class IosOfflinePlatform internal constructor(
             markTaskFailed(
                 metadata,
                 "Cannot finalize file",
+                task.taskIdentifier,
             )
             return
         }
@@ -422,7 +427,7 @@ class IosOfflinePlatform internal constructor(
             return
         }
         val generation = currentCancellationGeneration()
-        runOperationAndWait { scheduleArtwork(accountKey, trackId, generation) }
+        scheduleArtwork(accountKey, trackId, generation)
         if (dao.pendingOfflineTrackCount(accountKey) == 0) {
             postCompletionNotification(dao.completedOfflineTrackCount(accountKey))
         }
@@ -456,12 +461,14 @@ class IosOfflinePlatform internal constructor(
         ) {
             return
         }
-        dao.upsertOfflineArtwork(
+        val schedulingEntity =
             OfflineArtworkEntity(
                 accountKey, coverArtId, existing?.relativePath, existing?.contentType,
                 existing?.downloadedBytes ?: 0, DownloadState.Downloading.name, null, null,
-            ),
-        )
+            )
+        if (!dao.upsertOfflineArtworkIfReferenced(schedulingEntity)) {
+            return
+        }
         val url = NSURL.URLWithString(
             client.buildUrl(
                 "getCoverArt",
@@ -469,18 +476,21 @@ class IosOfflinePlatform internal constructor(
                 mapOf("id" to coverArtId, "size" to ARTWORK_SIZE.toString()),
             ),
         ) ?: return
-        session.downloadTaskWithURL(url).apply {
-            taskDescription = description
-            if (currentAccountKey() != accountKey ||
-                !isCurrentDownloadGeneration(generation, currentCancellationGeneration()) ||
-                safeComponent(accountKey) in cancelledAccountTokens.value ||
-                description in cancelledTaskDescriptions.value
-            ) {
-                cancel()
-            } else {
-                resume()
+        val task = session.downloadTaskWithURL(url)
+        task.taskDescription = description
+        if (currentAccountKey() != accountKey ||
+            !isCurrentDownloadGeneration(generation, currentCancellationGeneration()) ||
+            safeComponent(accountKey) in cancelledAccountTokens.value ||
+            description in cancelledTaskDescriptions.value
+        ) {
+            task.cancel()
+            val restored = existing?.let { dao.upsertOfflineArtworkIfReferenced(it) } == true
+            if (!restored) {
+                dao.deleteOfflineArtwork(accountKey, coverArtId)
             }
+            return
         }
+        task.resume()
     }
 
     private suspend fun completeArtwork(
@@ -510,6 +520,7 @@ class IosOfflinePlatform internal constructor(
             markTaskFailed(
                 metadata,
                 "Cannot finalize artwork",
+                task.taskIdentifier,
             )
             return
         }
@@ -529,7 +540,14 @@ class IosOfflinePlatform internal constructor(
         }
     }
 
-    private suspend fun markTaskFailed(metadata: IosDownloadTaskMetadata, message: String) {
+    private suspend fun markTaskFailed(
+        metadata: IosDownloadTaskMetadata,
+        message: String,
+        taskIdentifier: ULong,
+    ) {
+        if (!isTaskActive(metadata, taskIdentifier)) {
+            return
+        }
         val accountKey = accountKeyFor(metadata) ?: return
         when (metadata.kind) {
             TASK_TRACK -> {
@@ -541,9 +559,13 @@ class IosOfflinePlatform internal constructor(
             }
             TASK_ARTWORK -> {
                 val artwork = dao.offlineArtwork(accountKey, metadata.id) ?: return
-                dao.upsertOfflineArtwork(
+                val retained = dao.upsertOfflineArtworkIfReferenced(
                     artwork.copy(state = DownloadState.Failed.name, error = message),
                 )
+                if (!retained) {
+                    artwork.relativePath?.let { resolveUrl(accountKey, it).removeIfPresent() }
+                    dao.deleteOfflineArtwork(accountKey, metadata.id)
+                }
             }
         }
     }

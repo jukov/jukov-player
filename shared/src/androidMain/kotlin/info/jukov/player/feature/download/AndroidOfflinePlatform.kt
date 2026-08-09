@@ -46,15 +46,15 @@ class AndroidOfflinePlatform(context: Context) : OfflinePlatform {
         workManager.cancelUniqueWork(workName(accountKey))
     }
 
-    override fun cancelTrack(accountKey: String, trackId: String) {
+    override suspend fun cancelTrack(accountKey: String, trackId: String) {
         trackPartFile(accountKey, trackId).delete()
     }
 
-    override fun cancelTracks(accountKey: String, trackIds: List<String>) {
+    override suspend fun cancelTracks(accountKey: String, trackIds: List<String>) {
         trackIds.asSequence().map { trackPartFile(accountKey, it) }.forEach(File::delete)
     }
 
-    override fun cancelAccount(accountKey: String) {
+    override suspend fun cancelAccount(accountKey: String) {
         appContext.stopService(downloadServiceIntent(accountKey))
         workManager.cancelUniqueWork(workName(accountKey))
         workManager.cancelAllWorkByTag(accountTag(accountKey))
@@ -77,7 +77,6 @@ class AndroidOfflinePlatform(context: Context) : OfflinePlatform {
     }
 
     override fun deleteAccount(accountKey: String) {
-        cancelAccount(accountKey)
         accountDirectory(accountKey).deleteRecursively()
     }
 
