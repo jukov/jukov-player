@@ -340,7 +340,11 @@ class IosOfflinePlatform internal constructor(
                     return@forEach
                 }
                 val url = NSURL.URLWithString(
-                    client.buildUrl("download", currentSession, mapOf("id" to item.trackId)),
+                    client.buildUrl(
+                        "download",
+                        currentSession,
+                        mapOf("id" to item.trackId, "f" to "json"),
+                    ),
                 ) ?: return@forEach
                 val task = session.downloadTaskWithURL(url)
                 task.taskDescription = description
@@ -378,7 +382,7 @@ class IosOfflinePlatform internal constructor(
         val contentType = response?.allHeaderFields?.entries
             ?.firstOrNull { it.key.toString().equals("Content-Type", ignoreCase = true) }
             ?.value?.toString()
-        if (statusCode !in 200..299 || contentType?.contains("json", ignoreCase = true) == true) {
+        if (statusCode !in 200..299 || isApiErrorContentType(contentType)) {
             markTaskFailed(metadata, "HTTP $statusCode", task.taskIdentifier)
             return
         }
@@ -475,7 +479,11 @@ class IosOfflinePlatform internal constructor(
             client.buildUrl(
                 "getCoverArt",
                 currentSession,
-                mapOf("id" to coverArtId, "size" to ARTWORK_SIZE.toString()),
+                mapOf(
+                    "id" to coverArtId,
+                    "size" to ARTWORK_SIZE.toString(),
+                    "f" to "json",
+                ),
             ),
         ) ?: return
         val task = session.downloadTaskWithURL(url)
@@ -848,6 +856,11 @@ internal fun isActiveDownloadAttempt(
     taskIdentifier: ULong,
     cancelledTaskIdentifiers: Set<ULong>,
 ): Boolean = taskIdentifier !in cancelledTaskIdentifiers
+
+internal fun isApiErrorContentType(contentType: String?): Boolean =
+    contentType?.let { value ->
+        value.contains("json", ignoreCase = true) || value.contains("xml", ignoreCase = true)
+    } == true
 
 private const val BACKGROUND_SESSION_IDENTIFIER = "info.jukov.player.offline-downloads"
 private const val NOTIFICATION_OPEN_DOWNLOADS_KEY = "openDownloads"

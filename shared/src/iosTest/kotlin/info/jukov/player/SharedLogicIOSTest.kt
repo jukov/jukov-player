@@ -4,6 +4,7 @@ import info.jukov.player.feature.download.safeComponent
 import info.jukov.player.feature.download.isSafeRelativePath
 import info.jukov.player.feature.download.iosTaskDescription
 import info.jukov.player.feature.download.isActiveDownloadAttempt
+import info.jukov.player.feature.download.isApiErrorContentType
 import info.jukov.player.feature.download.isCurrentDownloadGeneration
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
@@ -124,6 +125,16 @@ class SharedLogicIOSTest {
 
         assertFalse(isActiveDownloadAttempt(41u, cancelledAttempts))
         assertTrue(isActiveDownloadAttempt(42u, cancelledAttempts))
+    }
+
+    @Test
+    fun apiErrorPayloadsAreNotAcceptedAsDownloadedMedia() {
+        assertTrue(isApiErrorContentType("application/json; charset=utf-8"))
+        assertTrue(isApiErrorContentType("application/xml"))
+        assertTrue(isApiErrorContentType("text/xml; charset=UTF-8"))
+        assertFalse(isApiErrorContentType("audio/mpeg"))
+        assertFalse(isApiErrorContentType("image/jpeg"))
+        assertFalse(isApiErrorContentType(null))
     }
 
     @OptIn(ExperimentalForeignApi::class)

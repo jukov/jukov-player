@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -29,6 +31,7 @@ class DefaultDownloadsRepository(
     private val platform: OfflinePlatform,
     private val client: SubsonicApiClient,
 ) : DownloadsRepository {
+    private val mutations = DownloadMutationCoordinator()
     override fun observeLibrary(): Flow<OfflineLibrary> = authRepository.authState.flatMapLatest { state ->
         val session = (state as? AuthState.LoggedIn)?.session
             ?: return@flatMapLatest flowOf(OfflineLibrary())
@@ -110,26 +113,30 @@ class DefaultDownloadsRepository(
     }
 
     override suspend fun downloadTrack(track: Track) {
-        val key = accountKey() ?: return
-        storeTrack(key, track, OWNER_TRACK, track.id, position = 0)
-        platform.enqueue(key)
+        mutations.run {
+            val key = accountKey() ?: return@run
+            storeTrack(key, track, OWNER_TRACK, track.id, position = 0)
+            platform.enqueue(key)
+        }
     }
 
     override suspend fun downloadAlbum(album: Album) {
-        val session = session() ?: return
-        val tracks = tracksApi.getTracks(session, TracksFilter.ByAlbum(album.id))
-        val now = Clock.System.now().toEpochMilliseconds()
-        dao.upsertAlbums(listOf(album.toEntity(session.accountKey)))
-        dao.upsertTracks(tracks.map { it.toEntity(session.accountKey) })
-        dao.upsertOfflineAlbum(
-            OfflineAlbumEntity(
-                session.accountKey, album.id, tracks.size, now,
-            ),
-        )
-        tracks.forEachIndexed { index, track ->
-            storeTrack(session.accountKey, track, OWNER_ALBUM, album.id, index)
+        mutations.run {
+            val session = session() ?: return@run
+            val tracks = tracksApi.getTracks(session, TracksFilter.ByAlbum(album.id))
+            val now = Clock.System.now().toEpochMilliseconds()
+            dao.upsertAlbums(listOf(album.toEntity(session.accountKey)))
+            dao.upsertTracks(tracks.map { it.toEntity(session.accountKey) })
+            dao.upsertOfflineAlbum(
+                OfflineAlbumEntity(
+                    session.accountKey, album.id, tracks.size, now,
+                ),
+            )
+            tracks.forEachIndexed { index, track ->
+                storeTrack(session.accountKey, track, OWNER_ALBUM, album.id, index)
+            }
+            platform.enqueue(session.accountKey)
         }
-        platform.enqueue(session.accountKey)
     }
 
     override suspend fun cancelTrack(trackId: String) {
@@ -137,69 +144,83 @@ class DefaultDownloadsRepository(
     }
 
     override suspend fun removeTracks(trackIds: List<String>) {
-        val key = accountKey() ?: return
-        if (trackIds.isEmpty()) return
-        withContext(NonCancellable) {
-            platform.cancelTracks(key, trackIds)
-            val removed = dao.removeOfflineTracks(key, trackIds)
-            platform.deleteTracks(key, removed.trackPaths)
-            platform.deleteArtworks(key, removed.artworkPaths)
+        mutations.run {
+            val key = accountKey() ?: return@run
+            if (trackIds.isEmpty()) {
+                return@run
+            }
+            withContext(NonCancellable) {
+                platform.cancelTracks(key, trackIds)
+                val removed = dao.removeOfflineTracks(key, trackIds)
+                platform.deleteTracks(key, removed.trackPaths)
+                platform.deleteArtworks(key, removed.artworkPaths)
+            }
         }
     }
 
     override suspend fun cancelAlbum(albumId: String) {
-        val key = accountKey() ?: return
-        withContext(NonCancellable) {
-            val tracks = dao.offlineAlbumTracks(key, albumId)
-            dao.deleteAlbumOwnerships(key, albumId)
-            dao.deleteOfflineAlbum(key, albumId)
-            tracks.forEach { track ->
-                if (dao.ownershipCount(key, track.trackId) == 0) {
-                    platform.cancelTrack(key, track.trackId)
-                    removeTrackIfUnowned(key, track.trackId)
+        mutations.run {
+            val key = accountKey() ?: return@run
+            withContext(NonCancellable) {
+                val tracks = dao.offlineAlbumTracks(key, albumId)
+                dao.deleteAlbumOwnerships(key, albumId)
+                dao.deleteOfflineAlbum(key, albumId)
+                tracks.forEach { track ->
+                    if (dao.ownershipCount(key, track.trackId) == 0) {
+                        platform.cancelTrack(key, track.trackId)
+                        removeTrackIfUnowned(key, track.trackId)
+                    }
                 }
             }
         }
     }
 
     override suspend fun retryTrack(trackId: String) {
-        val key = accountKey() ?: return
-        val track = dao.offlineTrack(key, trackId) ?: return
-        dao.updateOfflineTrackState(
-            key, trackId, DownloadState.Queued.name, track.downloadedBytes,
-            track.expectedSize, track.relativePath, null, null,
-        )
-        platform.enqueue(key)
+        mutations.run {
+            val key = accountKey() ?: return@run
+            val track = dao.offlineTrack(key, trackId) ?: return@run
+            dao.updateOfflineTrackState(
+                key, trackId, DownloadState.Queued.name, track.downloadedBytes,
+                track.expectedSize, track.relativePath, null, null,
+            )
+            platform.enqueue(key)
+        }
     }
 
     override suspend fun clearCurrentAccount() {
-        val key = accountKey() ?: return
-        withContext(NonCancellable) {
-            platform.cancelAccount(key)
-            platform.deleteAccount(key)
-            dao.clearOfflineAccount(key)
+        mutations.run {
+            val key = accountKey() ?: return@run
+            withContext(NonCancellable) {
+                platform.cancelAccount(key)
+                platform.deleteAccount(key)
+                dao.clearOfflineAccount(key)
+            }
         }
     }
 
     override suspend fun reconcile() {
-        val key = accountKey() ?: return
-        val tracks = dao.allOfflineTracks(key)
-        var hasPending = false
-        platform.cleanupStaleParts(key, tracks.mapTo(mutableSetOf()) { it.trackId })
-        tracks.forEach { track ->
-            val path = track.relativePath
-            when {
-                track.state == DownloadState.Completed.name &&
-                    (path == null || !platform.exists(key, path)) -> dao.updateOfflineTrackState(
-                        key, track.trackId, DownloadState.Failed.name, 0, track.expectedSize,
-                        null, "Local file is missing", null,
-                    )
-                track.state == DownloadState.Queued.name || track.state == DownloadState.Downloading.name -> {
-                    hasPending = true
+        mutations.run {
+            val key = accountKey() ?: return@run
+            val tracks = dao.allOfflineTracks(key)
+            var hasPending = false
+            platform.cleanupStaleParts(key, tracks.mapTo(mutableSetOf()) { it.trackId })
+            tracks.forEach { track ->
+                val path = track.relativePath
+                when {
+                    track.state == DownloadState.Completed.name &&
+                        (path == null || !platform.exists(key, path)) -> dao.updateOfflineTrackState(
+                            key, track.trackId, DownloadState.Failed.name, 0, track.expectedSize,
+                            null, "Local file is missing", null,
+                        )
+                    track.state == DownloadState.Queued.name || track.state == DownloadState.Downloading.name -> {
+                        hasPending = true
+                    }
                 }
             }
+            if (hasPending) {
+                platform.recover(key)
+            }
         }
-        if (hasPending) platform.recover(key)
     }
 
     override suspend fun localTrackUri(trackId: String): String? {
@@ -280,6 +301,14 @@ class DefaultDownloadsRepository(
     private companion object {
         const val OWNER_TRACK = "track"
         const val OWNER_ALBUM = "album"
+    }
+}
+
+internal class DownloadMutationCoordinator {
+    private val mutex = Mutex()
+
+    suspend fun <T> run(block: suspend () -> T): T = mutex.withLock {
+        block()
     }
 }
 
