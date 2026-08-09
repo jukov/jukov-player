@@ -5,10 +5,11 @@
 - A small music player and Navidrome client using the OpenSubsonic API.
 - Built with Kotlin Multiplatform (KMP).
 
-## Current Focus
+## Current Platforms
 
-- Work only on Android for now.
-- Do not modify or build the iOS app unless explicitly requested.
+- Android and iOS are both active product targets.
+- Keep shared implementation in `commonMain` where practical, and use platform source sets only for platform-specific APIs or integrations.
+- Maintain thin Android and iOS entry points around shared UI and shared application logic.
 
 ## Shared Code
 
@@ -46,3 +47,36 @@
 - Render screens through `NavDisplay`; do not select top-level screens manually with conditional UI in `App`.
 - Pass navigation callbacks into feature composables instead of passing the back stack or navigation framework types into them.
 - Replace authentication-flow destinations instead of retaining them in history: Back must not return to login after a successful login or to authorized screens after logout.
+
+## Development Workflow
+
+- Work in one Conductor workspace and one task branch per task.
+- Start by reading the relevant code and asking questions only when the requirements are materially ambiguous and cannot be answered from the repository.
+- Keep implementation, tests, and documentation changes in the same branch when they belong to the same task.
+- Before handoff, run `./scripts/check-fast.sh`. Run `./scripts/check-full.sh` when changes touch shared platform behavior, Gradle, CI, or iOS-relevant code.
+- Create or update a GitHub Pull Request after local checks pass. Merge remains manual.
+- Do not enable auto-merge or merge from an agent unless the user explicitly requests it.
+
+## Testing Requirements
+
+- New or changed behavior must include meaningful regression tests at the lowest practical layer.
+- Prefer `commonTest` for shared domain, data mapping, repository, use-case, ViewModel, navigation, and serialization behavior.
+- Use Android host tests for Android-specific logic that can run on the JVM with Android resources.
+- Use Android instrumented tests only for behavior requiring a device/emulator.
+- Use iOS tests for iOS-specific shared logic and iOS integration boundaries.
+- Do not add tests solely to increase coverage percentage. Existing low coverage must not block unrelated work.
+- If a change cannot reasonably be tested in this task, state the reason and residual risk in the PR.
+
+## Pull Request Readiness
+
+- A PR is ready for manual merge only when CI is green, required local checks have run, and independent AI review has no blocking findings for the latest commit SHA.
+- Any new push invalidates prior approval. Request review again for the new head SHA.
+- Blocking findings are `critical`, `high`, and unresolved `medium` findings unless explicitly accepted by the user.
+
+## Independent AI Review
+
+- Code review is performed by a separate, ephemeral, read-only Codex session.
+- The reviewer must not use the implementer's transcript or reasoning.
+- The reviewer must not edit files or fix code.
+- The reviewer reviews only `git diff origin/main...<head-sha>` and must report the exact reviewed SHA.
+- Reviewer output must follow `docs/ai-code-review.md`.

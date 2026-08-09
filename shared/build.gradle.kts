@@ -93,3 +93,10 @@ dependencies {
 room3 {
     schemaDirectory("$projectDir/schemas")
 }
+
+tasks.matching {
+    it.name == "lintAnalyzeAndroidHostTest" ||
+        it.name == "generateAndroidHostTestLintModel"
+}.configureEach {
+    dependsOn("kspAndroidHostTest")
+}

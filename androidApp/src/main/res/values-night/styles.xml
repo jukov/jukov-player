@@ -2,7 +2,6 @@
 <resources>
     <style name="Theme.JukovPlayer" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/app_background</item>
-        <item name="android:windowSplashScreenBackground">@color/app_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>

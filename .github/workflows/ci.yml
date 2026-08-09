@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      run_ios:
+        description: "Run iOS checks"
+        type: boolean
+        default: true
+      run_android_apk:
+        description: "Run Android APK smoke checks"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "17 2 * * *"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux-fast:
+    name: Linux fast checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Fast checks
+        run: ./scripts/check-fast.sh
+
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request'
+    outputs:
+      ios: ${{ steps.filter.outputs.ios }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Detect iOS-relevant changes
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            ios:
+              - 'shared/**'
+              - 'iosApp/**'
+              - 'build.gradle.kts'
+              - 'settings.gradle.kts'
+              - 'gradle/**'
+              - 'gradle.properties'
+              - 'buildSrc/**'
+
+  macos-ios:
+    name: macOS iOS checks
+    runs-on: macos-latest
+    timeout-minutes: 45
+    needs:
+      - linux-fast
+      - changes
+    if: >
+      always() &&
+      needs.linux-fast.result == 'success' &&
+      (
+        github.event_name == 'schedule' ||
+        (github.event_name == 'workflow_dispatch' && inputs.run_ios) ||
+        (github.event_name == 'pull_request' && needs.changes.outputs.ios == 'true')
+      )
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Cache Kotlin Native
+        uses: actions/cache@v5
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml', 'shared/build.gradle.kts') }}
+          restore-keys: |
+            konan-${{ runner.os }}-
+
+      - name: iOS checks
+        run: ./scripts/check-ios.sh
+
+  android-apk-smoke:
+    name: Android APK smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: linux-fast
+    if: github.event_name == 'workflow_dispatch' && inputs.run_android_apk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Assemble debug APK
+        run: ./gradlew --no-daemon --stacktrace :androidApp:assembleDebug
