@@ -13,10 +13,10 @@ import info.jukov.player.util.md5
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import platform.Foundation.*
@@ -73,42 +73,71 @@ class IosOfflinePlatform internal constructor(
         NSURLSession.sessionWithConfiguration(configuration, sessionDelegate, delegateQueue)
     }
     private val completedLocations = mutableSetOf<ULong>()
-    private val schedulingMutex = Mutex()
+    private val operations = Channel<suspend () -> Unit>(capacity = Channel.UNLIMITED)
+    private val generationLock = NSLock()
+    private var cancellationGeneration = 0L
     private val cancelledAccountTokens = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskDescriptions = MutableStateFlow<Set<String>>(emptySet())
     private var backgroundCompletionHandler: (() -> Unit)? = null
     private var backgroundEventsFinished = false
     private var processingCallbacks = 0
 
+    init {
+        scope.launch {
+            for (operation in operations) {
+                try {
+                    operation()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Throwable) {
+                    // Individual persistence/network operations report their own state where possible.
+                }
+            }
+        }
+    }
+
     override fun enqueue(accountKey: String) {
         requestNotificationAuthorization()
-        scope.launch { schedulePending(accountKey) }
+        val generation = currentCancellationGeneration()
+        submitOperation { schedulePending(accountKey, generation, allowCancelledRetry = true) }
     }
 
     override fun recover(accountKey: String) {
-        scope.launch { schedulePending(accountKey) }
+        val generation = currentCancellationGeneration()
+        submitOperation { schedulePending(accountKey, generation, allowCancelledRetry = true) }
     }
 
     override fun cancelTrack(accountKey: String, trackId: String) {
+        val generation = advanceCancellationGeneration()
         val description = iosTaskDescription(TASK_TRACK, accountKey, trackId)
         cancelledTaskDescriptions.update { it + description }
-        cancelTasks { it == description }
+        submitOperation {
+            cancelTasks { it == description }
+            schedulePending(accountKey, generation, allowCancelledRetry = false)
+        }
         partUrl(accountKey, trackId).removeIfPresent()
     }
 
     override fun cancelTracks(accountKey: String, trackIds: List<String>) {
+        val generation = advanceCancellationGeneration()
         val descriptions = trackIds.mapTo(hashSetOf()) {
             iosTaskDescription(TASK_TRACK, accountKey, it)
         }
         cancelledTaskDescriptions.update { it + descriptions }
-        cancelTasks { it in descriptions }
+        submitOperation {
+            cancelTasks { it in descriptions }
+            schedulePending(accountKey, generation, allowCancelledRetry = false)
+        }
         trackIds.forEach { partUrl(accountKey, it).removeIfPresent() }
     }
 
     override fun cancelAccount(accountKey: String) {
+        advanceCancellationGeneration()
         val accountToken = safeComponent(accountKey)
         cancelledAccountTokens.update { it + accountToken }
-        cancelTasks { parseIosTaskDescription(it)?.accountToken == accountToken }
+        submitOperation {
+            cancelTasks { parseIosTaskDescription(it)?.accountToken == accountToken }
+        }
     }
 
     override fun deleteTrack(accountKey: String, relativePath: String?) {
@@ -229,9 +258,6 @@ class IosOfflinePlatform internal constructor(
         val metadata = parseIosTaskDescription(task.taskDescription) ?: return
         if (!isTaskActive(metadata)) {
             completedLocations.remove(task.taskIdentifier)
-            currentAccountKey()?.takeIf { safeComponent(it) == metadata.accountToken }?.let { key ->
-                scope.launch { schedulePending(key) }
-            }
             return
         }
         if (error == null) {
@@ -256,7 +282,14 @@ class IosOfflinePlatform internal constructor(
         completeBackgroundEventsIfReady()
     }
 
-    private suspend fun schedulePending(accountKey: String) {
+    private suspend fun schedulePending(
+        accountKey: String,
+        generation: Long,
+        allowCancelledRetry: Boolean,
+    ) {
+        if (!isCurrentDownloadGeneration(generation, currentCancellationGeneration())) {
+            return
+        }
         cleanupStaleStaging()
         val sessionState = authRepository.authState.value as? AuthState.LoggedIn
         if (sessionState?.session?.accountKey != accountKey) {
@@ -267,47 +300,61 @@ class IosOfflinePlatform internal constructor(
             dao.failPendingOfflineTracks(accountKey, "HTTPS is required on iOS")
             return
         }
-        var retryAfterCancellation = false
-        schedulingMutex.withLock {
-            val tasks = currentTasks()
-            val accountToken = safeComponent(accountKey)
-            if (accountToken in cancelledAccountTokens.value) {
-                val oldTasks = tasks.filter {
-                    parseIosTaskDescription(it.taskDescription)?.accountToken == accountToken
-                }
-                if (oldTasks.isNotEmpty()) {
-                    oldTasks.forEach(NSURLSessionTask::cancel)
-                    retryAfterCancellation = true
-                    return@withLock
-                }
-                cancelledAccountTokens.update { it - accountToken }
+        val tasks = currentTasks()
+        val accountToken = safeComponent(accountKey)
+        if (accountToken in cancelledAccountTokens.value) {
+            tasks.filter {
+                parseIosTaskDescription(it.taskDescription)?.accountToken == accountToken
+            }.forEach(NSURLSessionTask::cancel)
+            if (!allowCancelledRetry) {
+                return
             }
-            val active = tasks.mapNotNullTo(hashSetOf()) { it.taskDescription }
-            dao.pendingOfflineTracks(accountKey).forEach { item ->
-                val description = iosTaskDescription(TASK_TRACK, accountKey, item.trackId)
-                if (description !in active) {
-                    cancelledTaskDescriptions.update { it - description }
-                    val url = NSURL.URLWithString(
-                        client.buildUrl("download", sessionState.session, mapOf("id" to item.trackId)),
-                    ) ?: return@forEach
-                    val task = session.downloadTaskWithURL(url)
-                    task.taskDescription = description
-                    dao.updateOfflineTrackState(
-                        accountKey, item.trackId, DownloadState.Downloading.name,
-                        0, item.expectedSize, item.relativePath, null, null,
-                    )
-                    task.resume()
-                }
-            }
+            cancelledAccountTokens.update { it - accountToken }
         }
-        if (retryAfterCancellation) {
-            delay(CANCELLATION_RETRY_DELAY_MS)
-            schedulePending(accountKey)
-            return
+        val active = tasks.filter {
+            it.state != NSURLSessionTaskStateCanceling &&
+                it.state != NSURLSessionTaskStateCompleted
+        }.mapNotNullTo(hashSetOf()) { it.taskDescription }
+        dao.pendingOfflineTracks(accountKey).forEach { item ->
+            val description = iosTaskDescription(TASK_TRACK, accountKey, item.trackId)
+            if (description !in active) {
+                if (description in cancelledTaskDescriptions.value && !allowCancelledRetry) {
+                    return@forEach
+                }
+                if (allowCancelledRetry) {
+                    cancelledTaskDescriptions.update { it - description }
+                }
+                val currentSession = (authRepository.authState.value as? AuthState.LoggedIn)?.session
+                if (currentSession?.accountKey != accountKey ||
+                    !isCurrentDownloadGeneration(generation, currentCancellationGeneration()) ||
+                    accountToken in cancelledAccountTokens.value ||
+                    description in cancelledTaskDescriptions.value
+                ) {
+                    return@forEach
+                }
+                val url = NSURL.URLWithString(
+                    client.buildUrl("download", currentSession, mapOf("id" to item.trackId)),
+                ) ?: return@forEach
+                val task = session.downloadTaskWithURL(url)
+                task.taskDescription = description
+                dao.updateOfflineTrackState(
+                    accountKey, item.trackId, DownloadState.Downloading.name,
+                    0, item.expectedSize, item.relativePath, null, null,
+                )
+                if (currentAccountKey() != accountKey ||
+                    !isCurrentDownloadGeneration(generation, currentCancellationGeneration()) ||
+                    accountToken in cancelledAccountTokens.value ||
+                    description in cancelledTaskDescriptions.value
+                ) {
+                    task.cancel()
+                    return@forEach
+                }
+                task.resume()
+            }
         }
         dao.allOfflineTracks(accountKey)
             .filter { it.state == DownloadState.Completed.name }
-            .forEach { scheduleArtwork(accountKey, it.trackId) }
+            .forEach { scheduleArtwork(accountKey, it.trackId, generation) }
     }
 
     private suspend fun processCompletedDownload(
@@ -373,13 +420,17 @@ class IosOfflinePlatform internal constructor(
             destination.removeIfPresent()
             return
         }
-        scheduleArtwork(accountKey, trackId)
+        val generation = currentCancellationGeneration()
+        runOperationAndWait { scheduleArtwork(accountKey, trackId, generation) }
         if (dao.pendingOfflineTrackCount(accountKey) == 0) {
             postCompletionNotification(dao.completedOfflineTrackCount(accountKey))
         }
     }
 
-    private suspend fun scheduleArtwork(accountKey: String, trackId: String) {
+    private suspend fun scheduleArtwork(accountKey: String, trackId: String, generation: Long) {
+        if (!isCurrentDownloadGeneration(generation, currentCancellationGeneration())) {
+            return
+        }
         val loggedIn = authRepository.authState.value as? AuthState.LoggedIn ?: return
         if (loggedIn.session.accountKey != accountKey) {
             return
@@ -391,27 +442,41 @@ class IosOfflinePlatform internal constructor(
         ) {
             return
         }
-        schedulingMutex.withLock {
-            val description = iosTaskDescription(TASK_ARTWORK, accountKey, coverArtId)
-            if (description in currentTaskDescriptions()) {
-                return
-            }
-            cancelledTaskDescriptions.update { it - description }
-            dao.upsertOfflineArtwork(
-                OfflineArtworkEntity(
-                    accountKey, coverArtId, existing?.relativePath, existing?.contentType,
-                    existing?.downloadedBytes ?: 0, DownloadState.Downloading.name, null, null,
-                ),
-            )
-            val url = NSURL.URLWithString(
-                client.buildUrl(
-                    "getCoverArt",
-                    loggedIn.session,
-                    mapOf("id" to coverArtId, "size" to ARTWORK_SIZE.toString()),
-                ),
-            ) ?: return
-            session.downloadTaskWithURL(url).apply {
-                taskDescription = description
+        val description = iosTaskDescription(TASK_ARTWORK, accountKey, coverArtId)
+        if (description in currentTaskDescriptions()) {
+            return
+        }
+        cancelledTaskDescriptions.update { it - description }
+        val currentSession = (authRepository.authState.value as? AuthState.LoggedIn)?.session
+        if (currentSession?.accountKey != accountKey ||
+            !isCurrentDownloadGeneration(generation, currentCancellationGeneration()) ||
+            safeComponent(accountKey) in cancelledAccountTokens.value ||
+            description in cancelledTaskDescriptions.value
+        ) {
+            return
+        }
+        dao.upsertOfflineArtwork(
+            OfflineArtworkEntity(
+                accountKey, coverArtId, existing?.relativePath, existing?.contentType,
+                existing?.downloadedBytes ?: 0, DownloadState.Downloading.name, null, null,
+            ),
+        )
+        val url = NSURL.URLWithString(
+            client.buildUrl(
+                "getCoverArt",
+                currentSession,
+                mapOf("id" to coverArtId, "size" to ARTWORK_SIZE.toString()),
+            ),
+        ) ?: return
+        session.downloadTaskWithURL(url).apply {
+            taskDescription = description
+            if (currentAccountKey() != accountKey ||
+                !isCurrentDownloadGeneration(generation, currentCancellationGeneration()) ||
+                safeComponent(accountKey) in cancelledAccountTokens.value ||
+                description in cancelledTaskDescriptions.value
+            ) {
+                cancel()
+            } else {
                 resume()
             }
         }
@@ -482,11 +547,43 @@ class IosOfflinePlatform internal constructor(
         }
     }
 
-    private fun cancelTasks(predicate: (String?) -> Boolean) {
-        session.getAllTasksWithCompletionHandler { tasks ->
-            tasks.orEmpty().filterIsInstance<NSURLSessionTask>()
-                .filter { predicate(it.taskDescription) }
-                .forEach { it.cancel() }
+    private suspend fun cancelTasks(predicate: (String?) -> Boolean) {
+        currentTasks().filter { predicate(it.taskDescription) }.forEach(NSURLSessionTask::cancel)
+    }
+
+    private fun submitOperation(operation: suspend () -> Unit) {
+        check(operations.trySend(operation).isSuccess) { "Download operation queue is unavailable" }
+    }
+
+    private suspend fun runOperationAndWait(operation: suspend () -> Unit) {
+        val completion = CompletableDeferred<Unit>()
+        operations.send {
+            try {
+                operation()
+                completion.complete(Unit)
+            } catch (error: Throwable) {
+                completion.completeExceptionally(error)
+            }
+        }
+        completion.await()
+    }
+
+    private fun currentCancellationGeneration(): Long {
+        generationLock.lock()
+        return try {
+            cancellationGeneration
+        } finally {
+            generationLock.unlock()
+        }
+    }
+
+    private fun advanceCancellationGeneration(): Long {
+        generationLock.lock()
+        return try {
+            cancellationGeneration++
+            cancellationGeneration
+        } finally {
+            generationLock.unlock()
         }
     }
 
@@ -629,7 +726,10 @@ class IosOfflinePlatform internal constructor(
         }
     }
 
-    private suspend fun currentTaskDescriptions(): Set<String> = currentTasks()
+    private suspend fun currentTaskDescriptions(): Set<String> = currentTasks().filter {
+        it.state != NSURLSessionTaskStateCanceling &&
+            it.state != NSURLSessionTaskStateCompleted
+    }
         .mapNotNullTo(hashSetOf()) { it.taskDescription }
 
 }
@@ -708,6 +808,9 @@ internal fun isSafeRelativePath(value: String): Boolean =
         !value.startsWith('\\') &&
         value.split('/', '\\').all { it.isNotBlank() && it != "." && it != ".." }
 
+internal fun isCurrentDownloadGeneration(submitted: Long, current: Long): Boolean =
+    submitted == current
+
 private const val BACKGROUND_SESSION_IDENTIFIER = "info.jukov.player.offline-downloads"
 private const val NOTIFICATION_OPEN_DOWNLOADS_KEY = "openDownloads"
 private const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-completed"
@@ -720,4 +823,3 @@ private const val TASK_ARTWORK = "artwork"
 private const val TASK_SEPARATOR = ":"
 private const val ARTWORK_SIZE = 1024
 private const val STALE_PART_AGE_SECONDS = 24.0 * 60.0 * 60.0
-private const val CANCELLATION_RETRY_DELAY_MS = 250L

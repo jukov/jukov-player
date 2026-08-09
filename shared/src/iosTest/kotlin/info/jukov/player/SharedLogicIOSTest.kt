@@ -3,6 +3,7 @@ package info.jukov.player
 import info.jukov.player.feature.download.safeComponent
 import info.jukov.player.feature.download.isSafeRelativePath
 import info.jukov.player.feature.download.iosTaskDescription
+import info.jukov.player.feature.download.isCurrentDownloadGeneration
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.core.data.cache.migrateLegacyDatabaseIfNeeded
@@ -72,6 +73,12 @@ class SharedLogicIOSTest {
                 playerWasExhausted = false,
             ),
         )
+    }
+
+    @Test
+    fun cancellationInvalidatesPreviouslySubmittedSchedulingWork() {
+        assertTrue(isCurrentDownloadGeneration(submitted = 7, current = 7))
+        assertFalse(isCurrentDownloadGeneration(submitted = 7, current = 8))
     }
 
     @OptIn(ExperimentalForeignApi::class)

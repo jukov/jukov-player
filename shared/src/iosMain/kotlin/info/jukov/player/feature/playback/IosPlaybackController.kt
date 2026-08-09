@@ -122,6 +122,7 @@ internal class IosPlaybackController(
             return
         }
         if (!activateAudioSession()) {
+            fail(AppError.PlayerConnectionFailed)
             return
         }
         player.play()
@@ -276,6 +277,8 @@ internal class IosPlaybackController(
         }
         if (autoplay) {
             if (!activateAudioSession()) {
+                updatePlaybackState(positionOverrideMs = positionMs)
+                fail(AppError.PlayerConnectionFailed)
                 return
             }
             player.play()
@@ -294,7 +297,6 @@ internal class IosPlaybackController(
         if (!audioSession.setCategory(AVAudioSessionCategoryPlayback, error = null) ||
             !audioSession.setActive(active = true, error = null)
         ) {
-            fail(AppError.PlayerConnectionFailed)
             return false
         }
         return true
@@ -348,6 +350,7 @@ internal class IosPlaybackController(
                 ) {
                     if (!activateAudioSession()) {
                         wasPlayingBeforeInterruption = false
+                        fail(AppError.PlayerConnectionFailed)
                         return
                     }
                     player.play()
