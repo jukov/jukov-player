@@ -61,8 +61,9 @@ internal class IosPlaybackController(
     private var currentIndex = -1
     private var origin: PlaybackOrigin = PlaybackOrigin.TrackList
     private var playWhenReady = false
-    private var wasPlayingBeforeInterruption = false
-    private var artworkTrackId: String? = null
+    private var interruptionActive = false
+    private var artworkIdentity: String? = null
+    private var artworkGeneration = 0L
     private var nowPlayingArtwork: MPMediaItemArtwork? = null
     private var playerItems = emptyList<AVPlayerItem>()
     private var timeObserver: Any? = null
@@ -104,6 +105,7 @@ internal class IosPlaybackController(
             fail(AppError.MissingTrackStreamUrl)
             return
         }
+        invalidateNowPlayingArtwork()
         queue = playable
         currentIndex = 0
         this.origin = origin
@@ -130,6 +132,10 @@ internal class IosPlaybackController(
             return
         }
         playWhenReady = true
+        if (interruptionActive) {
+            updatePlaybackState()
+            return
+        }
         if (!activateAudioSession()) {
             playWhenReady = false
             fail(AppError.PlayerConnectionFailed)
@@ -251,8 +257,8 @@ internal class IosPlaybackController(
         queue = emptyList()
         currentIndex = -1
         origin = PlaybackOrigin.TrackList
-        artworkTrackId = null
-        nowPlayingArtwork = null
+        interruptionActive = false
+        invalidateNowPlayingArtwork()
         playbackStore.clear()
         nowPlayingCenter.nowPlayingInfo = null
         runCatching { AVAudioSession.sharedInstance().setActive(active = false, error = null) }
@@ -287,6 +293,10 @@ internal class IosPlaybackController(
         }
         if (positionMs > 0) {
             player.seekToTime(CMTimeMakeWithSeconds(positionMs / 1_000.0, preferredTimescale = 600))
+        }
+        if (autoplay && interruptionActive) {
+            updatePlaybackState(positionOverrideMs = positionMs)
+            return
         }
         if (autoplay) {
             if (!activateAudioSession()) {
@@ -354,25 +364,28 @@ internal class IosPlaybackController(
         val type = (userInfo[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.unsignedIntegerValue
         when (type) {
             AVAudioSessionInterruptionTypeBegan -> {
-                wasPlayingBeforeInterruption = playWhenReady
-                playWhenReady = false
+                interruptionActive = true
                 updatePlaybackState()
             }
             AVAudioSessionInterruptionTypeEnded -> {
+                interruptionActive = false
                 val options = (userInfo[AVAudioSessionInterruptionOptionKey] as? NSNumber)
                     ?.unsignedIntegerValue ?: 0u
-                if (wasPlayingBeforeInterruption &&
-                    options and AVAudioSessionInterruptionOptionShouldResume != 0uL
-                ) {
+                val shouldResume = shouldResumeAfterInterruption(
+                    playWhenReady = playWhenReady,
+                    systemAllowsResume =
+                        options and AVAudioSessionInterruptionOptionShouldResume != 0uL,
+                )
+                if (shouldResume) {
                     if (!activateAudioSession()) {
-                        wasPlayingBeforeInterruption = false
+                        playWhenReady = false
                         fail(AppError.PlayerConnectionFailed)
                         return
                     }
-                    playWhenReady = true
                     player.play()
+                } else {
+                    playWhenReady = false
                 }
-                wasPlayingBeforeInterruption = false
                 updatePlaybackState()
             }
         }
@@ -469,7 +482,7 @@ internal class IosPlaybackController(
         }
         publish(
             positionMs = positionOverrideMs ?: currentPositionMs(),
-            isLoading = currentIndex in queue.indices && playWhenReady &&
+            isLoading = currentIndex in queue.indices && playWhenReady && !interruptionActive &&
                 player.currentItem?.isPlaybackLikelyToKeepUp() == false,
         )
     }
@@ -486,7 +499,7 @@ internal class IosPlaybackController(
             currentIndex = currentIndex,
             positionMs = positionMs.coerceAtLeast(0),
             durationMs = duration,
-            isPlaying = playWhenReady,
+            isPlaying = playWhenReady && !interruptionActive,
             isLoading = isLoading,
             origin = origin,
         )
@@ -500,9 +513,11 @@ internal class IosPlaybackController(
             nowPlayingCenter.nowPlayingInfo = null
             return
         }
-        val trackChanged = artworkTrackId != track.id
+        val identity = track.artworkIdentity()
+        val trackChanged = artworkIdentity != identity
         if (trackChanged) {
-            artworkTrackId = track.id
+            artworkIdentity = identity
+            artworkGeneration++
             nowPlayingArtwork = null
         }
         val info = mutableMapOf<Any?, Any?>(
@@ -518,16 +533,23 @@ internal class IosPlaybackController(
         remoteCommands.nextTrackCommand.enabled = snapshot.hasNext
         remoteCommands.previousTrackCommand.enabled = snapshot.hasPrevious || snapshot.positionMs > 0
         if (trackChanged) {
-            loadNowPlayingArtwork(track)
+            loadNowPlayingArtwork(track, artworkGeneration, identity)
         }
     }
 
-    private fun loadNowPlayingArtwork(track: Track) {
+    private fun loadNowPlayingArtwork(track: Track, generation: Long, identity: String) {
         val url = track.coverArtUrl?.let(NSURL::URLWithString) ?: return
         platform.Foundation.NSURLSession.sharedSession.dataTaskWithURL(url) { data, _, _ ->
             val image = data?.let { UIImage.imageWithData(it) } ?: return@dataTaskWithURL
             NSOperationQueue.mainQueue.addOperationWithBlock {
-                if (queue.getOrNull(currentIndex)?.id != track.id) {
+                val currentIdentity = queue.getOrNull(currentIndex)?.artworkIdentity()
+                if (!isCurrentArtworkRequest(
+                        submittedGeneration = generation,
+                        currentGeneration = artworkGeneration,
+                        requestedIdentity = identity,
+                        currentIdentity = currentIdentity,
+                    )
+                ) {
                     return@addOperationWithBlock
                 }
                 val artwork = MPMediaItemArtwork(boundsSize = image.size) { image }
@@ -538,6 +560,14 @@ internal class IosPlaybackController(
             }
         }.resume()
     }
+
+    private fun invalidateNowPlayingArtwork() {
+        artworkGeneration++
+        artworkIdentity = null
+        nowPlayingArtwork = null
+    }
+
+    private fun Track.artworkIdentity(): String = "$id|${coverArtUrl.orEmpty()}"
 
     private fun currentPositionMs(): Long = player.currentTime().validSeconds().toMilliseconds()
 
@@ -579,5 +609,17 @@ internal enum class PlaybackToggleAction { Play, Pause }
 
 internal fun playbackToggleAction(playWhenReady: Boolean): PlaybackToggleAction =
     if (playWhenReady) PlaybackToggleAction.Pause else PlaybackToggleAction.Play
+
+internal fun shouldResumeAfterInterruption(
+    playWhenReady: Boolean,
+    systemAllowsResume: Boolean,
+): Boolean = playWhenReady && systemAllowsResume
+
+internal fun isCurrentArtworkRequest(
+    submittedGeneration: Long,
+    currentGeneration: Long,
+    requestedIdentity: String,
+    currentIdentity: String?,
+): Boolean = submittedGeneration == currentGeneration && requestedIdentity == currentIdentity
 
 private const val PREVIOUS_RESTART_THRESHOLD_MS = 3_000L
