@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -30,9 +31,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -56,6 +55,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -172,7 +172,7 @@ fun TracksScreen(
     val canScrollAppBar = remember(pullToRefreshState) {
         { pullToRefreshState.distanceFraction == 0f }
     }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
         canScroll = canScrollAppBar,
     )
     val albumAppBarState = rememberAppCollapsingTopAppBarState(
@@ -220,15 +220,16 @@ fun TracksScreen(
                         scrollBehavior = scrollBehavior,
                         navigationIcon = { BackButton(onBack) },
                         actions = {
+                            if (filter !is TracksFilter.ByAlbum) {
+                                SearchAction(viewModel::openSearch)
+                            }
                             if (filter is TracksFilter.ByArtist) {
                                 PlayPauseButton(
                                     isPlaying = isCollectionActive && isPlaying,
                                     onClick = onCollectionPlayClick,
                                     enabled = tracks.isNotEmpty(),
                                 )
-                            }
-                            if (filter !is TracksFilter.ByAlbum) {
-                                SearchAction(viewModel::openSearch)
+                                Spacer(Modifier.width(4.dp))
                             }
                         },
                         searchQuery = searchQuery.takeIf { searchActive },
@@ -244,6 +245,8 @@ fun TracksScreen(
                         isFavorite = currentAlbumIsFavorite,
                         favoriteEnabled = albumHeader.albumId !in pending,
                         onFavoriteClick = { viewModel.toggleAlbumFavorite(albumHeader.albumId) },
+                        onAddToPlaylist = { onAddToPlaylist(tracks, {}) },
+                        onAddToQueue = { onAddToQueue(tracks) },
                         downloadStatus = albumDownloadStatuses[albumHeader.albumId],
                         onDownloadClick = {
                             val status = albumDownloadStatuses[albumHeader.albumId]
@@ -346,6 +349,8 @@ private fun AlbumTracksTopAppBar(
     isFavorite: Boolean,
     favoriteEnabled: Boolean,
     onFavoriteClick: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onAddToQueue: () -> Unit,
     downloadStatus: DownloadStatus?,
     onDownloadClick: () -> Unit,
     onArtistClick: (String, String) -> Unit,
@@ -365,6 +370,8 @@ private fun AlbumTracksTopAppBar(
                     isFavorite = isFavorite,
                     favoriteEnabled = favoriteEnabled,
                     onFavoriteClick = onFavoriteClick,
+                    onAddToPlaylist = onAddToPlaylist,
+                    onAddToQueue = onAddToQueue,
                     downloadStatus = downloadStatus,
                     onDownloadClick = onDownloadClick,
                     onArtistClick = onArtistClick,
@@ -403,6 +410,8 @@ private fun ExpandedAlbumTracksHeader(
     isFavorite: Boolean,
     favoriteEnabled: Boolean,
     onFavoriteClick: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onAddToQueue: () -> Unit,
     downloadStatus: DownloadStatus?,
     onDownloadClick: () -> Unit,
     onArtistClick: (String, String) -> Unit,
@@ -447,7 +456,8 @@ private fun ExpandedAlbumTracksHeader(
                 text = header.name,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (header.artist.isNotBlank()) {
@@ -461,13 +471,24 @@ private fun ExpandedAlbumTracksHeader(
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
             Spacer(Modifier.size(Padding.medium))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalIconButton(
+                IconButton(
+                    onClick = onAddToPlaylist,
+                    enabled = playEnabled,
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.playlist_plus),
+                        contentDescription = stringResource(Res.string.add_to_playlist),
+                    )
+                }
+                Spacer(Modifier.width(Padding.small))
+                IconButton(
                     onClick = onFavoriteClick,
                     enabled = favoriteEnabled,
                 ) {
@@ -492,11 +513,16 @@ private fun ExpandedAlbumTracksHeader(
                     modifier = Modifier.size(48.dp),
                 )
                 Spacer(Modifier.width(Padding.small))
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.secondaryContainer,
+                DownloadIconButton(downloadStatus, onDownloadClick)
+                Spacer(Modifier.width(Padding.small))
+                IconButton(
+                    onClick = onAddToQueue,
+                    enabled = playEnabled,
                 ) {
-                    DownloadIconButton(downloadStatus, onDownloadClick)
+                    Icon(
+                        painter = painterResource(Res.drawable.playlist_play),
+                        contentDescription = stringResource(Res.string.add_album_to_queue),
+                    )
                 }
             }
         }
@@ -757,7 +783,10 @@ fun TrackRow(
                     contentDescription = stringResource(if (isPlaying) Res.string.pause else Res.string.play),
                 )
             }
-            DownloadBadge(downloadStatus, Modifier.align(Alignment.BottomEnd))
+            DownloadBadge(
+                status = downloadStatus,
+                modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-6).dp, y = (-6).dp),
+            )
         }
         if (trailingAction == TrackTrailingAction.RemoveDownload) {
             IconButton(onClick = onCancelDownload) {
@@ -901,24 +930,52 @@ private fun DownloadIconButton(status: DownloadStatus?, onClick: () -> Unit) {
         IconButton(onClick = onClick) {
             Icon(painterResource(Res.drawable.download), stringResource(Res.string.downloads))
         }
-        DownloadBadge(status, Modifier.align(Alignment.BottomEnd))
+        DownloadBadge(
+            status = status,
+            modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-6).dp, y = (-6).dp),
+        )
     }
 }
 
 @Composable
 private fun DownloadBadge(status: DownloadStatus?, modifier: Modifier = Modifier) {
     when (status?.state) {
-        DownloadState.Queued, DownloadState.Downloading -> status.progress?.let { progress ->
-            CircularProgressIndicator(
-                progress = { progress },
-                modifier = modifier.size(14.dp),
-                strokeWidth = 2.dp,
+        DownloadState.Queued, DownloadState.Downloading -> DownloadStatusBadgeContainer(modifier) {
+            status.progress?.let { progress ->
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(11.dp),
+                    strokeWidth = 1.5.dp,
+                )
+            } ?: CircularProgressIndicator(
+                modifier = Modifier.size(11.dp),
+                strokeWidth = 1.5.dp,
             )
-        } ?: CircularProgressIndicator(
-            modifier = modifier.size(14.dp),
-            strokeWidth = 2.dp,
-        )
-        DownloadState.Completed -> Text("✓", modifier = modifier, color = MaterialTheme.colorScheme.primary)
+        }
+        DownloadState.Completed -> DownloadStatusBadgeContainer(modifier) {
+            Icon(
+                painter = painterResource(Res.drawable.arrow_down_bold),
+                contentDescription = stringResource(Res.string.downloads),
+                modifier = Modifier.size(11.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
         else -> Unit
+    }
+}
+
+@Composable
+private fun DownloadStatusBadgeContainer(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(16.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }

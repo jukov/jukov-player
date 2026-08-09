@@ -6,6 +6,7 @@
 - App name
 - Long loading of all tracks list even if cache is presented
 - Clear queue
+- Select track by cover swipe on player
 
 # V2
 - History

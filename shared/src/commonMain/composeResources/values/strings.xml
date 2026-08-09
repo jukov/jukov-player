@@ -73,6 +73,7 @@
     <string name="download_selected_albums">Download selected albums</string>
     <string name="favorite_selected_albums">Add selected albums to favorites</string>
     <string name="add_selected_albums_to_queue">Add selected albums to queue</string>
+    <string name="add_album_to_queue">Add album to queue</string>
     <string name="move_track">Move %1$s</string>
     <string name="move_selected_to_top">Move selected tracks to the top</string>
     <string name="remove_selected_tracks">Remove selected tracks</string>

@@ -108,7 +108,7 @@ fun FavoritesScreen(
     }
     val isRefreshing = loadingOrigin == LoadingOrigin.PullToRefresh
     val refreshState = rememberPullToRefreshState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
         canScroll = { refreshState.distanceFraction == 0f },
     )
     val refreshEnabled by remember(scrollBehavior, refreshState) {

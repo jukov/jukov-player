@@ -84,6 +84,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun PlayerHost(
     viewModel: PlayerViewModel,
+    onAddToPlaylist: (List<Track>) -> Unit,
     onArtistClick: (Track) -> Unit,
     onAlbumClick: (Track) -> Unit,
     content: @Composable () -> Unit,
@@ -125,6 +126,7 @@ fun PlayerHost(
                     sheetOffset = { runCatching { sheetState.requireOffset() }.getOrNull() },
                     onExpand = { scope.launch { sheetState.expand() } },
                     onOpenQueue = { queueVisible = true },
+                    onAddToPlaylist = onAddToPlaylist,
                     onArtistClick = { selectedTrack ->
                         scope.launch {
                             sheetState.partialExpand()
@@ -207,6 +209,7 @@ private fun PlayerSheetContent(
     sheetOffset: () -> Float?,
     onExpand: () -> Unit,
     onOpenQueue: () -> Unit,
+    onAddToPlaylist: (List<Track>) -> Unit,
     onArtistClick: (Track) -> Unit,
     onAlbumClick: (Track) -> Unit,
 ) {
@@ -235,6 +238,7 @@ private fun PlayerSheetContent(
             viewModel = viewModel,
             favoriteEnabled = favoriteEnabled,
             onOpenQueue = onOpenQueue,
+            onAddToPlaylist = onAddToPlaylist,
             onArtistClick = onArtistClick,
             onAlbumClick = onAlbumClick,
             modifier = Modifier
@@ -330,7 +334,7 @@ private fun MiniPlayer(
           }
           Box(
               Modifier.fillMaxWidth(progress).fillMaxHeight()
-                  .background(palette.primary),
+                  .background(MaterialTheme.colorScheme.onSurface),
           )
       }
     }
@@ -344,6 +348,7 @@ private fun FullPlayer(
     viewModel: PlayerViewModel,
     favoriteEnabled: Boolean,
     onOpenQueue: () -> Unit,
+    onAddToPlaylist: (List<Track>) -> Unit,
     onArtistClick: (Track) -> Unit,
     onAlbumClick: (Track) -> Unit,
     modifier: Modifier = Modifier,
@@ -481,15 +486,20 @@ private fun FullPlayer(
                 enabled = favoriteEnabled,
             )
             PlayerIconButton(
-                Res.drawable.repeat,
-                stringResource(Res.string.repeat),
-                enabled = false,
-                onClick = {},
+                resource = Res.drawable.playlist_plus,
+                description = stringResource(Res.string.add_to_playlist),
+                onClick = { onAddToPlaylist(listOf(track)) },
             )
             PlayerIconButton(
                 Res.drawable.playlist_play,
                 stringResource(Res.string.open_queue),
                 onClick = onOpenQueue,
+            )
+            PlayerIconButton(
+                Res.drawable.repeat,
+                stringResource(Res.string.repeat),
+                enabled = false,
+                onClick = {},
             )
         }
         Spacer(Modifier.height(16.dp))

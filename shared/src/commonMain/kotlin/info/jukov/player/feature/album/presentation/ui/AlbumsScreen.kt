@@ -46,6 +46,8 @@ import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.LARGE_ARTWORK_SIZE
 import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import info.jukov.player.core.presentation.LoadingOrigin
+import info.jukov.player.feature.download.domain.DownloadState
+import info.jukov.player.feature.download.domain.DownloadStatus
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -86,6 +88,7 @@ fun AlbumsScreen(
     )
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
+    val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
@@ -97,7 +100,7 @@ fun AlbumsScreen(
     val isRefreshing = loadingOrigin == LoadingOrigin.PullToRefresh
 
     val refreshState = rememberPullToRefreshState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
         canScroll = { refreshState.distanceFraction == 0f },
     )
     val refreshEnabled by remember(scrollBehavior, refreshState) {
@@ -196,6 +199,7 @@ fun AlbumsScreen(
                     onLoadMore = if (searchActive) viewModel::loadMoreSearch else viewModel::loadMore,
                     gridState = if (searchActive) searchGridState else browseGridState,
                     artworkUris = artworkUris,
+                    downloadStatuses = downloadStatuses,
                     selectionMode = selectionState.isActive,
                     selectedIds = selectionState.selectedIds,
                     onSelectionChange = selectionState::setSelected,
@@ -220,6 +224,7 @@ fun AlbumsGrid(
     onLoadMore: () -> Unit = {},
     modifier: Modifier = Modifier,
     artworkUris: Map<String, String> = emptyMap(),
+    downloadStatuses: Map<String, DownloadStatus> = emptyMap(),
     selectionMode: Boolean = false,
     selectedIds: Set<String> = emptySet(),
     onSelectionChange: (String, Boolean) -> Unit = { _, _ -> },
@@ -233,7 +238,9 @@ fun AlbumsGrid(
     ) {
         onAllTracksClick?.let { onClick ->
             item(span = { GridItemSpan(maxLineSpan) }) {
-                AllTracksCard(onClick)
+                Box(Modifier.padding(Padding.small)) {
+                    AllTracksCard(onClick)
+                }
             }
         }
         error?.let {
@@ -263,6 +270,7 @@ fun AlbumsGrid(
                 onFavoriteClick = { onFavoriteClick(album) },
                 favoriteEnabled = album.id !in pendingIds,
                 artworkUrl = album.coverArtId?.let(artworkUris::get) ?: album.coverArtUrl,
+                downloadStatus = downloadStatuses[album.id],
                 selectionMode = selectionMode,
                 selected = album.id in selectedIds,
                 onSelectedChange = { onSelectionChange(album.id, it) },
@@ -306,6 +314,7 @@ fun AlbumCard(
     onFavoriteClick: () -> Unit,
     favoriteEnabled: Boolean = true,
     artworkUrl: String? = album.coverArtUrl,
+    downloadStatus: DownloadStatus? = null,
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onSelectedChange: (Boolean) -> Unit = {},
@@ -369,6 +378,12 @@ fun AlbumCard(
                     modifier = Modifier.align(Alignment.BottomEnd).padding(Padding.small),
                 )
             }
+            if (downloadStatus != null) {
+                AlbumDownloadBadge(
+                    status = downloadStatus,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(Padding.small),
+                )
+            }
         }
         Spacer(Modifier.height(Padding.small))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -391,6 +406,42 @@ fun AlbumCard(
             if (!selectionMode) {
                 FavoriteToggleButton(album.isFavorite, onFavoriteClick, favoriteEnabled)
             }
+        }
+    }
+}
+
+@Composable
+private fun AlbumDownloadBadge(
+    status: DownloadStatus,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.size(28.dp).clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = .78f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        when (status.state) {
+            DownloadState.Queued, DownloadState.Downloading -> status.progress?.let { progress ->
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+            } ?: CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+            )
+            DownloadState.Completed -> Icon(
+                painter = painterResource(Res.drawable.arrow_down_bold),
+                contentDescription = stringResource(Res.string.downloads),
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+            DownloadState.Failed -> Text(
+                text = "!",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.titleMedium,
+            )
         }
     }
 }

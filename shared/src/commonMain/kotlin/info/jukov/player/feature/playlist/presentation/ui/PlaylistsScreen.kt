@@ -43,7 +43,7 @@ fun PlaylistsScreen(
         errorMessage?.let { snackbar.showSnackbar(it) }
         error = null
     }
-    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scroll = TopAppBarDefaults.pinnedScrollBehavior()
     val browseListState = rememberLazyListState()
     val searchListState = rememberLazyListState()
     LaunchedEffect(searchQuery) {

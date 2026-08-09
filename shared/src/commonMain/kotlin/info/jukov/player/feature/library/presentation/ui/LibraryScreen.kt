@@ -67,7 +67,7 @@ fun LibraryScreen(
         LibraryItem(stringResource(Res.string.albums), Res.drawable.album, onAlbumsClick),
         LibraryItem(stringResource(Res.string.downloads), Res.drawable.download, onDownloadsClick),
     )
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),

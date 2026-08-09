@@ -108,13 +108,13 @@ fun DownloadsScreen(
                             }
                         },
                         actions = {
+                            SearchAction(viewModel::openSearch)
                             IconButton(onClick = { confirmRemoveAll = true }) {
                                 Icon(
                                     painterResource(Res.drawable.download_off),
                                     stringResource(Res.string.remove_all_downloads),
                                 )
                             }
-                            SearchAction(viewModel::openSearch)
                         },
                         searchQuery = searchQuery.takeIf { searchActive },
                         onSearchQueryChange = viewModel::updateSearchQuery,

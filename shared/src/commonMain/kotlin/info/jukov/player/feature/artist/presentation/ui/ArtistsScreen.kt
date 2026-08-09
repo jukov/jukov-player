@@ -79,7 +79,7 @@ fun ArtistsScreen(
     val canScrollTopAppBar = remember(pullToRefreshState) {
         { pullToRefreshState.distanceFraction == 0f }
     }
-    val topAppBarScrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
+    val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(
         canScroll = canScrollTopAppBar,
     )
     val isPullToRefreshEnabled by remember(topAppBarScrollBehavior, pullToRefreshState) {

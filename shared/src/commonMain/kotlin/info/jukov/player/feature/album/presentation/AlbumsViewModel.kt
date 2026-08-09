@@ -41,6 +41,7 @@ class AlbumsViewModel(
     val pending = favoriteDelegate.pending
     val messages = favoriteDelegate.messages
     val artworkUris = downloadDelegate.artworkUris
+    val downloadStatuses = downloadDelegate.albumStatuses
     private val _hasMore = MutableStateFlow(false)
     val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
     private val searchDelegate = PagedSearchDelegate<Album>(viewModelScope) { query, offset, size ->

@@ -249,6 +249,7 @@ fun AppNavigation(
         if (authState is AuthState.LoggedIn) {
             PlayerHost(
                 viewModel = playerViewModel,
+                onAddToPlaylist = { tracks -> playlistPickerViewModel.open(tracks) },
                 onArtistClick = { track ->
                     track.artistId?.let { artistId ->
                         backStack.add(Routes.Albums(artistId, track.artist))
