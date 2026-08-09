@@ -27,6 +27,6 @@ data class PlaybackSnapshot(
     val origin: PlaybackOrigin = PlaybackOrigin.TrackList,
 ) {
     val currentTrack: Track? get() = queue.getOrNull(currentIndex)
-    val hasPrevious: Boolean get() = currentIndex > 0 || positionMs > 0
+    val hasPrevious: Boolean get() = currentIndex > 0
     val hasNext: Boolean get() = currentIndex in 0..<queue.lastIndex
 }

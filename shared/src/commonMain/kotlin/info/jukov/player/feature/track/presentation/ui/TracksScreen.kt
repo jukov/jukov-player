@@ -312,7 +312,15 @@ fun TracksScreen(
                     showTrackNumber = filter is TracksFilter.ByAlbum,
                     error = (displayedState as? LoadableState.Failure)?.error,
                     onPlayClick = { queue, index ->
-                        onPlayClick(queue, index, PlaybackOrigin.TrackList)
+                        if (searchActive) {
+                            onPlayClick(listOf(queue[index]), 0, PlaybackOrigin.TrackList)
+                        } else {
+                            onPlayClick(
+                                queue,
+                                index,
+                                collectionOrigin ?: PlaybackOrigin.TrackList,
+                            )
+                        }
                     },
                     onActiveTrackClick = onActiveTrackClick,
                     activeTrackId = activeTrackId,
