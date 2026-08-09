@@ -6,12 +6,16 @@ import info.jukov.player.feature.download.iosTaskDescription
 import info.jukov.player.feature.download.isActiveDownloadAttempt
 import info.jukov.player.feature.download.isApiErrorContentType
 import info.jukov.player.feature.download.isCurrentDownloadGeneration
+import info.jukov.player.feature.download.IosDownloadProgress
+import info.jukov.player.feature.download.IosDownloadTaskMetadata
+import info.jukov.player.feature.download.IosProgressCoalescer
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
 import info.jukov.player.feature.playback.PlaybackToggleAction
 import info.jukov.player.feature.playback.isCurrentArtworkRequest
 import info.jukov.player.feature.playback.shouldResumeAfterInterruption
+import info.jukov.player.feature.playback.shouldPublishPlaybackFailure
 import info.jukov.player.core.data.cache.migrateLegacyDatabaseIfNeeded
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSFileManager
@@ -114,6 +118,13 @@ class SharedLogicIOSTest {
     }
 
     @Test
+    fun onlyCurrentFailedPlayerItemPublishesPlaybackFailure() {
+        assertTrue(shouldPublishPlaybackFailure(isCurrentItem = true, hasError = true))
+        assertFalse(shouldPublishPlaybackFailure(isCurrentItem = false, hasError = true))
+        assertFalse(shouldPublishPlaybackFailure(isCurrentItem = true, hasError = false))
+    }
+
+    @Test
     fun cancellationInvalidatesPreviouslySubmittedSchedulingWork() {
         assertTrue(isCurrentDownloadGeneration(submitted = 7, current = 7))
         assertFalse(isCurrentDownloadGeneration(submitted = 7, current = 8))
@@ -135,6 +146,37 @@ class SharedLogicIOSTest {
         assertFalse(isApiErrorContentType("audio/mpeg"))
         assertFalse(isApiErrorContentType("image/jpeg"))
         assertFalse(isApiErrorContentType(null))
+    }
+
+    @Test
+    fun progressCallbacksAreCoalescedToTheLatestValue() {
+        val coalescer = IosProgressCoalescer()
+        val metadata = IosDownloadTaskMetadata("track", "account", "track-id")
+
+        assertTrue(coalescer.offer(IosDownloadProgress(metadata, 7u, 10, 100)))
+        repeat(1_000) { index ->
+            assertFalse(
+                coalescer.offer(
+                    IosDownloadProgress(metadata, 7u, index.toLong() + 11, 100),
+                ),
+            )
+        }
+
+        assertEquals(1_010, coalescer.take(7u)?.downloadedBytes)
+        assertFalse(coalescer.completeFlush(7u))
+    }
+
+    @Test
+    fun progressArrivingDuringAFlushSchedulesOneFollowUp() {
+        val coalescer = IosProgressCoalescer()
+        val metadata = IosDownloadTaskMetadata("track", "account", "track-id")
+
+        assertTrue(coalescer.offer(IosDownloadProgress(metadata, 9u, 10, 100)))
+        assertEquals(10, coalescer.take(9u)?.downloadedBytes)
+        assertFalse(coalescer.offer(IosDownloadProgress(metadata, 9u, 90, 100)))
+        assertTrue(coalescer.completeFlush(9u))
+        assertEquals(90, coalescer.take(9u)?.downloadedBytes)
+        assertFalse(coalescer.completeFlush(9u))
     }
 
     @OptIn(ExperimentalForeignApi::class)

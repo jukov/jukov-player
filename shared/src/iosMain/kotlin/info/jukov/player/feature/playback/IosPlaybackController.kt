@@ -333,6 +333,11 @@ internal class IosPlaybackController(
             queue = NSOperationQueue.mainQueue,
         ) { notification -> onItemEnded(notification) }
         notificationTokens += notificationCenter.addObserverForName(
+            name = AVPlayerItemFailedToPlayToEndTimeNotification,
+            `object` = null,
+            queue = NSOperationQueue.mainQueue,
+        ) { notification -> onItemFailed(notification) }
+        notificationTokens += notificationCenter.addObserverForName(
             name = AVAudioSessionInterruptionNotification,
             `object` = AVAudioSession.sharedInstance(),
             queue = NSOperationQueue.mainQueue,
@@ -357,6 +362,19 @@ internal class IosPlaybackController(
             playWhenReady = false
             updatePlaybackState(positionOverrideMs = durationMs())
         }
+    }
+
+    private fun onItemFailed(notification: NSNotification?) {
+        if (!shouldPublishPlaybackFailure(
+                isCurrentItem = notification?.`object` === player.currentItem,
+                hasError = true,
+            )
+        ) {
+            return
+        }
+        playWhenReady = false
+        player.pause()
+        fail(AppError.PlaybackFailed)
     }
 
     private fun onAudioInterruption(notification: NSNotification?) {
@@ -475,8 +493,14 @@ internal class IosPlaybackController(
     }
 
     private fun updatePlaybackState(positionOverrideMs: Long? = null) {
-        val itemError = player.currentItem?.error
-        if (itemError != null) {
+        val currentItem = player.currentItem
+        if (shouldPublishPlaybackFailure(
+                isCurrentItem = currentItem != null,
+                hasError = currentItem?.error != null || currentItem?.status == AVPlayerItemStatusFailed,
+            )
+        ) {
+            playWhenReady = false
+            player.pause()
             fail(AppError.PlaybackFailed)
             return
         }
@@ -614,6 +638,9 @@ internal fun shouldResumeAfterInterruption(
     playWhenReady: Boolean,
     systemAllowsResume: Boolean,
 ): Boolean = playWhenReady && systemAllowsResume
+
+internal fun shouldPublishPlaybackFailure(isCurrentItem: Boolean, hasError: Boolean): Boolean =
+    isCurrentItem && hasError
 
 internal fun isCurrentArtworkRequest(
     submittedGeneration: Long,

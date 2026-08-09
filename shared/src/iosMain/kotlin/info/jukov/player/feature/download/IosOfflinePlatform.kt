@@ -77,6 +77,8 @@ class IosOfflinePlatform internal constructor(
     private val completedLocations = mutableSetOf<ULong>()
     private val operations = Channel<suspend () -> Unit>(capacity = Channel.UNLIMITED)
     private val generationLock = NSLock()
+    private val progressLock = NSLock()
+    private val progressCoalescer = IosProgressCoalescer()
     private var cancellationGeneration = 0L
     private val cancelledAccountTokens = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskDescriptions = MutableStateFlow<Set<String>>(emptySet())
@@ -214,17 +216,19 @@ class IosOfflinePlatform internal constructor(
         if (metadata.kind != TASK_TRACK) {
             return
         }
-        submitOperation {
-            val accountKey = accountKeyFor(metadata) ?: return@submitOperation
-            if (!isTaskActive(metadata, downloadTask.taskIdentifier)) {
-                return@submitOperation
-            }
-            dao.updateOfflineTrackProgress(
-                accountKey = accountKey,
-                trackId = metadata.id,
-                downloadedBytes = totalBytesWritten.coerceAtLeast(0),
-                expectedSize = totalBytesExpectedToWrite.takeIf { it > 0 },
+        val taskIdentifier = downloadTask.taskIdentifier
+        val shouldSchedule = withProgressLock {
+            progressCoalescer.offer(
+                IosDownloadProgress(
+                    metadata = metadata,
+                    taskIdentifier = taskIdentifier,
+                    downloadedBytes = totalBytesWritten.coerceAtLeast(0),
+                    expectedSize = totalBytesExpectedToWrite.takeIf { it > 0 },
+                ),
             )
+        }
+        if (shouldSchedule) {
+            submitOperation { flushProgress(taskIdentifier) }
         }
     }
 
@@ -233,6 +237,7 @@ class IosOfflinePlatform internal constructor(
         location: NSURL,
     ) {
         val metadata = parseIosTaskDescription(downloadTask.taskDescription) ?: return
+        discardPendingProgress(downloadTask.taskIdentifier)
         val durableLocation = stagingUrl(metadata, downloadTask.taskIdentifier)
         durableLocation.ensureParentDirectory()
         durableLocation.removeIfPresent()
@@ -265,6 +270,7 @@ class IosOfflinePlatform internal constructor(
 
     internal fun didComplete(task: NSURLSessionTask, error: NSError?) {
         val metadata = parseIosTaskDescription(task.taskDescription) ?: return
+        discardPendingProgress(task.taskIdentifier)
         if (error == null) {
             completedLocations.remove(task.taskIdentifier)
             return
@@ -592,6 +598,40 @@ class IosOfflinePlatform internal constructor(
         check(operations.trySend(operation).isSuccess) { "Download operation queue is unavailable" }
     }
 
+    private suspend fun flushProgress(taskIdentifier: ULong) {
+        val progress = withProgressLock { progressCoalescer.take(taskIdentifier) }
+        if (progress != null) {
+            val accountKey = accountKeyFor(progress.metadata)
+            if (accountKey != null && isTaskActive(progress.metadata, progress.taskIdentifier)) {
+                dao.updateOfflineTrackProgress(
+                    accountKey = accountKey,
+                    trackId = progress.metadata.id,
+                    downloadedBytes = progress.downloadedBytes,
+                    expectedSize = progress.expectedSize,
+                )
+            }
+        }
+        val shouldReschedule = withProgressLock { progressCoalescer.completeFlush(taskIdentifier) }
+        if (shouldReschedule) {
+            submitOperation { flushProgress(taskIdentifier) }
+        }
+    }
+
+    private fun discardPendingProgress(taskIdentifier: ULong) {
+        withProgressLock {
+            progressCoalescer.discard(taskIdentifier)
+        }
+    }
+
+    private fun <T> withProgressLock(block: () -> T): T {
+        progressLock.lock()
+        return try {
+            block()
+        } finally {
+            progressLock.unlock()
+        }
+    }
+
     private suspend fun runOperationAndWait(operation: suspend () -> Unit) {
         val completion = CompletableDeferred<Unit>()
         operations.send {
@@ -818,6 +858,38 @@ internal data class IosDownloadTaskMetadata(
     val id: String,
 ) {
     val description: String get() = "$kind$TASK_SEPARATOR$accountToken$TASK_SEPARATOR$id"
+}
+
+internal data class IosDownloadProgress(
+    val metadata: IosDownloadTaskMetadata,
+    val taskIdentifier: ULong,
+    val downloadedBytes: Long,
+    val expectedSize: Long?,
+)
+
+internal class IosProgressCoalescer {
+    private val pending = mutableMapOf<ULong, IosDownloadProgress>()
+    private val scheduled = mutableSetOf<ULong>()
+
+    fun offer(progress: IosDownloadProgress): Boolean {
+        pending[progress.taskIdentifier] = progress
+        return scheduled.add(progress.taskIdentifier)
+    }
+
+    fun take(taskIdentifier: ULong): IosDownloadProgress? = pending.remove(taskIdentifier)
+
+    fun completeFlush(taskIdentifier: ULong): Boolean {
+        if (taskIdentifier in pending) {
+            return true
+        }
+        scheduled.remove(taskIdentifier)
+        return false
+    }
+
+    fun discard(taskIdentifier: ULong) {
+        pending.remove(taskIdentifier)
+        scheduled.remove(taskIdentifier)
+    }
 }
 
 internal fun iosTaskDescription(kind: String, accountKey: String, id: String): String =
