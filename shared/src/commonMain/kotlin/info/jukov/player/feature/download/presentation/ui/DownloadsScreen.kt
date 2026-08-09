@@ -1,16 +1,20 @@
 package info.jukov.player.feature.download.presentation.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,6 +33,7 @@ import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.presentation.ui.TracksList
 import info.jukov.player.feature.track.presentation.ui.TrackSelectionTopAppBar
 import info.jukov.player.feature.track.presentation.ui.TrackTrailingAction
+import info.jukov.player.feature.track.presentation.ui.DownloadPlayButton
 import info.jukov.player.feature.track.presentation.ui.rememberTrackSelectionState
 import info.jukov.player.feature.playback.presentation.ui.PlayerBackHandler
 import jukovplayer.shared.generated.resources.*
@@ -172,9 +177,20 @@ fun DownloadsScreen(
                                 contentPadding = PaddingValues(Padding.small).withPlayerBottomInset(),
                             ) {
                                 items(library.albums, key = { it.album.id }) { album ->
-                                    OfflineAlbumRow(album, { onAlbumClick(album) }) {
-                                        viewModel.removeAlbum(album.album.id)
-                                    }
+                                    OfflineAlbumRow(
+                                        album = album,
+                                        onClick = { onAlbumClick(album) },
+                                        onRemove = { viewModel.removeAlbum(album.album.id) },
+                                        onPlay = {
+                                            if (album.tracks.any { it.track.id == activeTrackId }) {
+                                                onActiveTrackClick()
+                                            } else if (album.tracks.isNotEmpty()) {
+                                                onPlayClick(album.tracks.map { it.track }, 0)
+                                            }
+                                        },
+                                        isPlaying = isPlaying &&
+                                            album.tracks.any { it.track.id == activeTrackId },
+                                    )
                                 }
                             }
                         }
@@ -271,39 +287,55 @@ fun OfflineAlbumTracksScreen(
 }
 
 @Composable
-private fun OfflineAlbumRow(album: OfflineAlbum, onClick: () -> Unit, onRemove: () -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
+private fun OfflineAlbumRow(
+    album: OfflineAlbum,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    onPlay: () -> Unit,
+    isPlaying: Boolean,
+) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         leadingContent = {
-            album.album.coverArtUrl?.let { url ->
-                AsyncImage(
-                    model = rememberArtworkRequest(url, album.album.id, SMALL_ARTWORK_SIZE),
-                    contentDescription = null,
-                    modifier = Modifier.size(56.dp),
-                )
+            Box(
+                modifier = Modifier.size(56.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                val artworkUrl = album.album.coverArtUrl
+                if (artworkUrl != null) {
+                    AsyncImage(
+                        model = rememberArtworkRequest(artworkUrl, album.album.id, SMALL_ARTWORK_SIZE),
+                        contentDescription = stringResource(Res.string.album_cover, album.album.name),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(Res.drawable.album),
+                        contentDescription = stringResource(Res.string.no_cover),
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         },
         headlineContent = { Text(album.album.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(album.album.artist, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                when (album.status.state) {
-                    DownloadState.Queued, DownloadState.Downloading -> LoadingIndicator(Modifier.size(22.dp))
-                    DownloadState.Completed -> Text("✓", color = MaterialTheme.colorScheme.primary)
-                    DownloadState.Failed -> Text("!", color = MaterialTheme.colorScheme.error)
+                IconButton(onClick = onRemove) {
+                    Icon(
+                        painter = painterResource(Res.drawable.delete),
+                        contentDescription = stringResource(Res.string.remove_download),
+                    )
                 }
-                Box {
-                    IconButton(onClick = { expanded = true }) {
-                        Icon(painterResource(Res.drawable.more_vert), stringResource(Res.string.more_actions))
-                    }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.remove_download)) },
-                            onClick = { expanded = false; onRemove() },
-                        )
-                    }
-                }
+                DownloadPlayButton(
+                    isPlaying = isPlaying,
+                    onClick = onPlay,
+                    status = album.status,
+                )
             }
         },
     )

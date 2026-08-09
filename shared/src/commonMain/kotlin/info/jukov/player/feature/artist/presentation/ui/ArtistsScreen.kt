@@ -45,7 +45,6 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun ArtistsScreen(
     viewModel: ArtistsViewModel,
-    onLogout: () -> Unit,
     onBack: () -> Unit,
     onArtistClick: (Artist) -> Unit,
     onAllAlbumsClick: () -> Unit,
@@ -93,7 +92,6 @@ fun ArtistsScreen(
         topBar = {
             Column {
                 ArtistsTopAppBar(
-                    onLogout = onLogout,
                     onBack = onBack,
                     onAllAlbumsClick = onAllAlbumsClick,
                     onSearchClick = viewModel::openSearch,
@@ -147,7 +145,6 @@ fun ArtistsScreen(
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun ArtistsTopAppBar(
-    onLogout: () -> Unit,
     onBack: () -> Unit,
     onAllAlbumsClick: () -> Unit,
     onSearchClick: () -> Unit,
@@ -191,13 +188,6 @@ private fun ArtistsTopAppBar(
                     onClick = {
                         menuExpanded = false
                         onAllAlbumsClick()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.sign_out)) },
-                    onClick = {
-                        menuExpanded = false
-                        onLogout()
                     },
                 )
             }

@@ -776,23 +776,36 @@ fun TrackRow(
                 enabled = favoriteEnabled,
             )
         }
-        Box {
-            IconButton(onClick = onPlayClick) {
-                Icon(
-                    painter = painterResource(if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow),
-                    contentDescription = stringResource(if (isPlaying) Res.string.pause else Res.string.play),
-                )
-            }
-            DownloadBadge(
-                status = downloadStatus,
-                modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-6).dp, y = (-6).dp),
-            )
-        }
         if (trailingAction == TrackTrailingAction.RemoveDownload) {
             IconButton(onClick = onCancelDownload) {
                 Icon(painterResource(Res.drawable.delete), stringResource(Res.string.remove_download))
             }
         }
+        DownloadPlayButton(
+            isPlaying = isPlaying,
+            onClick = onPlayClick,
+            status = downloadStatus,
+        )
+    }
+}
+
+@Composable
+fun DownloadPlayButton(
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    status: DownloadStatus?,
+) {
+    Box {
+        IconButton(onClick = onClick) {
+            Icon(
+                painter = painterResource(if (isPlaying) Res.drawable.pause else Res.drawable.play_arrow),
+                contentDescription = stringResource(if (isPlaying) Res.string.pause else Res.string.play),
+            )
+        }
+        DownloadBadge(
+            status = status,
+            modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-6).dp, y = (-6).dp),
+        )
     }
 }
 

@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
+import info.jukov.player.subsonic.data.SubsonicApiClient
 
 @BindingContainer
 object DownloadsModule {
@@ -30,7 +31,10 @@ object DownloadsModule {
         dao: CacheDao,
         tracksApi: TracksApi,
         platform: OfflinePlatform,
-    ): DownloadsRepository = DefaultDownloadsRepository(authRepository, dao, tracksApi, platform)
+        client: SubsonicApiClient,
+    ): DownloadsRepository = DefaultDownloadsRepository(
+        authRepository, dao, tracksApi, platform, client,
+    )
 
     @Provides
     fun provideDownloadsViewModel(

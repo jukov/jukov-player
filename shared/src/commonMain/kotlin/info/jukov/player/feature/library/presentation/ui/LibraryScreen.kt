@@ -38,6 +38,7 @@ private data class LibraryItem(val title: String, val icon: DrawableResource, va
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel,
+    onLogout: () -> Unit,
     onFavoritesClick: () -> Unit,
     onTracksClick: () -> Unit,
     onArtistsClick: () -> Unit,
@@ -48,6 +49,8 @@ fun LibraryScreen(
     onAlbumClick: (Album) -> Unit,
     onTrackClick: (Track) -> Unit,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var confirmLogout by remember { mutableStateOf(false) }
     val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
@@ -75,7 +78,27 @@ fun LibraryScreen(
             AppFlexibleTopAppBar(
                 title = stringResource(Res.string.library),
                 scrollBehavior = scrollBehavior,
-                actions = { SearchAction(viewModel::openSearch) },
+                actions = {
+                    SearchAction(viewModel::openSearch)
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            painter = painterResource(Res.drawable.more_vert),
+                            contentDescription = stringResource(Res.string.more),
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.sign_out)) },
+                            onClick = {
+                                menuExpanded = false
+                                confirmLogout = true
+                            },
+                        )
+                    }
+                },
                 searchQuery = query.takeIf { searchActive },
                 onSearchQueryChange = viewModel::updateSearchQuery,
                 onSearchClose = viewModel::closeSearch,
@@ -135,6 +158,28 @@ fun LibraryScreen(
                 onTrackClick = onTrackClick,
             )
         }
+    }
+    if (confirmLogout) {
+        AlertDialog(
+            onDismissRequest = { confirmLogout = false },
+            title = { Text(stringResource(Res.string.sign_out_title)) },
+            text = { Text(stringResource(Res.string.sign_out_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmLogout = false
+                        onLogout()
+                    },
+                ) {
+                    Text(stringResource(Res.string.sign_out))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLogout = false }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
     }
 }
 

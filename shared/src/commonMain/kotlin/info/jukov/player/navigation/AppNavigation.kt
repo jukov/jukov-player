@@ -90,6 +90,7 @@ fun AppNavigation(
                     val libraryViewModel = viewModel { graph.libraryViewModel }
                     LibraryScreen(
                         viewModel = libraryViewModel,
+                        onLogout = authViewModel::logout,
                         onFavoritesClick = { backStack.add(Routes.Favorites) },
                         onTracksClick = { backStack.add(Routes.Tracks()) },
                         onArtistsClick = { backStack.add(Routes.Artists) },
@@ -178,7 +179,6 @@ fun AppNavigation(
                         }
                         ArtistsScreen(
                             viewModel = artistsViewModel,
-                            onLogout = authViewModel::logout,
                             onBack = { backStack.removeLastOrNull() },
                             onArtistClick = { artist ->
                                 backStack.add(Routes.Albums(artist.id, artist.name))

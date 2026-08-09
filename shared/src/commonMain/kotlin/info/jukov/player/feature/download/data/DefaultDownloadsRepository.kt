@@ -3,12 +3,14 @@ package info.jukov.player.feature.download.data
 import info.jukov.player.core.data.cache.*
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.auth.domain.AuthRepository
+import info.jukov.player.feature.auth.domain.AuthSession
 import info.jukov.player.feature.auth.domain.AuthState
 import info.jukov.player.feature.auth.domain.accountKey
 import info.jukov.player.feature.download.domain.*
 import info.jukov.player.feature.track.data.TracksApi
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
+import info.jukov.player.subsonic.data.SubsonicApiClient
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -23,20 +25,22 @@ class DefaultDownloadsRepository(
     private val dao: CacheDao,
     private val tracksApi: TracksApi,
     private val platform: OfflinePlatform,
+    private val client: SubsonicApiClient,
 ) : DownloadsRepository {
     override fun observeLibrary(): Flow<OfflineLibrary> = authRepository.authState.flatMapLatest { state ->
-        val accountKey = (state as? AuthState.LoggedIn)?.session?.accountKey
+        val session = (state as? AuthState.LoggedIn)?.session
             ?: return@flatMapLatest flowOf(OfflineLibrary())
-        observeLibrary(accountKey, query = null)
+        observeLibrary(session, query = null)
     }
 
     override fun searchLibrary(query: String): Flow<OfflineLibrary> = authRepository.authState.flatMapLatest { state ->
-        val accountKey = (state as? AuthState.LoggedIn)?.session?.accountKey
+        val session = (state as? AuthState.LoggedIn)?.session
             ?: return@flatMapLatest flowOf(OfflineLibrary())
-        observeLibrary(accountKey, query.trim())
+        observeLibrary(session, query.trim())
     }
 
-    private fun observeLibrary(accountKey: String, query: String?) : Flow<OfflineLibrary> {
+    private fun observeLibrary(session: AuthSession, query: String?) : Flow<OfflineLibrary> {
+        val accountKey = session.accountKey
         val metadata = combine(
             dao.observeAccountTracks(accountKey),
             dao.observeAccountAlbums(accountKey),
@@ -63,7 +67,7 @@ class DefaultDownloadsRepository(
             val allOfflineTracks = allDownloads.mapNotNull { download ->
                 val track = tracksById[download.trackId] ?: return@mapNotNull null
                 download.trackId to download.toOfflineTrack(
-                    track, accountKey, platform, artworkPaths[track.coverArtId],
+                    track, accountKey, platform, client, session, artworkPaths[track.coverArtId],
                 )
             }.toMap()
             val visibleTrackIds = visibleDownloads.mapTo(hashSetOf()) { it.trackId }
@@ -77,7 +81,9 @@ class DefaultDownloadsRepository(
                         .mapNotNull { allOfflineTracks[it.trackId] }
                         .toList()
                     OfflineAlbum(
-                        album.toDomain(accountKey, platform, artworkPaths[album.coverArtId]),
+                        album.toDomain(
+                            accountKey, platform, client, session, artworkPaths[album.coverArtId],
+                        ),
                         albumTracks,
                         offlineAlbum.trackCount,
                     )
@@ -277,6 +283,8 @@ private fun OfflineTrackEntity.toOfflineTrack(
     metadata: TrackEntity,
     key: String,
     platform: OfflinePlatform,
+    client: SubsonicApiClient,
+    session: AuthSession,
     artworkPath: String? = null,
 ) = OfflineTrack(
     track = Track(
@@ -285,7 +293,10 @@ private fun OfflineTrackEntity.toOfflineTrack(
         artistId = metadata.artistId, trackNumber = metadata.trackNumber,
         year = metadata.year,
         coverArtId = metadata.coverArtId,
-        coverArtUrl = artworkPath?.let { platform.fileUri(key, it) },
+        coverArtUrl = artworkPath?.let { platform.fileUri(key, it) }
+            ?: metadata.coverArtId?.let {
+                client.buildUrl("getCoverArt", session, mapOf("id" to it))
+            },
         streamUrl = relativePath?.let { platform.fileUri(key, it) },
         durationMs = metadata.durationMs, contentType = metadata.contentType,
         isFavorite = metadata.isFavorite,
@@ -293,7 +304,15 @@ private fun OfflineTrackEntity.toOfflineTrack(
     status = toStatus(),
 )
 
-private fun AlbumEntity.toDomain(key: String, platform: OfflinePlatform, artworkPath: String?) = Album(
+private fun AlbumEntity.toDomain(
+    key: String,
+    platform: OfflinePlatform,
+    client: SubsonicApiClient,
+    session: AuthSession,
+    artworkPath: String?,
+) = Album(
     id = id, name = name, artist = artist, artistId = artistId, coverArtId = coverArtId,
-    coverArtUrl = artworkPath?.let { platform.fileUri(key, it) }, isFavorite = isFavorite,
+    coverArtUrl = artworkPath?.let { platform.fileUri(key, it) }
+        ?: coverArtId?.let { client.buildUrl("getCoverArt", session, mapOf("id" to it)) },
+    isFavorite = isFavorite,
 )

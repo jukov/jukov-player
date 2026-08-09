@@ -43,6 +43,8 @@
     <string name="all_albums">Все альбомы</string>
     <string name="all_tracks">Все треки</string>
     <string name="sign_out">Выйти</string>
+    <string name="sign_out_title">Выйти из аккаунта?</string>
+    <string name="sign_out_message">Для доступа к библиотеке потребуется снова войти в аккаунт.</string>
     <string name="albums_count">Альбомы: %1$d</string>
     <string name="artists_not_found">Исполнители не найдены</string>
     <string name="albums_not_found">Альбомы не найдены</string>
