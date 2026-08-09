@@ -15,8 +15,10 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import platform.Foundation.*
@@ -592,7 +594,7 @@ class IosOfflinePlatform internal constructor(
                 completion.completeExceptionally(error)
             }
         }
-        completion.await()
+        withContext(NonCancellable) { completion.await() }
     }
 
     private fun currentCancellationGeneration(): Long {

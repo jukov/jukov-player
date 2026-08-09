@@ -7,6 +7,8 @@ import info.jukov.player.feature.download.isActiveDownloadAttempt
 import info.jukov.player.feature.download.isCurrentDownloadGeneration
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
+import info.jukov.player.feature.playback.playbackToggleAction
+import info.jukov.player.feature.playback.PlaybackToggleAction
 import info.jukov.player.core.data.cache.migrateLegacyDatabaseIfNeeded
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSFileManager
@@ -74,6 +76,12 @@ class SharedLogicIOSTest {
                 playerWasExhausted = false,
             ),
         )
+    }
+
+    @Test
+    fun pauseIntentDoesNotDependOnPlayerRateWhileBuffering() {
+        assertEquals(PlaybackToggleAction.Pause, playbackToggleAction(playWhenReady = true))
+        assertEquals(PlaybackToggleAction.Play, playbackToggleAction(playWhenReady = false))
     }
 
     @Test

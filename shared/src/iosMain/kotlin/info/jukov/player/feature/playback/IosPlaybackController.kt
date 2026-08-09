@@ -60,6 +60,7 @@ internal class IosPlaybackController(
     private var queue = emptyList<Track>()
     private var currentIndex = -1
     private var origin: PlaybackOrigin = PlaybackOrigin.TrackList
+    private var playWhenReady = false
     private var wasPlayingBeforeInterruption = false
     private var artworkTrackId: String? = null
     private var nowPlayingArtwork: MPMediaItemArtwork? = null
@@ -112,10 +113,14 @@ internal class IosPlaybackController(
     }
 
     override fun playPause() {
-        if (player.rate > 0f) {
-            player.pause()
-            updatePlaybackState()
-            return
+        when (playbackToggleAction(playWhenReady)) {
+            PlaybackToggleAction.Pause -> {
+                playWhenReady = false
+                player.pause()
+                updatePlaybackState()
+                return
+            }
+            PlaybackToggleAction.Play -> Unit
         }
         if (currentIndex !in queue.indices) {
             return
@@ -124,7 +129,9 @@ internal class IosPlaybackController(
             rebuildPlayer(autoplay = true, positionMs = 0)
             return
         }
+        playWhenReady = true
         if (!activateAudioSession()) {
+            playWhenReady = false
             fail(AppError.PlayerConnectionFailed)
             return
         }
@@ -183,7 +190,7 @@ internal class IosPlaybackController(
             return
         }
         currentIndex--
-        rebuildPlayer(autoplay = player.rate > 0f, positionMs = 0)
+        rebuildPlayer(autoplay = playWhenReady, positionMs = 0)
         persist()
     }
 
@@ -212,7 +219,7 @@ internal class IosPlaybackController(
             return
         }
         queue = changed
-        rebuildPlayer(autoplay = player.rate > 0f, positionMs = currentPositionMs())
+        rebuildPlayer(autoplay = playWhenReady, positionMs = currentPositionMs())
         persist()
     }
 
@@ -222,7 +229,7 @@ internal class IosPlaybackController(
             return
         }
         queue = changed
-        rebuildPlayer(autoplay = player.rate > 0f, positionMs = currentPositionMs())
+        rebuildPlayer(autoplay = playWhenReady, positionMs = currentPositionMs())
         persist()
     }
 
@@ -232,12 +239,13 @@ internal class IosPlaybackController(
             return
         }
         queue = changed
-        rebuildPlayer(autoplay = player.rate > 0f, positionMs = currentPositionMs())
+        rebuildPlayer(autoplay = playWhenReady, positionMs = currentPositionMs())
         persist()
     }
 
     override fun stopAndClear() {
         player.pause()
+        playWhenReady = false
         player.removeAllItems()
         playerItems = emptyList()
         queue = emptyList()
@@ -266,6 +274,7 @@ internal class IosPlaybackController(
     }
 
     private fun rebuildPlayer(autoplay: Boolean, positionMs: Long) {
+        playWhenReady = autoplay
         player.pause()
         player.removeAllItems()
         playerItems = emptyList()
@@ -281,6 +290,7 @@ internal class IosPlaybackController(
         }
         if (autoplay) {
             if (!activateAudioSession()) {
+                playWhenReady = false
                 updatePlaybackState(positionOverrideMs = positionMs)
                 fail(AppError.PlayerConnectionFailed)
                 return
@@ -334,6 +344,7 @@ internal class IosPlaybackController(
             persist()
             updatePlaybackState(positionOverrideMs = 0)
         } else {
+            playWhenReady = false
             updatePlaybackState(positionOverrideMs = durationMs())
         }
     }
@@ -343,7 +354,8 @@ internal class IosPlaybackController(
         val type = (userInfo[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.unsignedIntegerValue
         when (type) {
             AVAudioSessionInterruptionTypeBegan -> {
-                wasPlayingBeforeInterruption = player.rate > 0f
+                wasPlayingBeforeInterruption = playWhenReady
+                playWhenReady = false
                 updatePlaybackState()
             }
             AVAudioSessionInterruptionTypeEnded -> {
@@ -357,6 +369,7 @@ internal class IosPlaybackController(
                         fail(AppError.PlayerConnectionFailed)
                         return
                     }
+                    playWhenReady = true
                     player.play()
                 }
                 wasPlayingBeforeInterruption = false
@@ -369,6 +382,7 @@ internal class IosPlaybackController(
         val reason = (notification?.userInfo?.get(AVAudioSessionRouteChangeReasonKey) as? NSNumber)
             ?.unsignedIntegerValue
         if (reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable) {
+            playWhenReady = false
             player.pause()
             updatePlaybackState()
         }
@@ -400,7 +414,7 @@ internal class IosPlaybackController(
         if (currentIndex !in queue.indices) {
             return MPRemoteCommandHandlerStatusNoSuchContent
         }
-        if (player.rate == 0f) {
+        if (!playWhenReady) {
             playPause()
         }
         return MPRemoteCommandHandlerStatusSuccess
@@ -410,7 +424,7 @@ internal class IosPlaybackController(
         if (currentIndex !in queue.indices) {
             return MPRemoteCommandHandlerStatusNoSuchContent
         }
-        if (player.rate > 0f) {
+        if (playWhenReady) {
             playPause()
         }
         return MPRemoteCommandHandlerStatusSuccess
@@ -455,7 +469,7 @@ internal class IosPlaybackController(
         }
         publish(
             positionMs = positionOverrideMs ?: currentPositionMs(),
-            isLoading = currentIndex in queue.indices && player.rate == 0f &&
+            isLoading = currentIndex in queue.indices && playWhenReady &&
                 player.currentItem?.isPlaybackLikelyToKeepUp() == false,
         )
     }
@@ -472,7 +486,7 @@ internal class IosPlaybackController(
             currentIndex = currentIndex,
             positionMs = positionMs.coerceAtLeast(0),
             durationMs = duration,
-            isPlaying = player.rate > 0f,
+            isPlaying = playWhenReady,
             isLoading = isLoading,
             origin = origin,
         )
@@ -560,5 +574,10 @@ internal fun indexAfterQueueAppend(
 } else {
     currentIndex
 }
+
+internal enum class PlaybackToggleAction { Play, Pause }
+
+internal fun playbackToggleAction(playWhenReady: Boolean): PlaybackToggleAction =
+    if (playWhenReady) PlaybackToggleAction.Pause else PlaybackToggleAction.Play
 
 private const val PREVIOUS_RESTART_THRESHOLD_MS = 3_000L

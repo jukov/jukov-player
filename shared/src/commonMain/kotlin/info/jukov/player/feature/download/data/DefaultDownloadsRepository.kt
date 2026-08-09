@@ -12,11 +12,13 @@ import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -137,21 +139,25 @@ class DefaultDownloadsRepository(
     override suspend fun removeTracks(trackIds: List<String>) {
         val key = accountKey() ?: return
         if (trackIds.isEmpty()) return
-        platform.cancelTracks(key, trackIds)
-        val removed = dao.removeOfflineTracks(key, trackIds)
-        platform.deleteTracks(key, removed.trackPaths)
-        platform.deleteArtworks(key, removed.artworkPaths)
+        withContext(NonCancellable) {
+            platform.cancelTracks(key, trackIds)
+            val removed = dao.removeOfflineTracks(key, trackIds)
+            platform.deleteTracks(key, removed.trackPaths)
+            platform.deleteArtworks(key, removed.artworkPaths)
+        }
     }
 
     override suspend fun cancelAlbum(albumId: String) {
         val key = accountKey() ?: return
-        val tracks = dao.offlineAlbumTracks(key, albumId)
-        dao.deleteAlbumOwnerships(key, albumId)
-        dao.deleteOfflineAlbum(key, albumId)
-        tracks.forEach { track ->
-            if (dao.ownershipCount(key, track.trackId) == 0) {
-                platform.cancelTrack(key, track.trackId)
-                removeTrackIfUnowned(key, track.trackId)
+        withContext(NonCancellable) {
+            val tracks = dao.offlineAlbumTracks(key, albumId)
+            dao.deleteAlbumOwnerships(key, albumId)
+            dao.deleteOfflineAlbum(key, albumId)
+            tracks.forEach { track ->
+                if (dao.ownershipCount(key, track.trackId) == 0) {
+                    platform.cancelTrack(key, track.trackId)
+                    removeTrackIfUnowned(key, track.trackId)
+                }
             }
         }
     }
@@ -168,9 +174,11 @@ class DefaultDownloadsRepository(
 
     override suspend fun clearCurrentAccount() {
         val key = accountKey() ?: return
-        platform.cancelAccount(key)
-        platform.deleteAccount(key)
-        dao.clearOfflineAccount(key)
+        withContext(NonCancellable) {
+            platform.cancelAccount(key)
+            platform.deleteAccount(key)
+            dao.clearOfflineAccount(key)
+        }
     }
 
     override suspend fun reconcile() {
