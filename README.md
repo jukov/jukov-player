@@ -19,6 +19,31 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 - Android app: `./gradlew :androidApp:assembleDebug`
 - iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there.
 
+### Signed Android release
+
+Generate a release key (keep this file and its passwords backed up):
+
+```shell
+mkdir -p release
+keytool -genkeypair -v \
+  -keystore release/jukov-player.jks \
+  -alias jukov-player \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Copy `keystore.properties.example` to `keystore.properties`, then replace the
+placeholder passwords. Both the properties file and keystores are ignored by
+Git. The same settings can instead be supplied with these environment variables:
+`JUKOV_RELEASE_STORE_FILE`, `JUKOV_RELEASE_STORE_PASSWORD`,
+`JUKOV_RELEASE_KEY_ALIAS`, and `JUKOV_RELEASE_KEY_PASSWORD`.
+
+Build and install the signed release on a connected device:
+
+```shell
+./gradlew :androidApp:assembleRelease
+adb install -r androidApp/build/outputs/apk/release/androidApp-release.apk
+```
+
 ### Running tests
 
 Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:

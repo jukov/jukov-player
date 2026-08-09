@@ -6,7 +6,6 @@
 - App name
 - Long loading of all tracks list even if cache is presented
 - Clear queue
-- List scroll jank
 
 # V2
 - History
