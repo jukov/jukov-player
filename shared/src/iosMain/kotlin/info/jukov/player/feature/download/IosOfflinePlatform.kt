@@ -199,12 +199,27 @@ class IosOfflinePlatform internal constructor(
         location: NSURL,
     ) {
         val metadata = parseIosTaskDescription(downloadTask.taskDescription) ?: return
+        val durableLocation = stagingUrl(metadata, downloadTask.taskIdentifier)
+        durableLocation.ensureParentDirectory()
+        durableLocation.removeIfPresent()
+        if (!fileManager.moveItemAtURL(location, durableLocation, error = null)) {
+            beginCallbackProcessing()
+            scope.launch {
+                try {
+                    markTaskFailed(metadata, "Cannot retain temporary download")
+                } finally {
+                    endCallbackProcessing()
+                }
+            }
+            return
+        }
         completedLocations += downloadTask.taskIdentifier
         beginCallbackProcessing()
         scope.launch {
             try {
-                processCompletedDownload(downloadTask, location, metadata)
+                processCompletedDownload(downloadTask, durableLocation, metadata)
             } finally {
+                durableLocation.removeIfPresent()
                 endCallbackProcessing()
             }
         }
@@ -242,6 +257,7 @@ class IosOfflinePlatform internal constructor(
     }
 
     private suspend fun schedulePending(accountKey: String) {
+        cleanupStaleStaging()
         val sessionState = authRepository.authState.value as? AuthState.LoggedIn
         if (sessionState?.session?.accountKey != accountKey) {
             dao.failPendingOfflineTracks(accountKey, "Authentication required")
@@ -511,6 +527,33 @@ class IosOfflinePlatform internal constructor(
         accountKey, ARTWORK_DIRECTORY,
     ).URLByAppendingPathComponent("${safeComponent(coverArtId)}.image")!!
 
+    private fun stagingUrl(metadata: IosDownloadTaskMetadata, taskIdentifier: ULong): NSURL =
+        applicationSupportUrl
+            .URLByAppendingPathComponent(STAGING_DIRECTORY, isDirectory = true)!!
+            .URLByAppendingPathComponent(
+                "${safeComponent(metadata.description)}-$taskIdentifier.download",
+            )!!
+
+    private fun cleanupStaleStaging() {
+        val stagingDirectory = applicationSupportUrl.URLByAppendingPathComponent(
+            STAGING_DIRECTORY,
+            isDirectory = true,
+        ) ?: return
+        val cutoff = NSDate.dateWithTimeIntervalSinceNow(-STALE_PART_AGE_SECONDS)
+        fileManager.contentsOfDirectoryAtURL(
+            url = stagingDirectory,
+            includingPropertiesForKeys = listOf(NSURLContentModificationDateKey),
+            options = 0u,
+            error = null,
+        ).orEmpty().filterIsInstance<NSURL>().filter { url ->
+            (url.resourceValuesForKeys(
+                keys = listOf(NSURLContentModificationDateKey),
+                error = null,
+            )?.get(NSURLContentModificationDateKey) as? NSDate)
+                ?.compare(cutoff) == NSOrderedAscending
+        }.forEach { it.removeIfPresent() }
+    }
+
     private fun relative(url: NSURL, accountKey: String): String {
         val root = requireNotNull(accountUrl(accountKey).path).trimEnd('/')
         val path = requireNotNull(url.path)
@@ -671,6 +714,7 @@ private const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-comple
 private const val OFFLINE_DIRECTORY = "offline"
 private const val TRACKS_DIRECTORY = "tracks"
 private const val ARTWORK_DIRECTORY = "artwork"
+private const val STAGING_DIRECTORY = "offline-staging"
 private const val TASK_TRACK = "track"
 private const val TASK_ARTWORK = "artwork"
 private const val TASK_SEPARATOR = ":"

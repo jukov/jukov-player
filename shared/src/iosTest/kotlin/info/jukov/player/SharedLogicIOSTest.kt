@@ -4,6 +4,11 @@ import info.jukov.player.feature.download.safeComponent
 import info.jukov.player.feature.download.isSafeRelativePath
 import info.jukov.player.feature.download.iosTaskDescription
 import info.jukov.player.feature.download.parseIosTaskDescription
+import info.jukov.player.core.data.cache.migrateLegacyDatabaseIfNeeded
+import kotlinx.cinterop.ExperimentalForeignApi
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSTemporaryDirectory
+import platform.Foundation.NSUUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -46,5 +51,43 @@ class SharedLogicIOSTest {
         assertFalse(description.contains("secret"))
         assertNull(parseIosTaskDescription("track:missing-id"))
         assertNull(parseIosTaskDescription("unknown:token:id"))
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    @Test
+    fun legacyDatabaseAndSidecarsMoveToApplicationSupportLocation() {
+        val fileManager = NSFileManager.defaultManager
+        val directory = "${NSTemporaryDirectory()}/jukov-db-${NSUUID.UUID().UUIDString}"
+        assertTrue(
+            fileManager.createDirectoryAtPath(
+                path = directory,
+                withIntermediateDirectories = true,
+                attributes = null,
+                error = null,
+            ),
+        )
+        val legacyPath = "$directory/legacy.db"
+        val destinationPath = "$directory/application-support.db"
+        listOf("", "-wal", "-shm").forEach { suffix ->
+            assertTrue(
+                fileManager.createFileAtPath(
+                    path = legacyPath + suffix,
+                    contents = null,
+                    attributes = null,
+                ),
+            )
+        }
+        try {
+            assertEquals(
+                destinationPath,
+                migrateLegacyDatabaseIfNeeded(fileManager, legacyPath, destinationPath),
+            )
+            listOf("", "-wal", "-shm").forEach { suffix ->
+                assertTrue(fileManager.fileExistsAtPath(destinationPath + suffix))
+                assertFalse(fileManager.fileExistsAtPath(legacyPath + suffix))
+            }
+        } finally {
+            fileManager.removeItemAtPath(directory, error = null)
+        }
     }
 }
