@@ -20,7 +20,7 @@ import kotlinx.coroutines.Job
 import info.jukov.player.feature.playback.domain.PlaybackQueueResolver
 
 data class PlayerUiState(
-    val queue: List<Track> = emptyList(),
+    val queue: List<PlayerQueueItem> = emptyList(),
     val currentIndex: Int = -1,
     val currentTrack: Track? = null,
     val positionMs: Long = 0,
@@ -31,12 +31,19 @@ data class PlayerUiState(
     val origin: PlaybackOrigin = PlaybackOrigin.TrackList,
 )
 
+data class PlayerQueueItem(
+    val uiId: String,
+    val track: Track,
+)
+
 class PlayerViewModel(
     private val controller: PlaybackController,
     private val favoriteDelegate: FavoriteDelegate,
     private val queueResolver: PlaybackQueueResolver,
 ) : ViewModel() {
     private var playJob: Job? = null
+    private var nextQueueItemId = 0L
+    private var queueItems = emptyList<PlayerQueueItem>()
     private val favoriteOverrides = MutableStateFlow<Map<String, Boolean>>(emptyMap())
 
     val state: StateFlow<LoadableState<PlayerUiState>> = combine(
@@ -86,12 +93,43 @@ class PlayerViewModel(
     fun previous() = controller.previous()
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
     fun playAt(index: Int) = controller.playAt(index)
-    fun moveQueueItem(fromIndex: Int, toIndex: Int) = controller.moveQueueItem(fromIndex, toIndex)
-    fun removeQueueItem(index: Int) = controller.removeQueueItems(setOf(index))
-    fun removeQueueItems(indices: Set<Int>) = controller.removeQueueItems(indices)
-    fun moveQueueItemsToTop(indices: Set<Int>) = controller.moveQueueItemsToTop(indices)
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        val currentIndex = state.value.content?.currentIndex ?: return
+        if (
+            fromIndex !in queueItems.indices ||
+            toIndex !in queueItems.indices ||
+            fromIndex <= currentIndex ||
+            toIndex <= currentIndex ||
+            fromIndex == toIndex
+        ) {
+            return
+        }
+        queueItems = queueItems.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+        controller.moveQueueItem(fromIndex, toIndex)
+    }
+    fun removeQueueItem(index: Int) = removeQueueItems(setOf(index))
+    fun removeQueueItems(indices: Set<Int>) {
+        val currentIndex = state.value.content?.currentIndex ?: return
+        queueItems = queueItems.filterIndexed { index, _ ->
+            index <= currentIndex || index !in indices
+        }
+        controller.removeQueueItems(indices)
+    }
+    fun moveQueueItemsToTop(indices: Set<Int>) {
+        val currentIndex = state.value.content?.currentIndex ?: return
+        val selected = indices.filter { it in queueItems.indices && it > currentIndex }.sorted()
+        if (selected.isEmpty()) return
+        val prefix = queueItems.take(currentIndex + 1)
+        val moved = selected.map(queueItems::get)
+        val remaining = queueItems.drop(currentIndex + 1).filterIndexed { offset, _ ->
+            currentIndex + 1 + offset !in selected
+        }
+        queueItems = prefix + moved + remaining
+        controller.moveQueueItemsToTop(indices)
+    }
     fun stopAndClear() {
         playJob?.cancel()
+        queueItems = emptyList()
         controller.stopAndClear()
     }
     fun toggleFavorite() {
@@ -108,7 +146,7 @@ class PlayerViewModel(
     }
 
     private fun PlaybackSnapshot.toUiState(favoriteOverrides: Map<String, Boolean>) = PlayerUiState(
-        queue = queue,
+        queue = reconcileQueue(queue),
         currentIndex = currentIndex,
         currentTrack = currentTrack?.let { track ->
             favoriteOverrides[track.id]?.let { track.copy(isFavorite = it) } ?: track
@@ -120,6 +158,25 @@ class PlayerViewModel(
         hasNext = hasNext,
         origin = origin,
     )
+
+    private fun reconcileQueue(tracks: List<Track>): List<PlayerQueueItem> {
+        if (
+            tracks.size == queueItems.size &&
+            tracks.indices.all { index -> tracks[index] == queueItems[index].track }
+        ) {
+            return queueItems
+        }
+        val unmatched = queueItems.toMutableList()
+        queueItems = tracks.map { track ->
+            val existingIndex = unmatched.indexOfFirst { it.track == track }
+            if (existingIndex >= 0) {
+                unmatched.removeAt(existingIndex)
+            } else {
+                PlayerQueueItem(uiId = "queue-item-${nextQueueItemId++}", track = track)
+            }
+        }
+        return queueItems
+    }
 
     private fun <T, R> LoadableState<T>.mapContent(transform: (T) -> R): LoadableState<R> =
         when (this) {

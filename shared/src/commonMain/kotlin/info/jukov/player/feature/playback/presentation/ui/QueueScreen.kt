@@ -81,12 +81,12 @@ fun QueueScreen(
     onMoveSelectedToTop: (Set<Int>) -> Unit,
 ) {
     var selectedIds by remember { mutableStateOf(emptySet<String>()) }
-    var draggedTrackId by remember { mutableStateOf<String?>(null) }
-    val visibleTracks = state.queue.drop(state.currentIndex.coerceAtLeast(0))
-    val validFutureIds = state.queue.drop(state.currentIndex + 1).mapTo(mutableSetOf(), Track::id)
+    var draggedItemId by remember { mutableStateOf<String?>(null) }
+    val visibleItems = state.queue.drop(state.currentIndex.coerceAtLeast(0))
+    val validFutureIds = state.queue.drop(state.currentIndex + 1).mapTo(mutableSetOf()) { it.uiId }
     LaunchedEffect(validFutureIds) { selectedIds = selectedIds intersect validFutureIds }
-    val selectedIndices = state.queue.mapIndexedNotNull { index, track ->
-        index.takeIf { index > state.currentIndex && track.id in selectedIds }
+    val selectedIndices = state.queue.mapIndexedNotNull { index, item ->
+        index.takeIf { index > state.currentIndex && item.uiId in selectedIds }
     }.toSet()
 
     Scaffold(
@@ -123,7 +123,7 @@ fun QueueScreen(
             )
         },
     ) { contentPadding ->
-        if (visibleTracks.isEmpty()) {
+        if (visibleItems.isEmpty()) {
             Box(
                 Modifier.fillMaxSize().padding(contentPadding)
                     .padding(androidx.compose.foundation.layout.PaddingValues().withPlayerBottomInset()),
@@ -137,9 +137,10 @@ fun QueueScreen(
                 verticalArrangement = Arrangement.spacedBy(Padding.xSmall),
             ) {
                 itemsIndexed(
-                    items = visibleTracks,
-                    key = { _, track -> track.id },
-                ) { visibleIndex, track ->
+                    items = visibleItems,
+                    key = { _, item -> item.uiId },
+                ) { visibleIndex, item ->
+                    val track = item.track
                     val absoluteIndex = state.currentIndex + visibleIndex
                     val isCurrent = visibleIndex == 0
                     if (isCurrent) {
@@ -164,20 +165,24 @@ fun QueueScreen(
                             absoluteIndex = absoluteIndex,
                             currentIndex = state.currentIndex,
                             lastIndex = state.queue.lastIndex,
-                            selected = track.id in selectedIds,
+                            selected = item.uiId in selectedIds,
                             onSelectedChange = { selected ->
-                                selectedIds = if (selected) selectedIds + track.id else selectedIds - track.id
+                                selectedIds = if (selected) {
+                                    selectedIds + item.uiId
+                                } else {
+                                    selectedIds - item.uiId
+                                }
                             },
                             onClick = { onPlayAt(absoluteIndex) },
                             onMove = onMove,
                             onDraggingChange = { dragging ->
-                                draggedTrackId = track.id.takeIf { dragging }
+                                draggedItemId = item.uiId.takeIf { dragging }
                             },
                             onRemove = {
-                                selectedIds -= track.id
+                                selectedIds -= item.uiId
                                 onRemove(absoluteIndex)
                             },
-                            modifier = if (draggedTrackId == track.id) {
+                            modifier = if (draggedItemId == item.uiId) {
                                 Modifier.animateItem(placementSpec = null)
                             } else {
                                 Modifier.animateItem()
@@ -185,7 +190,7 @@ fun QueueScreen(
                         )
                     }
                 }
-                if (visibleTracks.size == 1) {
+                if (visibleItems.size == 1) {
                     item {
                         Box(
                             Modifier.fillMaxWidth().padding(Padding.large),
