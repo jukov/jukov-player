@@ -10,6 +10,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import info.jukov.player.feature.download.domain.OfflinePlatform
+import info.jukov.player.feature.download.domain.OfflinePlatformFactory
 import java.io.File
 
 class AndroidOfflinePlatform(context: Context) : OfflinePlatform {
@@ -131,4 +132,15 @@ class AndroidOfflinePlatform(context: Context) : OfflinePlatform {
             Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING,
         )
     }
+}
+
+class AndroidOfflinePlatformFactory(
+    private val context: Context,
+) : OfflinePlatformFactory {
+    override fun create(
+        authRepository: info.jukov.player.feature.auth.domain.AuthRepository,
+        dao: info.jukov.player.core.data.cache.CacheDao,
+        client: info.jukov.player.subsonic.data.SubsonicApiClient,
+        scope: kotlinx.coroutines.CoroutineScope,
+    ): OfflinePlatform = AndroidOfflinePlatform(context)
 }

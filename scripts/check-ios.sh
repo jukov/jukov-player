@@ -30,3 +30,12 @@ xcodebuild \
   -derivedDataPath .context/DerivedData/iosApp \
   CODE_SIGNING_ALLOWED=NO \
   build
+
+xcodebuild \
+  -project iosApp/iosApp.xcodeproj \
+  -scheme iosApp \
+  -configuration Release \
+  -sdk iphoneos \
+  -derivedDataPath .context/DerivedData/iosApp-device \
+  CODE_SIGNING_ALLOWED=NO \
+  build

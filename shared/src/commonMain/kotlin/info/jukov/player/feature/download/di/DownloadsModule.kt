@@ -9,6 +9,7 @@ import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.feature.download.data.DefaultDownloadsRepository
 import info.jukov.player.feature.download.domain.DownloadsRepository
 import info.jukov.player.feature.download.domain.OfflinePlatform
+import info.jukov.player.feature.download.domain.OfflinePlatformFactory
 import info.jukov.player.feature.track.data.TracksApi
 import info.jukov.player.feature.download.presentation.DownloadsViewModel
 import info.jukov.player.feature.download.presentation.DownloadDelegate
@@ -23,6 +24,16 @@ object DownloadsModule {
     @Provides
     @SingleIn(AppScope::class)
     fun provideDownloadScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideOfflinePlatform(
+        factory: OfflinePlatformFactory,
+        authRepository: AuthRepository,
+        dao: CacheDao,
+        client: SubsonicApiClient,
+        scope: CoroutineScope,
+    ): OfflinePlatform = factory.create(authRepository, dao, client, scope)
 
     @Provides
     @SingleIn(AppScope::class)

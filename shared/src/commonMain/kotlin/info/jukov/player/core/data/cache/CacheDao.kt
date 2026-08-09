@@ -111,6 +111,14 @@ interface CacheDao {
     @Query("UPDATE OfflineTrackEntity SET state=:state, downloadedBytes=:downloadedBytes, expectedSize=:expectedSize, relativePath=:relativePath, error=:error, completedAtMs=:completedAtMs WHERE accountKey=:accountKey AND trackId=:trackId")
     suspend fun updateOfflineTrackState(accountKey: String, trackId: String, state: String, downloadedBytes: Long, expectedSize: Long?, relativePath: String?, error: String?, completedAtMs: Long?)
 
+    @Query("UPDATE OfflineTrackEntity SET state='Downloading', downloadedBytes=:downloadedBytes, expectedSize=COALESCE(:expectedSize, expectedSize), error=NULL, completedAtMs=NULL WHERE accountKey=:accountKey AND trackId=:trackId AND state IN ('Queued','Downloading')")
+    suspend fun updateOfflineTrackProgress(
+        accountKey: String,
+        trackId: String,
+        downloadedBytes: Long,
+        expectedSize: Long?,
+    )
+
     @Query("DELETE FROM DownloadOwnershipEntity WHERE accountKey=:accountKey AND trackId=:trackId")
     suspend fun deleteTrackOwnerships(accountKey: String, trackId: String)
 
