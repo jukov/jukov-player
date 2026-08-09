@@ -6,8 +6,17 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
+xcode_developer_dir="${XCODE_DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 if ! xcodebuild -version >/dev/null 2>&1; then
-  echo "xcodebuild requires a full Xcode installation. Select it with xcode-select before running iOS checks." >&2
+  if [[ ! -x "$xcode_developer_dir/usr/bin/xcodebuild" ]]; then
+    echo "xcodebuild requires a full Xcode installation. Set XCODE_DEVELOPER_DIR if Xcode is not installed at /Applications/Xcode.app." >&2
+    exit 1
+  fi
+  export DEVELOPER_DIR="$xcode_developer_dir"
+fi
+
+if ! xcodebuild -version >/dev/null 2>&1; then
+  echo "xcodebuild is not usable with DEVELOPER_DIR=$DEVELOPER_DIR." >&2
   exit 1
 fi
 

@@ -23,8 +23,12 @@ if [[ -z "${ANDROID_HOME:-}" && -z "${ANDROID_SDK_ROOT:-}" && ! -f "local.proper
   exit 1
 fi
 
-if [[ "${CONDUCTOR_IS_LOCAL:-0}" == "1" ]] && ! xcodebuild -version >/dev/null 2>&1; then
-  echo "xcodebuild requires a full Xcode installation; iOS checks will not run locally until full Xcode is selected." >&2
+if [[ "${CONDUCTOR_IS_LOCAL:-0}" == "1" ]]; then
+  xcode_developer_dir="${XCODE_DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+  if ! xcodebuild -version >/dev/null 2>&1 &&
+    [[ ! -x "$xcode_developer_dir/usr/bin/xcodebuild" ]]; then
+    echo "xcodebuild requires a full Xcode installation. Set XCODE_DEVELOPER_DIR if Xcode is not installed at /Applications/Xcode.app." >&2
+  fi
 fi
 
 echo "Environment looks ready for Android checks."
