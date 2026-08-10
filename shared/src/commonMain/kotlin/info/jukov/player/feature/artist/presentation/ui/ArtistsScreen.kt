@@ -47,7 +47,6 @@ fun ArtistsScreen(
     viewModel: ArtistsViewModel,
     onBack: () -> Unit,
     onArtistClick: (Artist) -> Unit,
-    onAllAlbumsClick: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
@@ -93,7 +92,6 @@ fun ArtistsScreen(
             Column {
                 ArtistsTopAppBar(
                     onBack = onBack,
-                    onAllAlbumsClick = onAllAlbumsClick,
                     onSearchClick = viewModel::openSearch,
                     searchQuery = searchQuery.takeIf { searchActive },
                     onSearchQueryChange = viewModel::updateSearchQuery,
@@ -146,15 +144,12 @@ fun ArtistsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun ArtistsTopAppBar(
     onBack: () -> Unit,
-    onAllAlbumsClick: () -> Unit,
     onSearchClick: () -> Unit,
     searchQuery: String?,
     onSearchQueryChange: (String) -> Unit,
     onSearchClose: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
-
     AppFlexibleTopAppBar(
         title = stringResource(Res.string.artists),
         scrollBehavior = scrollBehavior,
@@ -171,26 +166,6 @@ private fun ArtistsTopAppBar(
         },
         actions = {
             SearchAction(onSearchClick)
-            IconButton(
-                onClick = { menuExpanded = true },
-            ) {
-                Icon(
-                    painter = painterResource(Res.drawable.more_vert),
-                    contentDescription = stringResource(Res.string.more),
-                )
-            }
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false },
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(Res.string.all_albums)) },
-                    onClick = {
-                        menuExpanded = false
-                        onAllAlbumsClick()
-                    },
-                )
-            }
         },
     )
 }
