@@ -17,11 +17,12 @@ This repository uses a lightweight task flow built around Conductor workspaces, 
 ## Local Commands
 
 - Setup check: `./scripts/check-env.sh`
+- Unit check: `./scripts/check-unit.sh`
 - Fast check: `./scripts/check-fast.sh`
 - Full local check: `./scripts/check-full.sh`
 - iOS-only check: `./scripts/check-ios.sh`
 
-`check-fast.sh` runs shared Android host tests, debug Android build, and Android lint. `check-full.sh` runs fast checks and adds iOS checks on macOS. iOS checks require a full Xcode installation selected by `xcode-select`.
+`check-unit.sh` runs shared Android host tests for the shortest development loop. `check-fast.sh` adds the debug Android build and Android lint. `check-full.sh` runs fast checks and adds iOS tests and a Debug simulator build on macOS. iOS checks require a full Xcode installation selected by `xcode-select`.
 
 ## CI
 
@@ -33,9 +34,11 @@ Every PR and push to `main` runs Linux fast checks:
 
 macOS iOS checks run only when needed:
 
-- on PRs that touch `shared/**`, `iosApp/**`, Gradle files, or build logic;
+- on PRs that touch shared common/iOS sources, `iosApp/**`, Gradle files, or build logic;
 - on nightly scheduled runs;
 - on manual `workflow_dispatch`.
+
+The iOS simulator checks start independently from Linux checks. The slower Release device build runs only in the nightly schedule and does not block pull requests.
 
 Every PR also reports a stable `Required PR checks` gate. Branch protection for `main`
 requires this gate and an up-to-date branch before merge. The gate requires Linux fast

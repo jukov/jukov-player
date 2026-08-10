@@ -8,6 +8,11 @@ file_include_globs = [
 setup = "./scripts/check-env.sh"
 run_mode = "concurrent"
 
+[scripts.run.unit-check]
+command = "./scripts/check-unit.sh"
+default = true
+icon = "zap"
+
 [scripts.run.fast-check]
 command = "./scripts/check-fast.sh"
 icon = "test-tube"
