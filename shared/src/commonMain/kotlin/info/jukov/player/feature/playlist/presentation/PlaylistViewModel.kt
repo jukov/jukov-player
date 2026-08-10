@@ -28,6 +28,8 @@ class PlaylistViewModel(
     val state = _state.asStateFlow()
     private val _messages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
     val messages = _messages.asSharedFlow()
+    private val _pending = MutableStateFlow(false)
+    val pending = _pending.asStateFlow()
     val downloadStatuses = downloadDelegate.trackStatuses
     val artworkUris = downloadDelegate.artworkUris
     private var id: String? = null
@@ -80,18 +82,31 @@ class PlaylistViewModel(
         }
     }
 
-    fun remove(indexes: List<Int>) = mutate {
-        repository.removeTracks(requireNotNull(id), indexes)
-    }
+    fun remove(indexes: List<Int>) = mutate(
+        action = { repository.removeTracks(requireNotNull(id), indexes) },
+    )
+
+    fun update(name: String, isPublic: Boolean, onUpdated: () -> Unit) = mutate(
+        action = { repository.updatePlaylist(requireNotNull(id), name.trim(), isPublic) },
+        onSuccess = onUpdated,
+    )
 
     fun delete(onDeleted: () -> Unit) = viewModelScope.launch {
+        _pending.value = true
         repository.deletePlaylist(requireNotNull(id))
             .onSuccess { onDeleted() }
             .onFailure { _messages.tryEmit(it.toAppError(AppError.PlaylistUpdateFailed)) }
+        _pending.value = false
     }
 
-    private fun mutate(action: suspend () -> Result<Unit>) = viewModelScope.launch {
+    private fun mutate(
+        action: suspend () -> Result<Unit>,
+        onSuccess: () -> Unit = {},
+    ) = viewModelScope.launch {
+        _pending.value = true
         action()
+            .onSuccess { onSuccess() }
             .onFailure { _messages.tryEmit(it.toAppError(AppError.PlaylistUpdateFailed)) }
+        _pending.value = false
     }
 }

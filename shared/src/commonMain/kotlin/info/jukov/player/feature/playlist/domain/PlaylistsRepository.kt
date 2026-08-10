@@ -9,7 +9,12 @@ interface PlaylistsRepository {
     fun playlist(id: String): Flow<LoadableState<Playlist>>
     suspend fun loadPlaylists(forceRefresh: Boolean = false): Result<Unit>
     suspend fun loadPlaylist(id: String, forceRefresh: Boolean = false): Result<Unit>
-    suspend fun createPlaylist(name: String, songIds: List<String> = emptyList()): Result<Unit>
+    suspend fun createPlaylist(
+        name: String,
+        isPublic: Boolean,
+        songIds: List<String> = emptyList(),
+    ): Result<PlaylistCreationResult>
+    suspend fun updatePlaylist(id: String, name: String, isPublic: Boolean): Result<Unit>
     suspend fun addTracks(playlistId: String, songIds: List<String>): Result<Unit>
     suspend fun removeTracks(playlistId: String, songIndexes: List<Int>): Result<Unit>
     suspend fun deletePlaylist(id: String): Result<Unit>

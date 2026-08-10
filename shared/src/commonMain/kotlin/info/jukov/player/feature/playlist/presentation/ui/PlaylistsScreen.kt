@@ -1,7 +1,9 @@
 package info.jukov.player.feature.playlist.presentation.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +14,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import info.jukov.player.core.domain.AppError
@@ -34,6 +37,7 @@ fun PlaylistsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val pending by viewModel.pending.collectAsStateWithLifecycle()
     var creating by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     var error by remember { mutableStateOf<AppError?>(null) }
@@ -104,17 +108,25 @@ fun PlaylistsScreen(
                             headlineContent = {
                                 Text(
                                     playlist.name,
+                                    fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             },
                             supportingContent = {
-                                Text(
-                                    stringResource(
-                                        Res.string.playlist_tracks_count,
-                                        playlist.songCount,
-                                    ),
-                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(Padding.small)) {
+                                    MetadataPill(
+                                        stringResource(
+                                            Res.string.playlist_tracks_count,
+                                            playlist.songCount,
+                                        ),
+                                    )
+                                    if (playlist.isPublic) {
+                                        MetadataPill(
+                                            stringResource(Res.string.playlist_public_label),
+                                        )
+                                    }
+                                }
                             },
                             trailingContent = {
                                 if (!viewModel.isEditable(playlist)) {
@@ -130,9 +142,11 @@ fun PlaylistsScreen(
     }
     if (creating) {
         CreatePlaylistDialog(
-            pending = false,
+            pending = pending,
             onDismiss = { creating = false },
-            onCreate = { viewModel.create(it) { creating = false } },
+            onCreate = { name, isPublic ->
+                viewModel.create(name, isPublic) { creating = false }
+            },
         )
     }
 }
