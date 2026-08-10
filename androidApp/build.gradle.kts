@@ -4,6 +4,8 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.googleServices)
+    alias(libs.plugins.firebaseCrashlytics)
 }
 
 kotlin {
@@ -15,12 +17,15 @@ dependencies {
     implementation(project(":shared"))
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.fragment)
     implementation(libs.compose.uiToolingPreview)
     implementation(libs.androidx.room3.runtime)
     implementation(libs.androidx.work.runtime)
     implementation(libs.ktor.client.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.multiplatform.settings.no.arg)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
     debugImplementation(libs.compose.uiTooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     androidTestImplementation(libs.kotlin.testJunit)

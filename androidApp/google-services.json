@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "45823112596",
+    "project_id": "the-only-player",
+    "storage_bucket": "the-only-player.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:45823112596:android:cf0f57d3b872b09b138b81",
+        "android_client_info": {
+          "package_name": "info.jukov.player"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGhhM7xwO820mM9jqGpGQoPid-XrTw-sM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:45823112596:android:8cd3ed012a19fc1a138b81",
+        "android_client_info": {
+          "package_name": "info.jukov.player.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGhhM7xwO820mM9jqGpGQoPid-XrTw-sM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
