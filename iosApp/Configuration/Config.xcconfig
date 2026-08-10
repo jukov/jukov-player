@@ -1,4 +1,6 @@
 TEAM_ID=
+// Define TEAM_ID in the gitignored Local.xcconfig for device signing.
+#include? "Local.xcconfig"
 
 PRODUCT_NAME=Jukovplayer
 PRODUCT_BUNDLE_IDENTIFIER=info.jukov.player.Jukovplayer$(TEAM_ID)

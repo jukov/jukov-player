@@ -2,6 +2,7 @@
 
 file_include_globs = [
     "local.properties",
+    "iosApp/Configuration/Local.xcconfig",
 ]
 
 [scripts]
@@ -25,3 +26,8 @@ icon = "shield-check"
 available_in = [ "local" ]
 command = "./scripts/check-ios.sh"
 icon = "smartphone"
+
+[scripts.run.open-xcode]
+available_in = [ "local" ]
+command = "open \"$CONDUCTOR_ROOT_PATH/iosApp/iosApp.xcodeproj\""
+icon = "app-window"
