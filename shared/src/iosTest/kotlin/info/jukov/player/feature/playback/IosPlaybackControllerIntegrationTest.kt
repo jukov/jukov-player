@@ -2,11 +2,17 @@ package info.jukov.player.feature.playback
 
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.LoadableState
+import info.jukov.player.feature.favorite.domain.FavoriteChange
+import info.jukov.player.feature.favorite.domain.FavoriteMutator
 import info.jukov.player.feature.playback.data.PersistedPlaybackState
 import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.track.domain.Track
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import platform.AVFAudio.AVAudioSessionInterruptionOptionShouldResume
 import platform.AVFAudio.AVAudioSessionInterruptionTypeBegan
 import platform.AVFAudio.AVAudioSessionInterruptionTypeEnded
@@ -74,8 +80,33 @@ class IosPlaybackControllerIntegrationTest {
         assertEquals(0, controller.state.value.content?.currentIndex)
     }
 
+    @Test
+    fun remoteFavoriteUsesFeedbackDirectionAndPersistsState() {
+        val store = RecordingPlaybackStore(saved(queueSize = 1))
+        val controller = controller(store)
+
+        assertEquals(MPRemoteCommandHandlerStatusSuccess, controller.remoteFavorite(isNegative = false))
+        assertTrue(controller.state.value.content?.currentTrack?.isFavorite == true)
+        assertTrue(store.current?.queue?.single()?.isFavorite == true)
+
+        assertEquals(MPRemoteCommandHandlerStatusSuccess, controller.remoteFavorite(isNegative = true))
+        assertFalse(controller.state.value.content?.currentTrack?.isFavorite ?: true)
+        assertFalse(store.current?.queue?.single()?.isFavorite ?: true)
+    }
+
+    @Test
+    fun remoteFavoriteRejectsMissingCurrentTrack() {
+        val controller = controller(RecordingPlaybackStore())
+
+        assertEquals(
+            MPRemoteCommandHandlerStatusNoSuchContent,
+            controller.remoteFavorite(isNegative = false),
+        )
+    }
+
     private fun controller(store: PlaybackStore) = IosPlaybackController(
         playbackStore = store,
+        favoriteMutator = RecordingFavoriteMutator(),
         installSystemIntegrations = false,
         audioSessionActivation = { true },
     )
@@ -99,6 +130,19 @@ class IosPlaybackControllerIntegrationTest {
             durationMs = 10_000,
             isFavorite = false,
         )
+    }
+}
+
+private class RecordingFavoriteMutator : FavoriteMutator {
+    override val pending: StateFlow<Set<String>> = MutableStateFlow(emptySet())
+    override val changes: SharedFlow<FavoriteChange> = MutableSharedFlow()
+
+    override suspend fun set(
+        track: Track,
+        isFavorite: Boolean,
+        updateFavorite: (Boolean) -> Unit,
+    ) {
+        updateFavorite(isFavorite)
     }
 }
 

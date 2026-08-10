@@ -1,25 +1,46 @@
 package info.jukov.player.feature.playback
 
+import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import info.jukov.player.di.AndroidAppGraphOwner
+import info.jukov.player.feature.auth.domain.AuthState
+import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.playback.data.PlaybackStore
+import info.jukov.player.feature.playback.domain.trackById
+import info.jukov.player.feature.playback.domain.updateTrackFavorite
+import jukovplayer.shared.generated.resources.Res
+import jukovplayer.shared.generated.resources.add_to_favorites
+import jukovplayer.shared.generated.resources.remove_from_favorites
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
 
+@androidx.annotation.OptIn(UnstableApi::class)
 class PlaybackService : MediaLibraryService() {
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaLibrarySession
     private lateinit var store: PlaybackStore
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val graph by lazy { (application as AndroidAppGraphOwner).graph }
 
     override fun onCreate() {
         super.onCreate()
-        store = (application as AndroidAppGraphOwner).graph.playbackStore
+        store = graph.playbackStore
         player = ExoPlayer.Builder(this)
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -32,12 +53,22 @@ class PlaybackService : MediaLibraryService() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         restoreQueue()
+        player.addListener(
+            object : Player.Listener {
+                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                    refreshFavoriteButton()
+                }
+            },
+        )
         session = MediaLibrarySession.Builder(this, player, LibraryCallback()).build()
+        observeFavoriteState()
+        refreshFavoriteButton()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = session
 
     override fun onDestroy() {
+        serviceScope.cancel()
         session.release()
         player.release()
         super.onDestroy()
@@ -58,7 +89,96 @@ class PlaybackService : MediaLibraryService() {
         player.prepare()
     }
 
+    private fun observeFavoriteState() {
+        serviceScope.launch {
+            graph.favoriteMutator.changes.collect { change ->
+                if (change.target is FavoriteTarget.Track) {
+                    updateFavoriteState(change.target.id, change.isFavorite)
+                }
+            }
+        }
+        serviceScope.launch {
+            graph.favoriteMutator.pending.collectLatest {
+                publishFavoriteButton()
+            }
+        }
+    }
+
+    private fun refreshFavoriteButton() {
+        serviceScope.launch { publishFavoriteButton() }
+    }
+
+    private suspend fun publishFavoriteButton() {
+        if (!::session.isInitialized) {
+            return
+        }
+        val track = currentTrack()
+        if (track == null || graph.authRepository.authState.value !is AuthState.LoggedIn) {
+            session.setMediaButtonPreferences(emptyList())
+            return
+        }
+        val displayName = getString(
+            if (track.isFavorite) {
+                Res.string.remove_from_favorites
+            } else {
+                Res.string.add_to_favorites
+            },
+        )
+        session.setMediaButtonPreferences(
+            listOf(
+                favoriteCommandButton(
+                    isFavorite = track.isFavorite,
+                    enabled = track.id !in graph.favoriteMutator.pending.value,
+                    displayName = displayName,
+                ),
+            ),
+        )
+    }
+
+    private fun currentTrack() = store.read()?.trackById(player.currentMediaItem?.mediaId)
+
+    private fun updateFavoriteState(trackId: String, isFavorite: Boolean) {
+        store.updateTrackFavorite(trackId, isFavorite)
+        refreshFavoriteButton()
+    }
+
     private inner class LibraryCallback : MediaLibrarySession.Callback {
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): MediaSession.ConnectionResult {
+            val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
+                .buildUpon()
+                .add(setCurrentTrackFavoriteCommand())
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(commands)
+                .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: androidx.media3.session.SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction != ACTION_SET_CURRENT_TRACK_FAVORITE) {
+                return super.onCustomCommand(session, controller, customCommand, args)
+            }
+            val track = currentTrack()
+            if (track == null || graph.authRepository.authState.value !is AuthState.LoggedIn) {
+                return Futures.immediateFuture(
+                    SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE),
+                )
+            }
+            serviceScope.launch {
+                graph.favoriteMutator.set(track, !track.isFavorite) { isFavorite ->
+                    updateFavoriteState(track.id, isFavorite)
+                }
+            }
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+
         override fun onGetLibraryRoot(
             session: MediaLibrarySession,
             browser: MediaSession.ControllerInfo,
