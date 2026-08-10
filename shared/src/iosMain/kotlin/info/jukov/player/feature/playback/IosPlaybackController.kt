@@ -52,8 +52,10 @@ object IosPlaybackControllerFactory : PlaybackControllerFactory {
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 internal class IosPlaybackController(
     private val playbackStore: PlaybackStore,
+    private val player: AVQueuePlayer = AVQueuePlayer(),
+    private val installSystemIntegrations: Boolean = true,
+    private val audioSessionActivation: () -> Boolean = ::activateIosAudioSession,
 ) : PlaybackController {
-    private val player = AVQueuePlayer()
     private val notificationCenter = NSNotificationCenter.defaultCenter
     private val nowPlayingCenter = MPNowPlayingInfoCenter.defaultCenter()
     private val remoteCommands = MPRemoteCommandCenter.sharedCommandCenter()
@@ -76,12 +78,14 @@ internal class IosPlaybackController(
     override val state: StateFlow<LoadableState<PlaybackSnapshot>> = _state.asStateFlow()
 
     init {
-        installNotifications()
-        installRemoteCommands()
-        timeObserver = player.addPeriodicTimeObserverForInterval(
-            interval = CMTimeMakeWithSeconds(0.5, preferredTimescale = 600),
-            queue = dispatch_get_main_queue(),
-        ) { updatePlaybackState() }
+        if (installSystemIntegrations) {
+            installNotifications()
+            installRemoteCommands()
+            timeObserver = player.addPeriodicTimeObserverForInterval(
+                interval = CMTimeMakeWithSeconds(0.5, preferredTimescale = 600),
+                queue = dispatch_get_main_queue(),
+            ) { updatePlaybackState() }
+        }
         val saved = playbackStore.read()
         if (saved != null && saved.queue.isNotEmpty() && saved.currentIndex in saved.queue.indices) {
             queue = saved.queue
@@ -138,7 +142,7 @@ internal class IosPlaybackController(
             updatePlaybackState()
             return
         }
-        if (!activateAudioSession()) {
+        if (!audioSessionActivation()) {
             playWhenReady = false
             fail(AppError.PlayerConnectionFailed)
             return
@@ -304,7 +308,7 @@ internal class IosPlaybackController(
             return
         }
         if (autoplay) {
-            if (!activateAudioSession()) {
+            if (!audioSessionActivation()) {
                 playWhenReady = false
                 updatePlaybackState(positionOverrideMs = positionMs)
                 fail(AppError.PlayerConnectionFailed)
@@ -319,16 +323,6 @@ internal class IosPlaybackController(
         val url = NSURL.URLWithString(requireNotNull(streamUrl))
             ?: error("Invalid playback URL for track $id")
         return AVPlayerItem(uRL = url)
-    }
-
-    private fun activateAudioSession(): Boolean {
-        val audioSession = AVAudioSession.sharedInstance()
-        if (!audioSession.setCategory(AVAudioSessionCategoryPlayback, error = null) ||
-            !audioSession.setActive(active = true, error = null)
-        ) {
-            return false
-        }
-        return true
     }
 
     private fun installNotifications() {
@@ -358,6 +352,10 @@ internal class IosPlaybackController(
         if (notification?.`object` !== playerItems.firstOrNull()) {
             return
         }
+        handleCurrentItemEnded()
+    }
+
+    internal fun handleCurrentItemEnded() {
         val completedPositionMs = terminalPlaybackPositionMs(
             nativeDurationMs = durationMs(),
             trackDurationMs = queue.getOrNull(currentIndex)?.durationMs,
@@ -381,6 +379,10 @@ internal class IosPlaybackController(
         ) {
             return
         }
+        handleCurrentItemFailed()
+    }
+
+    internal fun handleCurrentItemFailed() {
         playWhenReady = false
         player.pause()
         publish(isLoading = false)
@@ -390,6 +392,12 @@ internal class IosPlaybackController(
     private fun onAudioInterruption(notification: NSNotification?) {
         val userInfo = notification?.userInfo ?: return
         val type = (userInfo[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.unsignedIntegerValue
+        val options = (userInfo[AVAudioSessionInterruptionOptionKey] as? NSNumber)
+            ?.unsignedIntegerValue ?: 0u
+        handleAudioInterruption(type, options)
+    }
+
+    internal fun handleAudioInterruption(type: ULong?, options: ULong) {
         when (type) {
             AVAudioSessionInterruptionTypeBegan -> {
                 interruptionActive = true
@@ -397,15 +405,13 @@ internal class IosPlaybackController(
             }
             AVAudioSessionInterruptionTypeEnded -> {
                 interruptionActive = false
-                val options = (userInfo[AVAudioSessionInterruptionOptionKey] as? NSNumber)
-                    ?.unsignedIntegerValue ?: 0u
                 val shouldResume = shouldResumeAfterInterruption(
                     playWhenReady = playWhenReady,
                     systemAllowsResume =
                         options and AVAudioSessionInterruptionOptionShouldResume != 0uL,
                 )
                 if (shouldResume) {
-                    if (!activateAudioSession()) {
+                    if (!audioSessionActivation()) {
                         playWhenReady = false
                         fail(AppError.PlayerConnectionFailed)
                         return
@@ -452,7 +458,7 @@ internal class IosPlaybackController(
         return result
     }
 
-    private fun remotePlay(): Long {
+    internal fun remotePlay(): Long {
         if (currentIndex !in queue.indices) {
             return MPRemoteCommandHandlerStatusNoSuchContent
         }
@@ -462,7 +468,7 @@ internal class IosPlaybackController(
         return MPRemoteCommandHandlerStatusSuccess
     }
 
-    private fun remotePause(): Long {
+    internal fun remotePause(): Long {
         if (currentIndex !in queue.indices) {
             return MPRemoteCommandHandlerStatusNoSuchContent
         }
@@ -472,7 +478,7 @@ internal class IosPlaybackController(
         return MPRemoteCommandHandlerStatusSuccess
     }
 
-    private fun remoteToggle(): Long {
+    internal fun remoteToggle(): Long {
         if (currentIndex !in queue.indices) {
             return MPRemoteCommandHandlerStatusNoSuchContent
         }
@@ -480,7 +486,7 @@ internal class IosPlaybackController(
         return MPRemoteCommandHandlerStatusSuccess
     }
 
-    private fun remoteNext(): Long {
+    internal fun remoteNext(): Long {
         if (currentIndex !in 0..<queue.lastIndex) {
             return MPRemoteCommandHandlerStatusNoSuchContent
         }
@@ -488,7 +494,7 @@ internal class IosPlaybackController(
         return MPRemoteCommandHandlerStatusSuccess
     }
 
-    private fun remotePrevious(): Long {
+    internal fun remotePrevious(): Long {
         if (currentIndex !in queue.indices) {
             return MPRemoteCommandHandlerStatusNoSuchContent
         }
@@ -544,6 +550,9 @@ internal class IosPlaybackController(
     }
 
     private fun updateNowPlaying(snapshot: PlaybackSnapshot) {
+        if (!installSystemIntegrations) {
+            return
+        }
         val track = snapshot.currentTrack
         if (track == null) {
             nowPlayingCenter.nowPlayingInfo = null
@@ -687,3 +696,14 @@ internal fun isCurrentArtworkRequest(
 ): Boolean = submittedGeneration == currentGeneration && requestedIdentity == currentIdentity
 
 private const val PREVIOUS_RESTART_THRESHOLD_MS = 3_000L
+
+@OptIn(ExperimentalForeignApi::class)
+private fun activateIosAudioSession(): Boolean {
+    val audioSession = AVAudioSession.sharedInstance()
+    if (!audioSession.setCategory(AVAudioSessionCategoryPlayback, error = null) ||
+        !audioSession.setActive(active = true, error = null)
+    ) {
+        return false
+    }
+    return true
+}

@@ -9,8 +9,11 @@ import info.jukov.player.feature.download.isActiveDownloadAttempt
 import info.jukov.player.feature.download.isApiErrorContentType
 import info.jukov.player.feature.download.isCurrentDownloadGeneration
 import info.jukov.player.feature.download.IosDownloadProgress
+import info.jukov.player.feature.download.IosDownloadFinalization
 import info.jukov.player.feature.download.IosDownloadTaskMetadata
+import info.jukov.player.feature.download.IosBackgroundCallbackCoordinator
 import info.jukov.player.feature.download.IosProgressCoalescer
+import info.jukov.player.feature.download.finalizeIosDownload
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
@@ -23,12 +26,14 @@ import info.jukov.player.feature.playback.shouldPublishPlaybackFailure
 import info.jukov.player.feature.playback.terminalPlaybackPositionMs
 import info.jukov.player.core.data.cache.migrateLegacyDatabaseIfNeeded
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.coroutines.test.runTest
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSUUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.test.assertNull
@@ -203,6 +208,79 @@ class SharedLogicIOSTest {
         assertTrue(coalescer.completeFlush(9u))
         assertEquals(90, coalescer.take(9u)?.downloadedBytes)
         assertFalse(coalescer.completeFlush(9u))
+    }
+
+    @Test
+    fun backgroundCompletionWaitsForEveryPersistedCallback() {
+        val coordinator = IosBackgroundCallbackCoordinator()
+        var completions = 0
+
+        coordinator.beginProcessing()
+        assertNull(coordinator.register { completions++ })
+        assertNull(coordinator.finishEvents())
+        assertEquals(0, completions)
+
+        val completion = assertNotNull(coordinator.endProcessing())
+        completion()
+        assertEquals(1, completions)
+        assertNull(coordinator.finishEvents())
+    }
+
+    @Test
+    fun backgroundCompletionHandlesSystemCallbackBeforeRuntimeRegistration() {
+        val coordinator = IosBackgroundCallbackCoordinator()
+        var completions = 0
+
+        assertNull(coordinator.finishEvents())
+        val completion = assertNotNull(coordinator.register { completions++ })
+        completion()
+
+        assertEquals(1, completions)
+    }
+
+    @Test
+    fun cancellationRacingWithCompletionCannotLeaveACommittedFile() = runTest {
+        var activeCheck = 0
+        var fileExists = false
+        var databaseCommitted = false
+
+        val result = finalizeIosDownload(
+            isActive = {
+                activeCheck++
+                activeCheck == 1
+            },
+            moveToDestination = {
+                fileExists = true
+                true
+            },
+            commit = {
+                databaseCommitted = true
+                true
+            },
+            removeDestination = { fileExists = false },
+        )
+
+        assertEquals(IosDownloadFinalization.Cancelled, result)
+        assertFalse(fileExists)
+        assertFalse(databaseCommitted)
+    }
+
+    @Test
+    fun rejectedDatabaseCommitRemovesFinalizedFile() = runTest {
+        var fileExists = false
+
+        val result = finalizeIosDownload(
+            isActive = { true },
+            moveToDestination = {
+                fileExists = true
+                true
+            },
+            commit = { false },
+            removeDestination = { fileExists = false },
+        )
+
+        assertEquals(IosDownloadFinalization.CommitRejected, result)
+        assertFalse(fileExists)
     }
 
     @OptIn(ExperimentalForeignApi::class)

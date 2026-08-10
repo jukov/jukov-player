@@ -83,9 +83,7 @@ class IosOfflinePlatform internal constructor(
     private val cancelledAccountTokens = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskDescriptions = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskIdentifiers = MutableStateFlow<Set<ULong>>(emptySet())
-    private var backgroundCompletionHandler: (() -> Unit)? = null
-    private var backgroundEventsFinished = false
-    private var processingCallbacks = 0
+    private val backgroundCallbacks = IosBackgroundCallbackCoordinator()
 
     init {
         scope.launch {
@@ -202,8 +200,7 @@ class IosOfflinePlatform internal constructor(
             return
         }
         delegateQueue.addOperationWithBlock {
-            backgroundCompletionHandler = completionHandler
-            completeBackgroundEventsIfReady()
+            dispatchBackgroundCompletion(backgroundCallbacks.register(completionHandler))
             session.getAllTasksWithCompletionHandler { }
             onRegistered()
         }
@@ -293,8 +290,7 @@ class IosOfflinePlatform internal constructor(
     internal fun didFinishBackgroundEvents() {
         beginCallbackProcessing()
         submitOperation { endCallbackProcessing() }
-        backgroundEventsFinished = true
-        completeBackgroundEventsIfReady()
+        dispatchBackgroundCompletion(backgroundCallbacks.finishEvents())
     }
 
     private suspend fun schedulePending(
@@ -418,26 +414,27 @@ class IosOfflinePlatform internal constructor(
         val destination = trackUrl(accountKey, trackId)
         destination.ensureParentDirectory()
         destination.removeIfPresent()
-        if (!fileManager.moveItemAtURL(temporaryUrl, destination, error = null)) {
-            markTaskFailed(
-                metadata,
-                "Cannot finalize file",
-                task.taskIdentifier,
-            )
-            return
-        }
-        if (!isTaskActive(metadata, task.taskIdentifier)) {
-            destination.removeIfPresent()
-            return
-        }
         val bytes = task.countOfBytesReceived.coerceAtLeast(0)
-        dao.updateOfflineTrackState(
-            accountKey, trackId, DownloadState.Completed.name, bytes,
-            task.countOfBytesExpectedToReceive.takeIf { it > 0 }, relative(destination, accountKey),
-            null, Clock.System.now().toEpochMilliseconds(),
+        val result = finalizeIosDownload(
+            isActive = { isTaskActive(metadata, task.taskIdentifier) },
+            moveToDestination = {
+                fileManager.moveItemAtURL(temporaryUrl, destination, error = null)
+            },
+            commit = {
+                dao.updateOfflineTrackState(
+                    accountKey, trackId, DownloadState.Completed.name, bytes,
+                    task.countOfBytesExpectedToReceive.takeIf { it > 0 },
+                    relative(destination, accountKey), null,
+                    Clock.System.now().toEpochMilliseconds(),
+                )
+                true
+            },
+            removeDestination = { destination.removeIfPresent() },
         )
-        if (!isTaskActive(metadata, task.taskIdentifier)) {
-            destination.removeIfPresent()
+        if (result == IosDownloadFinalization.MoveFailed) {
+            markTaskFailed(metadata, "Cannot finalize file", task.taskIdentifier)
+        }
+        if (result != IosDownloadFinalization.Completed) {
             return
         }
         val generation = currentCancellationGeneration()
@@ -534,27 +531,24 @@ class IosOfflinePlatform internal constructor(
         val destination = artworkUrl(accountKey, coverArtId)
         destination.ensureParentDirectory()
         destination.removeIfPresent()
-        if (!fileManager.moveItemAtURL(temporaryUrl, destination, error = null)) {
-            markTaskFailed(
-                metadata,
-                "Cannot finalize artwork",
-                task.taskIdentifier,
-            )
-            return
-        }
-        if (!isTaskActive(metadata, task.taskIdentifier)) {
-            destination.removeIfPresent()
-            return
-        }
-        val committed = dao.upsertOfflineArtworkIfReferenced(
-            OfflineArtworkEntity(
-                accountKey, coverArtId, relative(destination, accountKey), contentType,
-                task.countOfBytesReceived.coerceAtLeast(0), DownloadState.Completed.name,
-                null, Clock.System.now().toEpochMilliseconds(),
-            ),
+        val result = finalizeIosDownload(
+            isActive = { isTaskActive(metadata, task.taskIdentifier) },
+            moveToDestination = {
+                fileManager.moveItemAtURL(temporaryUrl, destination, error = null)
+            },
+            commit = {
+                dao.upsertOfflineArtworkIfReferenced(
+                    OfflineArtworkEntity(
+                        accountKey, coverArtId, relative(destination, accountKey), contentType,
+                        task.countOfBytesReceived.coerceAtLeast(0), DownloadState.Completed.name,
+                        null, Clock.System.now().toEpochMilliseconds(),
+                    ),
+                )
+            },
+            removeDestination = { destination.removeIfPresent() },
         )
-        if (!committed || !isTaskActive(metadata, task.taskIdentifier)) {
-            destination.removeIfPresent()
+        if (result == IosDownloadFinalization.MoveFailed) {
+            markTaskFailed(metadata, "Cannot finalize artwork", task.taskIdentifier)
         }
     }
 
@@ -760,24 +754,19 @@ class IosOfflinePlatform internal constructor(
     }
 
     private fun beginCallbackProcessing() {
-        processingCallbacks++
+        backgroundCallbacks.beginProcessing()
     }
 
     private fun endCallbackProcessing() {
         delegateQueue.addOperationWithBlock {
-            processingCallbacks--
-            completeBackgroundEventsIfReady()
+            dispatchBackgroundCompletion(backgroundCallbacks.endProcessing())
         }
     }
 
-    private fun completeBackgroundEventsIfReady() {
-        if (!backgroundEventsFinished || processingCallbacks != 0) {
-            return
+    private fun dispatchBackgroundCompletion(handler: (() -> Unit)?) {
+        if (handler != null) {
+            NSOperationQueue.mainQueue.addOperationWithBlock(handler)
         }
-        val handler = backgroundCompletionHandler ?: return
-        backgroundCompletionHandler = null
-        backgroundEventsFinished = false
-        NSOperationQueue.mainQueue.addOperationWithBlock(handler)
     }
 
     private fun requestNotificationAuthorization() {
@@ -892,6 +881,71 @@ internal class IosProgressCoalescer {
         pending.remove(taskIdentifier)
         scheduled.remove(taskIdentifier)
     }
+}
+
+internal class IosBackgroundCallbackCoordinator {
+    private var completionHandler: (() -> Unit)? = null
+    private var eventsFinished = false
+    private var processingCallbacks = 0
+
+    fun register(handler: () -> Unit): (() -> Unit)? {
+        completionHandler = handler
+        return takeCompletionIfReady()
+    }
+
+    fun beginProcessing() {
+        processingCallbacks++
+    }
+
+    fun endProcessing(): (() -> Unit)? {
+        check(processingCallbacks > 0) { "No background callback is being processed" }
+        processingCallbacks--
+        return takeCompletionIfReady()
+    }
+
+    fun finishEvents(): (() -> Unit)? {
+        eventsFinished = true
+        return takeCompletionIfReady()
+    }
+
+    private fun takeCompletionIfReady(): (() -> Unit)? {
+        if (!eventsFinished || processingCallbacks != 0) {
+            return null
+        }
+        val handler = completionHandler ?: return null
+        completionHandler = null
+        eventsFinished = false
+        return handler
+    }
+}
+
+internal enum class IosDownloadFinalization { Completed, Cancelled, MoveFailed, CommitRejected }
+
+internal suspend fun finalizeIosDownload(
+    isActive: () -> Boolean,
+    moveToDestination: () -> Boolean,
+    commit: suspend () -> Boolean,
+    removeDestination: () -> Unit,
+): IosDownloadFinalization {
+    if (!isActive()) {
+        return IosDownloadFinalization.Cancelled
+    }
+    if (!moveToDestination()) {
+        return IosDownloadFinalization.MoveFailed
+    }
+    if (!isActive()) {
+        removeDestination()
+        return IosDownloadFinalization.Cancelled
+    }
+    if (!commit()) {
+        removeDestination()
+        return IosDownloadFinalization.CommitRejected
+    }
+    if (!isActive()) {
+        removeDestination()
+        return IosDownloadFinalization.Cancelled
+    }
+    return IosDownloadFinalization.Completed
 }
 
 internal fun iosTaskDescription(kind: String, accountKey: String, id: String): String =
