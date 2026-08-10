@@ -1,6 +1,12 @@
 package info.jukov.player.feature.track.presentation.ui
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
@@ -55,6 +61,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -783,17 +792,49 @@ fun TrackRow(
             Spacer(Modifier.width(Padding.medium))
         }
         Column(Modifier.weight(1f)) {
-            Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                text = listOfNotNull(
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    isLoading -> TrackLoadingIndicator()
+                    isPlaying -> PlayingEqualizer()
+                }
+                if (isLoading || isPlaying) {
+                    Spacer(Modifier.width(Padding.xSmall))
+                }
+                Text(
+                    text = track.title,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (track.durationMs > 0) {
+                    Text(
+                        text = formatTrackDuration(track.durationMs),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                val trackDetails = listOfNotNull(
                     track.artist.takeIf(String::isNotBlank),
                     track.album?.takeIf(String::isNotBlank),
-                ).distinct().joinToString(" · "),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+                ).distinct().joinToString(" · ")
+                if (track.durationMs > 0 && trackDetails.isNotEmpty()) {
+                    Spacer(Modifier.width(Padding.small))
+                }
+                Text(
+                    text = trackDetails,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         if (trailingAction == TrackTrailingAction.Favorite) {
             FavoriteToggleButton(
@@ -807,13 +848,67 @@ fun TrackRow(
                 Icon(painterResource(Res.drawable.delete), stringResource(Res.string.remove_download))
             }
         }
-        DownloadPlayButton(
-            isPlaying = isPlaying,
-            isLoading = isLoading,
-            onClick = onPlayClick,
+        DownloadBadge(
             status = downloadStatus,
+            modifier = Modifier.padding(end = Padding.small),
         )
     }
+}
+
+@Composable
+private fun TrackLoadingIndicator() {
+    val description = stringResource(Res.string.track_loading)
+    CircularProgressIndicator(
+        modifier = Modifier.size(20.dp).semantics { contentDescription = description },
+        strokeWidth = 2.dp,
+    )
+}
+
+@Composable
+private fun PlayingEqualizer() {
+    val transition = rememberInfiniteTransition(label = "playing equalizer")
+    val firstBar by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 480), RepeatMode.Reverse),
+        label = "first bar",
+    )
+    val secondBar by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.4f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 620), RepeatMode.Reverse),
+        label = "second bar",
+    )
+    val thirdBar by transition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 390), RepeatMode.Reverse),
+        label = "third bar",
+    )
+    val color = MaterialTheme.colorScheme.primary
+    val description = stringResource(Res.string.track_playing)
+    Canvas(
+        Modifier.size(20.dp).semantics { contentDescription = description },
+    ) {
+        val barWidth = size.width * 0.18f
+        val gap = size.width * 0.12f
+        val totalWidth = barWidth * 3 + gap * 2
+        val startX = (size.width - totalWidth) / 2
+        listOf(firstBar, secondBar, thirdBar).forEachIndexed { index, heightFraction ->
+            val barHeight = size.height * heightFraction
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(startX + index * (barWidth + gap), size.height - barHeight),
+                size = Size(barWidth, barHeight),
+                cornerRadius = CornerRadius(barWidth / 2),
+            )
+        }
+    }
+}
+
+internal fun formatTrackDuration(milliseconds: Long): String {
+    val totalSeconds = milliseconds.coerceAtLeast(0) / 1_000
+    return "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
 }
 
 @Composable

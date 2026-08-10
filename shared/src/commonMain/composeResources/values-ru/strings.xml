@@ -82,6 +82,8 @@
     <string name="remove_track_from_queue">Удалить %1$s из очереди</string>
     <string name="pause">Пауза</string>
     <string name="play">Воспроизвести</string>
+    <string name="track_loading">Трек загружается</string>
+    <string name="track_playing">Трек воспроизводится</string>
     <string name="remove_from_favorites">Удалить из избранного</string>
     <string name="add_to_favorites">Добавить в избранное</string>
 
