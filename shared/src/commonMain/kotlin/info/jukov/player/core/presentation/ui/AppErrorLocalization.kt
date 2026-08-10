@@ -29,5 +29,4 @@ fun AppError.localizedMessage(): String = when (this) {
     AppError.PlayerConnectionFailed -> stringResource(Res.string.error_player_connection_failed)
     AppError.MissingTrackStreamUrl -> stringResource(Res.string.error_missing_track_stream_url)
     AppError.PlaybackFailed -> stringResource(Res.string.error_playback_failed)
-    AppError.IosPlaybackNotImplemented -> stringResource(Res.string.error_ios_playback_not_implemented)
 }

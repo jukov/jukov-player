@@ -25,6 +25,7 @@ import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.feature.download.di.DownloadsModule
 import info.jukov.player.feature.download.domain.DownloadsRepository
 import info.jukov.player.feature.download.domain.OfflinePlatform
+import info.jukov.player.feature.download.domain.OfflinePlatformFactory
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.feature.download.presentation.DownloadsViewModel
 import info.jukov.player.feature.playlist.di.PlaylistsModule
@@ -59,6 +60,7 @@ interface AppGraph {
     val playerViewModel: PlayerViewModel
     val favoritesViewModel: FavoritesViewModel
     val downloadsRepository: DownloadsRepository
+    val offlinePlatform: OfflinePlatform
     val cacheDao: CacheDao
     val authRepository: AuthRepository
     val subsonicApiClient: SubsonicApiClient
@@ -73,7 +75,7 @@ interface AppGraph {
         fun create(
             @Provides playbackControllerFactory: PlaybackControllerFactory,
             @Provides cacheDatabaseBuilder: RoomDatabase.Builder<CacheDatabase>,
-            @Provides offlinePlatform: OfflinePlatform,
+            @Provides offlinePlatformFactory: OfflinePlatformFactory,
         ): AppGraph
     }
 }
@@ -81,7 +83,7 @@ interface AppGraph {
 fun createAppGraph(
     playbackControllerFactory: PlaybackControllerFactory,
     cacheDatabaseBuilder: RoomDatabase.Builder<CacheDatabase>,
-    offlinePlatform: OfflinePlatform,
+    offlinePlatformFactory: OfflinePlatformFactory,
 ): AppGraph = createGraphFactory<AppGraph.Factory>().create(
-    playbackControllerFactory, cacheDatabaseBuilder, offlinePlatform,
+    playbackControllerFactory, cacheDatabaseBuilder, offlinePlatformFactory,
 )

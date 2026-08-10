@@ -10,7 +10,7 @@ import info.jukov.player.di.AndroidAppGraphOwner
 import info.jukov.player.di.createAppGraph
 import info.jukov.player.feature.playback.AndroidPlaybackControllerFactory
 import info.jukov.player.core.data.cache.cacheDatabaseBuilder
-import info.jukov.player.feature.download.AndroidOfflinePlatform
+import info.jukov.player.feature.download.AndroidOfflinePlatformFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,7 +25,7 @@ class JukovApplication : Application(), AndroidAppGraphOwner {
         graph = createAppGraph(
             AndroidPlaybackControllerFactory(this),
             cacheDatabaseBuilder(this),
-            AndroidOfflinePlatform(this),
+            AndroidOfflinePlatformFactory(this),
         )
         graph.playbackController
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||

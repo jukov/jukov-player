@@ -1,7 +1,11 @@
 package info.jukov.player.feature.download.domain
 
+import info.jukov.player.core.data.cache.CacheDao
 import info.jukov.player.feature.album.domain.Album
+import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.subsonic.data.SubsonicApiClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 
 interface LocalMediaResolver {
@@ -32,9 +36,9 @@ interface DownloadsRepository : LocalMediaResolver, PersistentArtworkResolver {
 interface OfflinePlatform {
     fun enqueue(accountKey: String)
     fun recover(accountKey: String)
-    fun cancelTrack(accountKey: String, trackId: String)
-    fun cancelTracks(accountKey: String, trackIds: List<String>)
-    fun cancelAccount(accountKey: String)
+    suspend fun cancelTrack(accountKey: String, trackId: String)
+    suspend fun cancelTracks(accountKey: String, trackIds: List<String>)
+    suspend fun cancelAccount(accountKey: String)
     fun deleteTrack(accountKey: String, relativePath: String?)
     fun deleteTracks(accountKey: String, relativePaths: List<String>)
     fun deleteArtwork(accountKey: String, relativePath: String?)
@@ -43,4 +47,13 @@ interface OfflinePlatform {
     fun fileUri(accountKey: String, relativePath: String): String
     fun exists(accountKey: String, relativePath: String): Boolean
     fun cleanupStaleParts(accountKey: String, activeTrackIds: Set<String>)
+}
+
+fun interface OfflinePlatformFactory {
+    fun create(
+        authRepository: AuthRepository,
+        dao: CacheDao,
+        client: SubsonicApiClient,
+        scope: CoroutineScope,
+    ): OfflinePlatform
 }

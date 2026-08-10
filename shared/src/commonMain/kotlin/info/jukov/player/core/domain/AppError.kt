@@ -25,7 +25,6 @@ sealed interface AppError {
     data object PlayerConnectionFailed : AppError
     data object MissingTrackStreamUrl : AppError
     data object PlaybackFailed : AppError
-    data object IosPlaybackNotImplemented : AppError
 }
 
 class AppException(val error: AppError) : IllegalStateException()

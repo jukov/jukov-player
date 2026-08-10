@@ -103,5 +103,4 @@
     <string name="error_player_connection_failed">Не удалось подключиться к плееру</string>
     <string name="error_missing_track_stream_url">У трека отсутствует URL воспроизведения</string>
     <string name="error_playback_failed">Не удалось воспроизвести трек</string>
-    <string name="error_ios_playback_not_implemented">Воспроизведение на iOS пока не реализовано</string>
 </resources>
