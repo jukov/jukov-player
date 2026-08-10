@@ -26,53 +26,59 @@ fun PlaylistPickerHost(viewModel: PlaylistPickerViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var error by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { error = it } }
-    if (!state.visible) return
-    ModalBottomSheet(onDismissRequest = viewModel::dismiss) {
-        Text(
-            stringResource(Res.string.choose_playlist),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(Padding.medium),
-        )
-        ListItem(
-            modifier = Modifier.clickable(
-                enabled = !state.pending,
-                onClick = viewModel::showCreate,
-            ),
-            leadingContent = { Icon(painterResource(Res.drawable.add), null) },
-            headlineContent = { Text(stringResource(Res.string.create_and_add)) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        )
-        when (val playlists = state.playlists) {
-            is LoadableState.Loading -> Box(
-                Modifier.fillMaxWidth().padding(Padding.large),
-                contentAlignment = Alignment.Center,
-            ) { LoadingIndicator() }
-            is LoadableState.Failure -> Text(
-                playlists.error.localizedMessage(),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(Padding.medium),
-            )
-            is LoadableState.Content -> playlists.content.forEach { playlist ->
-                ListItem(
-                    modifier = Modifier.clickable(enabled = !state.pending) {
-                        viewModel.addTo(playlist)
-                    },
-                    headlineContent = { Text(playlist.name) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                )
-            }
-        }
-        error?.let {
-            Text(
-                it.localizedMessage(),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(Padding.medium),
-            )
-        }
-        Spacer(Modifier.height(Padding.large))
+    val snackbar = remember { SnackbarHostState() }
+    val errorMessage = error?.localizedMessage()
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { snackbar.showSnackbar(it) }
+        error = null
     }
-    if (state.creating) {
-        CreatePlaylistDialog(state.pending, viewModel::hideCreate, viewModel::create)
+    if (state.visible) {
+        ModalBottomSheet(onDismissRequest = viewModel::dismiss) {
+            Text(
+                stringResource(Res.string.choose_playlist),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(Padding.medium),
+            )
+            ListItem(
+                modifier = Modifier.clickable(
+                    enabled = !state.pending,
+                    onClick = viewModel::showCreate,
+                ),
+                leadingContent = { Icon(painterResource(Res.drawable.add), null) },
+                headlineContent = { Text(stringResource(Res.string.create_and_add)) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
+            when (val playlists = state.playlists) {
+                is LoadableState.Loading -> Box(
+                    Modifier.fillMaxWidth().padding(Padding.large),
+                    contentAlignment = Alignment.Center,
+                ) { LoadingIndicator() }
+                is LoadableState.Failure -> Text(
+                    playlists.error.localizedMessage(),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(Padding.medium),
+                )
+                is LoadableState.Content -> playlists.content.forEach { playlist ->
+                    ListItem(
+                        modifier = Modifier.clickable(enabled = !state.pending) {
+                            viewModel.addTo(playlist)
+                        },
+                        headlineContent = { Text(playlist.name) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
+                }
+            }
+            Spacer(Modifier.height(Padding.large))
+        }
+        if (state.creating) {
+            CreatePlaylistDialog(state.pending, viewModel::hideCreate, viewModel::create)
+        }
+    }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        SnackbarHost(
+            hostState = snackbar,
+            modifier = Modifier.navigationBarsPadding().padding(Padding.medium),
+        )
     }
 }
 
