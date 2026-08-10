@@ -6,6 +6,7 @@ import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.Favorites
 import info.jukov.player.feature.favorite.domain.FavoritesRepository
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.album.domain.Album
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -66,6 +67,26 @@ class FavoriteDelegateTest {
         first.join()
     }
 
+    @Test
+    fun setAlbumsUpdatesEveryChangedAlbum() = runTest {
+        val repository = RecordingFavoritesRepository()
+        val delegate = FavoriteDelegate(repository)
+        val updates = mutableListOf<Pair<String, Boolean>>()
+        val albums = listOf(
+            album(id = "first", isFavorite = false),
+            album(id = "second", isFavorite = true),
+        )
+
+        delegate.setAlbums(albums, isFavorite = true) { album, isFavorite ->
+            updates += album.id to isFavorite
+        }
+
+        assertEquals(listOf("first" to true), updates)
+        assertEquals(FavoriteTarget.Album("first"), repository.calls.single().first)
+        assertTrue(repository.calls.single().second)
+        assertTrue(delegate.pending.value.isEmpty())
+    }
+
     private fun track() = Track(
         id = "track",
         title = "Track",
@@ -75,6 +96,15 @@ class FavoriteDelegateTest {
         trackNumber = 1,
         coverArtUrl = null,
         isFavorite = false,
+    )
+
+    private fun album(id: String, isFavorite: Boolean) = Album(
+        id = id,
+        name = "Album",
+        artist = "Artist",
+        artistId = null,
+        coverArtUrl = null,
+        isFavorite = isFavorite,
     )
 }
 
