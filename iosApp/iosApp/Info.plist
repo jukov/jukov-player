@@ -5,7 +5,7 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Jukov Player connects to your Navidrome server on the local network.</string>
+	<string>проигрыватель подключается к вашему серверу Navidrome в локальной сети.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
