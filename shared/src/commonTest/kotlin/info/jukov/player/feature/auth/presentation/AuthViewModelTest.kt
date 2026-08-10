@@ -33,6 +33,11 @@ class AuthViewModelTest {
     }
 
     @Test
+    fun initialStateHasEmptyServerUrl() {
+        assertEquals("", AuthUiState().server)
+    }
+
+    @Test
     fun successfulLoginClearsPasswordAndPublishesSession() = runTest {
         kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val repository = FakeAuthRepository()
