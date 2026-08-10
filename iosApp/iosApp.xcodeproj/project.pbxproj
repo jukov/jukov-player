@@ -187,7 +187,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n";
+			shellScript = "firebase_plist=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\"\nfirebase_bundle_id=$(/usr/libexec/PlistBuddy -c \"Print :BUNDLE_ID\" \"${firebase_plist}\")\nif [ \"${firebase_bundle_id}\" != \"${PRODUCT_BUNDLE_IDENTIFIER}\" ]; then\n  echo \"Skipping Crashlytics symbol upload: ${PRODUCT_BUNDLE_IDENTIFIER} is not registered by GoogleService-Info.plist\"\n  exit 0\nfi\n\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
