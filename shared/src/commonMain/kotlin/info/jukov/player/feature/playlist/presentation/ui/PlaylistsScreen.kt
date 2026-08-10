@@ -115,14 +115,14 @@ fun PlaylistsScreen(
                             },
                             supportingContent = {
                                 Row(horizontalArrangement = Arrangement.spacedBy(Padding.small)) {
-                                    PlaylistMetadataPill(
+                                    MetadataPill(
                                         stringResource(
                                             Res.string.playlist_tracks_count,
                                             playlist.songCount,
                                         ),
                                     )
                                     if (playlist.isPublic) {
-                                        PlaylistMetadataPill(
+                                        MetadataPill(
                                             stringResource(Res.string.playlist_public_label),
                                         )
                                     }

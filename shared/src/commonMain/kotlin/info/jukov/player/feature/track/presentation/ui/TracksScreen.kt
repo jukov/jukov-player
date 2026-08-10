@@ -85,6 +85,7 @@ import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBarState
 import info.jukov.player.core.presentation.ui.rememberAppCollapsingTopAppBarState
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.PlayPauseButton
+import info.jukov.player.core.presentation.ui.MetadataPill
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.feature.track.presentation.TracksViewModel
@@ -809,15 +810,7 @@ fun TrackRow(
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (track.durationMs > 0) {
-                    Text(
-                        text = formatTrackDuration(track.durationMs),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    MetadataPill(formatTrackDuration(track.durationMs))
                 }
                 val trackDetails = listOfNotNull(
                     track.artist.takeIf(String::isNotBlank),

@@ -277,14 +277,6 @@ internal fun ReadOnlyPill() {
 }
 
 @Composable
-internal fun PlaylistMetadataPill(text: String) {
-    PlaylistPill(
-        text = text,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-    )
-}
-
-@Composable
 private fun PlaylistPill(text: String, color: Color) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
