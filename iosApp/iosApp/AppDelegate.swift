@@ -1,3 +1,4 @@
+import FirebaseCore
 import Shared
 import UIKit
 import UserNotifications
@@ -7,9 +8,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        configureFirebaseIfRegistered()
         IosAppRuntime.shared.start()
         UNUserNotificationCenter.current().delegate = self
         return true
+    }
+
+    private func configureFirebaseIfRegistered() {
+        guard let options = FirebaseOptions.defaultOptions(),
+              options.bundleID == Bundle.main.bundleIdentifier else {
+            return
+        }
+        FirebaseApp.configure(options: options)
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
