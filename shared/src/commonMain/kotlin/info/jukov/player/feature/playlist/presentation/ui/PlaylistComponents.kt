@@ -270,12 +270,28 @@ internal fun DeletePlaylistDialog(
 
 @Composable
 internal fun ReadOnlyPill() {
+    PlaylistPill(
+        text = stringResource(Res.string.read_only),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+    )
+}
+
+@Composable
+internal fun PlaylistMetadataPill(text: String) {
+    PlaylistPill(
+        text = text,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    )
+}
+
+@Composable
+private fun PlaylistPill(text: String, color: Color) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = color,
     ) {
         Text(
-            stringResource(Res.string.read_only),
+            text,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.padding(horizontal = Padding.small, vertical = Padding.xSmall),
         )

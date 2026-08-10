@@ -10,7 +10,7 @@
     <string name="library">Library</string>
     <string name="favorites">Favorites</string>
     <string name="playlists">Playlists</string>
-    <string name="playlist">Playlist</string><string name="playlists_not_found">No playlists found</string><string name="playlist_tracks_count">Tracks: %1$d</string><string name="read_only">Read only</string>
+    <string name="playlist">Playlist</string><string name="playlists_not_found">No playlists found</string><string name="playlist_tracks_count">Tracks: %1$d</string><string name="playlist_public_label">Public</string><string name="read_only">Read only</string>
     <string name="create_playlist">Create playlist</string><string name="edit_playlist">Edit playlist</string><string name="playlist_name">Playlist name</string><string name="public_playlist">Public playlist</string><string name="public_playlist_description">Visible to all users</string><string name="create">Create</string><string name="save">Save</string><string name="cancel">Cancel</string>
     <string name="add_to_playlist">Add to playlist</string><string name="choose_playlist">Choose playlist</string><string name="create_and_add">Create new playlist</string>
     <string name="download_playlist">Download playlist</string><string name="add_playlist_to_queue">Add playlist to queue</string><string name="delete_playlist">Delete playlist</string>
