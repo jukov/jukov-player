@@ -1,6 +1,6 @@
 <resources>
     <string name="search">Поиск</string><string name="close_search">Закрыть поиск</string><string name="nothing_found">Ничего не найдено</string><string name="error_search_failed">Не удалось выполнить поиск</string>
-    <string name="app_name">проигрыватель</string>
+    <string name="app_name">единственный плеер</string>
     <string name="login_subtitle">Подключитесь к своему Subsonic-серверу</string>
     <string name="server">Сервер</string>
     <string name="username">Логин</string>
@@ -40,7 +40,6 @@
     <string name="back">Назад</string>
     <string name="more">Ещё</string>
     <string name="retry">Повторить</string>
-    <string name="all_albums">Все альбомы</string>
     <string name="all_tracks">Все треки</string>
     <string name="sign_out">Выйти</string>
     <string name="sign_out_title">Выйти из аккаунта?</string>

@@ -1,2 +1,3 @@
-"CFBundleDisplayName" = "jukov player";
-"NSLocalNetworkUsageDescription" = "jukov player connects to your Navidrome server on the local network.";
+"CFBundleDisplayName" = "the only player";
+"CFBundleName" = "the only player";
+"NSLocalNetworkUsageDescription" = "the only player connects to your Navidrome server on your local network.";

@@ -1,2 +1,3 @@
-"CFBundleDisplayName" = "проигрыватель";
-"NSLocalNetworkUsageDescription" = "проигрыватель подключается к вашему серверу Navidrome в локальной сети.";
+"CFBundleDisplayName" = "единственный плеер";
+"CFBundleName" = "единственный плеер";
+"NSLocalNetworkUsageDescription" = "единственный плеер подключается к вашему серверу Navidrome в локальной сети.";
