@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   linux-fast:
-    name: Linux fast checks
+    name: Android and shared checks
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -46,7 +46,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Fast checks
+      - name: Run Android and shared checks
         run: ./scripts/check-fast.sh
 
   changes:
@@ -75,7 +75,7 @@ jobs:
               - 'buildSrc/**'
 
   macos-ios:
-    name: macOS iOS checks
+    name: iOS checks
     runs-on: macos-latest
     timeout-minutes: 45
     needs:
@@ -132,7 +132,7 @@ jobs:
           MACOS_IOS_RESULT: ${{ needs.macos-ios.result }}
         run: |
           if [[ "$LINUX_FAST_RESULT" != "success" ]]; then
-            echo "Linux fast checks did not pass: $LINUX_FAST_RESULT"
+            echo "Android and shared checks did not pass: $LINUX_FAST_RESULT"
             exit 1
           fi
 
@@ -142,14 +142,14 @@ jobs:
           fi
 
           if [[ "$MACOS_IOS_RESULT" != "success" && "$MACOS_IOS_RESULT" != "skipped" ]]; then
-            echo "macOS iOS checks did not pass: $MACOS_IOS_RESULT"
+            echo "iOS checks did not pass: $MACOS_IOS_RESULT"
             exit 1
           fi
 
           echo "All checks required for this pull request passed."
 
   android-apk-smoke:
-    name: Android APK smoke
+    name: Manual Android APK build
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: linux-fast
