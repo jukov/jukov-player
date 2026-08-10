@@ -36,6 +36,9 @@ internal fun favoriteCommandSpec(
     slots = listOf(CommandButton.SLOT_FORWARD_SECONDARY, CommandButton.SLOT_OVERFLOW),
 )
 
+internal fun canAccessFavoriteCommand(isTrustedController: Boolean): Boolean =
+    isTrustedController
+
 @OptIn(UnstableApi::class)
 internal fun favoriteCommandButton(
     isFavorite: Boolean,

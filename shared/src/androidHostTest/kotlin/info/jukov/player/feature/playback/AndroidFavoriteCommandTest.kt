@@ -35,4 +35,10 @@ class AndroidFavoriteCommandTest {
         assertEquals(CommandButton.ICON_HEART_FILLED, spec.icon)
         assertFalse(spec.enabled)
     }
+
+    @Test
+    fun favoriteCommandRejectsUntrustedControllers() {
+        assertFalse(canAccessFavoriteCommand(isTrustedController = false))
+        assertTrue(canAccessFavoriteCommand(isTrustedController = true))
+    }
 }

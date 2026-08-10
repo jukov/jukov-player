@@ -147,6 +147,9 @@ class PlaybackService : MediaLibraryService() {
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): MediaSession.ConnectionResult {
+            if (!canAccessFavoriteCommand(controller.isTrusted)) {
+                return MediaSession.ConnectionResult.AcceptedResultBuilder(session).build()
+            }
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
                 .buildUpon()
                 .add(setCurrentTrackFavoriteCommand())
@@ -164,6 +167,11 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<SessionResult> {
             if (customCommand.customAction != ACTION_SET_CURRENT_TRACK_FAVORITE) {
                 return super.onCustomCommand(session, controller, customCommand, args)
+            }
+            if (!canAccessFavoriteCommand(controller.isTrusted)) {
+                return Futures.immediateFuture(
+                    SessionResult(SessionResult.RESULT_ERROR_PERMISSION_DENIED),
+                )
             }
             val track = currentTrack()
             if (track == null || graph.authRepository.authState.value !is AuthState.LoggedIn) {
