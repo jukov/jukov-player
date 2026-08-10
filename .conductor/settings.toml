@@ -1,7 +1,10 @@
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
+spotlight_testing = true
+
 file_include_globs = [
     "local.properties",
+    "iosApp/Configuration/Local.xcconfig",
 ]
 
 [scripts]
@@ -25,3 +28,9 @@ icon = "shield-check"
 available_in = [ "local" ]
 command = "./scripts/check-ios.sh"
 icon = "smartphone"
+
+# Spotlight syncs the active workspace into the repository root watched by Xcode.
+[scripts.run.open-spotlight-xcode]
+available_in = [ "local" ]
+command = "open \"$CONDUCTOR_ROOT_PATH/iosApp/iosApp.xcodeproj\""
+icon = "app-window"
