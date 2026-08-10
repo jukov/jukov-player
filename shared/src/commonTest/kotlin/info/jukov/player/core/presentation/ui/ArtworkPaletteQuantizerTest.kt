@@ -10,7 +10,13 @@ class ArtworkPaletteQuantizerTest {
     fun selectsDominantAndContrastingColors() {
         val red = 0xFFFF2020.toInt()
         val blue = 0xFF2040FF.toInt()
-        val pixels = IntArray(100) { index -> if (index < 70) red else blue }
+        val pixels = IntArray(100) { index ->
+            if (index < 70) {
+                red
+            } else {
+                blue
+            }
+        }
 
         val palette = assertNotNull(extractArtworkPalette(pixels))
 
