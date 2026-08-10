@@ -28,9 +28,11 @@ fun PlaylistPickerHost(viewModel: PlaylistPickerViewModel) {
     LaunchedEffect(viewModel) { viewModel.messages.collect { error = it } }
     val snackbar = remember { SnackbarHostState() }
     val errorMessage = error?.localizedMessage()
-    LaunchedEffect(errorMessage) {
-        errorMessage?.let { snackbar.showSnackbar(it) }
-        error = null
+    LaunchedEffect(errorMessage, state.visible) {
+        if (errorMessage != null && !state.visible) {
+            snackbar.showSnackbar(errorMessage)
+            error = null
+        }
     }
     if (state.visible) {
         ModalBottomSheet(onDismissRequest = viewModel::dismiss) {
@@ -42,7 +44,10 @@ fun PlaylistPickerHost(viewModel: PlaylistPickerViewModel) {
             ListItem(
                 modifier = Modifier.clickable(
                     enabled = !state.pending,
-                    onClick = viewModel::showCreate,
+                    onClick = {
+                        error = null
+                        viewModel.showCreate()
+                    },
                 ),
                 leadingContent = { Icon(painterResource(Res.drawable.add), null) },
                 headlineContent = { Text(stringResource(Res.string.create_and_add)) },
@@ -61,6 +66,7 @@ fun PlaylistPickerHost(viewModel: PlaylistPickerViewModel) {
                 is LoadableState.Content -> playlists.content.forEach { playlist ->
                     ListItem(
                         modifier = Modifier.clickable(enabled = !state.pending) {
+                            error = null
                             viewModel.addTo(playlist)
                         },
                         headlineContent = { Text(playlist.name) },
@@ -68,10 +74,25 @@ fun PlaylistPickerHost(viewModel: PlaylistPickerViewModel) {
                     )
                 }
             }
+            if (!state.creating && errorMessage != null) {
+                Text(
+                    errorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(Padding.medium),
+                )
+            }
             Spacer(Modifier.height(Padding.large))
         }
         if (state.creating) {
-            CreatePlaylistDialog(state.pending, viewModel::hideCreate, viewModel::create)
+            CreatePlaylistDialog(
+                pending = state.pending,
+                errorMessage = errorMessage,
+                onDismiss = viewModel::hideCreate,
+                onCreate = { name, isPublic ->
+                    error = null
+                    viewModel.create(name, isPublic)
+                },
+            )
         }
     }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
@@ -85,6 +106,7 @@ fun PlaylistPickerHost(viewModel: PlaylistPickerViewModel) {
 @Composable
 internal fun CreatePlaylistDialog(
     pending: Boolean,
+    errorMessage: String? = null,
     onDismiss: () -> Unit,
     onCreate: (String, Boolean) -> Unit,
 ) {
@@ -112,6 +134,14 @@ internal fun CreatePlaylistDialog(
                     enabled = !pending,
                     onChange = { isPublic = it },
                 )
+                if (errorMessage != null) {
+                    Spacer(Modifier.height(Padding.medium))
+                    Text(
+                        errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         },
         confirmButton = {
