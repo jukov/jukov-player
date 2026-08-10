@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import platform.AVFAudio.AVAudioSessionInterruptionOptionShouldResume
 import platform.AVFAudio.AVAudioSessionInterruptionTypeBegan
 import platform.AVFAudio.AVAudioSessionInterruptionTypeEnded
+import platform.AVFoundation.AVQueuePlayer
 import platform.MediaPlayer.MPRemoteCommandHandlerStatusNoSuchContent
 import platform.MediaPlayer.MPRemoteCommandHandlerStatusSuccess
 import kotlin.test.Test
@@ -34,6 +35,20 @@ class IosPlaybackControllerIntegrationTest {
         controller.handleCurrentItemEnded()
 
         assertEquals(1, controller.state.value.content?.currentIndex)
+        assertEquals(1, store.current?.currentIndex)
+    }
+
+    @Test
+    fun periodicUpdateSynchronizesAnAutomaticallyAdvancedQueueItem() {
+        val store = RecordingPlaybackStore(saved(queueSize = 3))
+        val player = AVQueuePlayer()
+        val controller = controller(store, player)
+
+        player.advanceToNextItem()
+        controller.handlePeriodicTimeUpdate()
+
+        assertEquals(1, controller.state.value.content?.currentIndex)
+        assertEquals("track-1", controller.state.value.content?.currentTrack?.id)
         assertEquals(1, store.current?.currentIndex)
     }
 
@@ -104,9 +119,13 @@ class IosPlaybackControllerIntegrationTest {
         )
     }
 
-    private fun controller(store: PlaybackStore) = IosPlaybackController(
+    private fun controller(
+        store: PlaybackStore,
+        player: AVQueuePlayer = AVQueuePlayer(),
+    ) = IosPlaybackController(
         playbackStore = store,
         favoriteMutator = RecordingFavoriteMutator(),
+        player = player,
         installSystemIntegrations = false,
         audioSessionActivation = { true },
     )

@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import platform.AVFAudio.*
 import platform.AVFoundation.*
 import platform.CoreMedia.CMTimeGetSeconds
+import platform.CoreMedia.CMTimeMake
 import platform.CoreMedia.CMTimeMakeWithSeconds
 import platform.Foundation.*
 import platform.MediaPlayer.MPMediaItemPropertyAlbumTitle
@@ -85,6 +86,8 @@ internal class IosPlaybackController(
     private var artworkGeneration = 0L
     private var nowPlayingArtwork: MPMediaItemArtwork? = null
     private var playerItems = emptyList<AVPlayerItem>()
+    private var pendingSeekPositionMs: Long? = null
+    private var seekGeneration = 0L
     private var timeObserver: Any? = null
     private val notificationTokens = mutableListOf<Any>()
     private var addFavoriteTitle = "Add to favorites"
@@ -104,7 +107,7 @@ internal class IosPlaybackController(
             timeObserver = player.addPeriodicTimeObserverForInterval(
                 interval = CMTimeMakeWithSeconds(0.5, preferredTimescale = 600),
                 queue = dispatch_get_main_queue(),
-            ) { updatePlaybackState() }
+            ) { handlePeriodicTimeUpdate() }
         }
         val saved = playbackStore.read()
         if (saved != null && saved.queue.isNotEmpty() && saved.currentIndex in saved.queue.indices) {
@@ -206,6 +209,7 @@ internal class IosPlaybackController(
         if (currentIndex !in 0..<queue.lastIndex) {
             return
         }
+        cancelPendingSeek()
         currentIndex++
         player.advanceToNextItem()
         playerItems = playerItems.drop(1)
@@ -233,7 +237,21 @@ internal class IosPlaybackController(
         }
         val duration = durationMs().takeIf { it > 0 } ?: queue[currentIndex].durationMs
         val target = positionMs.coerceIn(0, duration.coerceAtLeast(0))
-        player.seekToTime(CMTimeMakeWithSeconds(target / 1_000.0, preferredTimescale = 600))
+        val generation = ++seekGeneration
+        pendingSeekPositionMs = target
+        val zeroTolerance = CMTimeMake(value = 0, timescale = 1)
+        player.seekToTime(
+            time = CMTimeMakeWithSeconds(target / 1_000.0, preferredTimescale = 600),
+            toleranceBefore = zeroTolerance,
+            toleranceAfter = zeroTolerance,
+        ) { _ ->
+            NSOperationQueue.mainQueue.addOperationWithBlock {
+                if (generation == seekGeneration) {
+                    pendingSeekPositionMs = null
+                    updatePlaybackState()
+                }
+            }
+        }
         updatePlaybackState(positionOverrideMs = target)
     }
 
@@ -281,6 +299,7 @@ internal class IosPlaybackController(
         playWhenReady = false
         player.removeAllItems()
         playerItems = emptyList()
+        cancelPendingSeek()
         queue = emptyList()
         currentIndex = -1
         origin = PlaybackOrigin.TrackList
@@ -311,6 +330,7 @@ internal class IosPlaybackController(
     private fun rebuildPlayer(autoplay: Boolean, positionMs: Long) {
         playbackError = null
         playWhenReady = autoplay
+        cancelPendingSeek()
         player.pause()
         player.removeAllItems()
         playerItems = emptyList()
@@ -370,7 +390,7 @@ internal class IosPlaybackController(
     }
 
     private fun onItemEnded(notification: NSNotification?) {
-        if (notification?.`object` !== playerItems.firstOrNull()) {
+        if (notification?.`object` != playerItems.firstOrNull()) {
             return
         }
         handleCurrentItemEnded()
@@ -382,6 +402,7 @@ internal class IosPlaybackController(
             trackDurationMs = queue.getOrNull(currentIndex)?.durationMs,
         )
         playerItems = playerItems.drop(1)
+        cancelPendingSeek()
         if (currentIndex < queue.lastIndex) {
             currentIndex++
             persist()
@@ -575,7 +596,12 @@ internal class IosPlaybackController(
         return MPRemoteCommandHandlerStatusSuccess
     }
 
+    internal fun handlePeriodicTimeUpdate() {
+        updatePlaybackState()
+    }
+
     private fun updatePlaybackState(positionOverrideMs: Long? = null) {
+        synchronizeCurrentPlayerItem()
         val currentItem = player.currentItem
         if (shouldPublishPlaybackFailure(
                 isCurrentItem = currentItem != null,
@@ -589,10 +615,35 @@ internal class IosPlaybackController(
             return
         }
         publish(
-            positionMs = positionOverrideMs ?: currentPositionMs(),
+            positionMs = playbackPositionMs(
+                positionOverrideMs = positionOverrideMs,
+                pendingSeekPositionMs = pendingSeekPositionMs,
+                currentPositionMs = currentPositionMs(),
+            ),
             isLoading = currentIndex in queue.indices && playWhenReady && !interruptionActive &&
                 player.currentItem?.isPlaybackLikelyToKeepUp() == false,
         )
+    }
+
+    private fun synchronizeCurrentPlayerItem() {
+        val currentItem = player.currentItem ?: return
+        val offset = playerItems.indexOfFirst { item -> item == currentItem }
+        if (offset <= 0) {
+            return
+        }
+        val synchronizedIndex = currentIndex + offset
+        if (synchronizedIndex !in queue.indices) {
+            return
+        }
+        currentIndex = synchronizedIndex
+        playerItems = playerItems.drop(offset)
+        cancelPendingSeek()
+        persist()
+    }
+
+    private fun cancelPendingSeek() {
+        seekGeneration++
+        pendingSeekPositionMs = null
     }
 
     private fun publish(
@@ -771,6 +822,12 @@ internal fun playbackToggleAction(playWhenReady: Boolean): PlaybackToggleAction 
 
 internal fun terminalPlaybackPositionMs(nativeDurationMs: Long, trackDurationMs: Long?): Long =
     nativeDurationMs.takeIf { it > 0 } ?: trackDurationMs?.coerceAtLeast(0) ?: 0
+
+internal fun playbackPositionMs(
+    positionOverrideMs: Long?,
+    pendingSeekPositionMs: Long?,
+    currentPositionMs: Long,
+): Long = positionOverrideMs ?: pendingSeekPositionMs ?: currentPositionMs
 
 internal fun playbackLoadableState(
     snapshot: PlaybackSnapshot,
