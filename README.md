@@ -44,12 +44,33 @@ Build and install the signed release on a connected device:
 adb install -r androidApp/build/outputs/apk/release/androidApp-release.apk
 ```
 
+Publish a minified release App Bundle, including R8 mapping data and available
+native debug symbols, to Google Play Internal Testing:
+
+1. Create a Google Play service account with access to the app and enable the
+   Android Publisher API.
+2. Save its JSON key as `play-service-account.json` in the project root (the
+   file is ignored by Git), or set `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`. When the
+   command runs from another Git worktree, it also looks for the ignored file in
+   the repository's primary worktree.
+3. Use a new version code for every upload:
+
+```shell
+./scripts/publish-internal.sh 2 1.0.1
+```
+
+The script also accepts the service-account JSON directly through
+`ANDROID_PUBLISHER_CREDENTIALS`. Release signing still comes from
+`keystore.properties` or the `JUKOV_RELEASE_*` environment variables described
+above.
+
 ### Running tests
 
 Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 - Android tests: `./gradlew :shared:testAndroidHostTest`
 - Android device smoke (API 28 and 36): `./scripts/check-android-device.sh`
+- Minified release smoke (API 36): `./scripts/check-android-device.sh --release-api-36`
 - Android host coverage: `./scripts/check-coverage.sh`
 - iOS tests: `./gradlew :shared:iosSimulatorArm64Test`
 
