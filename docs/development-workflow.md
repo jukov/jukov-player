@@ -21,6 +21,8 @@ This repository uses a lightweight task flow built around Conductor workspaces, 
 - Fast check: `./scripts/check-fast.sh`
 - Full local check: `./scripts/check-full.sh`
 - iOS-only check: `./scripts/check-ios.sh`
+- Android device smoke, API 28 and 36: `./scripts/check-android-device.sh`
+- Android host coverage report: `./scripts/check-coverage.sh`
 
 `check-unit.sh` runs shared Android host tests for the shortest development loop. `check-fast.sh` adds the debug Android build and Android lint. `check-full.sh` runs fast checks and adds iOS tests and a Debug simulator build on macOS. iOS checks require a full Xcode installation selected by `xcode-select`.
 
@@ -46,7 +48,13 @@ checks on every PR and macOS iOS checks whenever the changed paths make them rel
 Changes to `main` must go through a pull request; no approving GitHub review is required
 by branch protection because independent AI review is tracked separately in the PR.
 
-Android device smoke checks are manual-only in the MVP. Add real instrumented tests before making them required.
+Android device smoke checks run nightly on API 28 and API 36 and can be started manually with
+`workflow_dispatch`. They use deterministic in-process HTTP responses and do not contact a real
+Navidrome server. Device checks do not block pull requests.
+
+The coverage job publishes Kover XML and HTML reports for common and Android host code. It is
+intentionally non-blocking while the project establishes a useful baseline; generated Metro,
+Room, and resource code is excluded.
 
 ## Minutes Strategy
 
@@ -68,7 +76,7 @@ CI uses `gradle/actions/setup-gradle` for Gradle caching. macOS jobs also cache 
 
 The project can run from a Git worktree. Conductor copies `local.properties` into new workspaces when available. Avoid global build output paths; iOS scripts use `.context/DerivedData` to avoid DerivedData conflicts between workspaces.
 
-Gradle daemons, Kotlin daemons, Android emulators, iOS simulators, `~/.gradle`, and `~/.konan` are shared machine resources. Avoid running heavy emulator/simulator checks concurrently across many local workspaces.
+Gradle daemons, Kotlin daemons, Android emulators, iOS simulators, `~/.gradle`, and `~/.konan` are shared machine resources. Conductor run scripts in this workspace are nonconcurrent so a device check does not overlap another run started from the same workspace.
 
 ## Definition of Done
 

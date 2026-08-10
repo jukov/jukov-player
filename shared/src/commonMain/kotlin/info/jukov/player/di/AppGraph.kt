@@ -35,6 +35,8 @@ import info.jukov.player.feature.playlist.presentation.PlaylistViewModel
 import info.jukov.player.feature.playlist.presentation.PlaylistsViewModel
 import info.jukov.player.feature.search.di.SearchModule
 import info.jukov.player.feature.library.presentation.LibraryViewModel
+import info.jukov.player.feature.auth.data.AuthStorage
+import io.ktor.client.HttpClient
 
 @DependencyGraph(
     scope = AppScope::class,
@@ -78,6 +80,9 @@ interface AppGraph {
             @Provides playbackControllerFactory: PlaybackControllerFactory,
             @Provides cacheDatabaseBuilder: RoomDatabase.Builder<CacheDatabase>,
             @Provides offlinePlatformFactory: OfflinePlatformFactory,
+            @Provides httpClient: HttpClient,
+            @Provides authStorage: AuthStorage,
+            @Provides playbackStore: PlaybackStore,
         ): AppGraph
     }
 }
@@ -86,6 +91,14 @@ fun createAppGraph(
     playbackControllerFactory: PlaybackControllerFactory,
     cacheDatabaseBuilder: RoomDatabase.Builder<CacheDatabase>,
     offlinePlatformFactory: OfflinePlatformFactory,
+    httpClient: HttpClient,
+    authStorage: AuthStorage,
+    playbackStore: PlaybackStore,
 ): AppGraph = createGraphFactory<AppGraph.Factory>().create(
-    playbackControllerFactory, cacheDatabaseBuilder, offlinePlatformFactory,
+    playbackControllerFactory,
+    cacheDatabaseBuilder,
+    offlinePlatformFactory,
+    httpClient,
+    authStorage,
+    playbackStore,
 )

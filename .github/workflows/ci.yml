@@ -13,8 +13,8 @@ on:
         description: "Run iOS simulator checks"
         type: boolean
         default: true
-      run_android_apk:
-        description: "Run Android APK smoke checks"
+      run_android_device:
+        description: "Run Android device smoke checks"
         type: boolean
         default: false
   schedule:
@@ -48,6 +48,49 @@ jobs:
 
       - name: Run Android and shared checks
         run: ./scripts/check-fast.sh
+
+      - name: Upload host test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-host-test-reports
+          path: |
+            shared/build/reports/tests/
+            shared/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  coverage:
+    name: Android host coverage report
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    if: github.event_name != 'schedule'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Generate coverage reports
+        run: ./scripts/check-coverage.sh
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-host-coverage
+          path: shared/build/reports/kover/
+          if-no-files-found: ignore
+          retention-days: 7
 
   changes:
     name: Detect changed areas
@@ -193,12 +236,18 @@ jobs:
 
           echo "All checks required for this pull request passed."
 
-  android-apk-smoke:
-    name: Manual Android APK build
+  android-device-smoke:
+    name: Android device smoke (API ${{ matrix.api }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs: linux-fast
-    if: github.event_name == 'workflow_dispatch' && inputs.run_android_apk
+    if: >
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_android_device)
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [28, 36]
 
     steps:
       - name: Checkout
@@ -213,5 +262,29 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Assemble debug APK
-        run: ./gradlew --stacktrace :androidApp:assembleDebug
+      - name: Enable KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run device smoke tests
+        run: ./scripts/check-android-device.sh --api-${{ matrix.api }}
+
+      - name: Capture connected-device logcat
+        if: failure()
+        run: adb logcat -d > androidApp/build/device-logcat-api-${{ matrix.api }}.txt || true
+
+      - name: Upload device test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-device-api-${{ matrix.api }}
+          path: |
+            androidApp/build/reports/androidTests/
+            androidApp/build/outputs/androidTest-results/
+            androidApp/build/outputs/managed_device_android_test_additional_output/
+            androidApp/build/device-logcat-api-${{ matrix.api }}.txt
+          if-no-files-found: ignore
+          retention-days: 7

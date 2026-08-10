@@ -31,8 +31,14 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.testTag
 
-private data class LibraryItem(val title: String, val icon: DrawableResource, val onClick: () -> Unit)
+private data class LibraryItem(
+    val id: String,
+    val title: String,
+    val icon: DrawableResource,
+    val onClick: () -> Unit,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,12 +69,12 @@ fun LibraryScreen(
         }
     }
     val items = listOf(
-        LibraryItem(stringResource(Res.string.favorites), Res.drawable.heart, onFavoritesClick),
-        LibraryItem(stringResource(Res.string.playlists), Res.drawable.playlist_music, onPlaylistsClick),
-        LibraryItem(stringResource(Res.string.tracks), Res.drawable.music_box_multiple, onTracksClick),
-        LibraryItem(stringResource(Res.string.artists), Res.drawable.account_multiple, onArtistsClick),
-        LibraryItem(stringResource(Res.string.albums), Res.drawable.album, onAlbumsClick),
-        LibraryItem(stringResource(Res.string.downloads), Res.drawable.download, onDownloadsClick),
+        LibraryItem("favorites", stringResource(Res.string.favorites), Res.drawable.heart, onFavoritesClick),
+        LibraryItem("playlists", stringResource(Res.string.playlists), Res.drawable.playlist_music, onPlaylistsClick),
+        LibraryItem("tracks", stringResource(Res.string.tracks), Res.drawable.music_box_multiple, onTracksClick),
+        LibraryItem("artists", stringResource(Res.string.artists), Res.drawable.account_multiple, onArtistsClick),
+        LibraryItem("albums", stringResource(Res.string.albums), Res.drawable.album, onAlbumsClick),
+        LibraryItem("downloads", stringResource(Res.string.downloads), Res.drawable.download, onDownloadsClick),
     )
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -122,7 +128,8 @@ fun LibraryScreen(
                     }
                     Card(
                         onClick = item.onClick,
-                        modifier = Modifier.fillMaxWidth().aspectRatio(1.15f),
+                        modifier = Modifier.fillMaxWidth().aspectRatio(1.15f)
+                            .testTag("library.${item.id}"),
                         shape = RoundedCornerShape(28.dp),
                         colors = CardDefaults.cardColors(containerColor = container),
                     ) {

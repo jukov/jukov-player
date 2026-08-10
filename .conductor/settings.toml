@@ -9,7 +9,7 @@ file_include_globs = [
 
 [scripts]
 setup = "./scripts/check-env.sh"
-run_mode = "concurrent"
+run_mode = "nonconcurrent"
 
 [scripts.run.unit-check]
 command = "./scripts/check-unit.sh"
@@ -34,3 +34,8 @@ icon = "smartphone"
 available_in = [ "local" ]
 command = "open \"$CONDUCTOR_ROOT_PATH/iosApp/iosApp.xcodeproj\""
 icon = "app-window"
+
+[scripts.run.android-device-check]
+available_in = [ "local" ]
+command = "./scripts/check-android-device.sh"
+icon = "monitor-smartphone"
