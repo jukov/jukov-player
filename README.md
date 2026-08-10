@@ -68,6 +68,7 @@ Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 - Android tests: `./gradlew :shared:testAndroidHostTest`
 - Android device smoke (API 28 and 36): `./scripts/check-android-device.sh`
+- Minified release smoke (API 36): `./scripts/check-android-device.sh --release-api-36`
 - Android host coverage: `./scripts/check-coverage.sh`
 - iOS tests: `./gradlew :shared:iosSimulatorArm64Test`
 

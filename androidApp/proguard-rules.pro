@@ -6,3 +6,8 @@
 -keepattributes RuntimeVisibleAnnotations,RuntimeInvisibleAnnotations
 -keepattributes RuntimeVisibleParameterAnnotations,RuntimeInvisibleParameterAnnotations
 -renamesourcefileattribute SourceFile
+
+# Compose-generated subclasses can read the stability marker from their parent.
+-keepclassmembers class ** {
+    public static int $stable;
+}

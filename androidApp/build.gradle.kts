@@ -70,6 +70,8 @@ val releaseVersionCode = providers.environmentVariable("JUKOV_VERSION_CODE")
     }
 val releaseVersionName = providers.environmentVariable("JUKOV_VERSION_NAME")
     .orElse("1.0")
+val androidTestBuildType = providers.environmentVariable("JUKOV_ANDROID_TEST_BUILD_TYPE")
+    .orElse("debug")
 
 android {
     namespace = "info.jukov.player"
@@ -88,6 +90,10 @@ android {
         versionCode = releaseVersionCode.get()
         versionName = releaseVersionName.get()
         testInstrumentationRunner = "info.jukov.player.JukovTestRunner"
+        if (androidTestBuildType.get() == "releaseSmoke") {
+            testInstrumentationRunnerArguments["class"] =
+                "info.jukov.player.ReleaseR8SmokeTest"
+        }
     }
     packaging {
         resources {
@@ -123,6 +129,11 @@ android {
                 "proguard-rules.pro"
             )
         }
+        create("releaseSmoke") {
+            initWith(getByName("release"))
+            matchingFallbacks += "release"
+            proguardFile("proguard-release-smoke-rules.pro")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -132,6 +143,7 @@ android {
         compose = true
     }
     testOptions {
+        testBuildType = androidTestBuildType.get()
         managedDevices {
             localDevices {
                 create("pixel2Api28") {
