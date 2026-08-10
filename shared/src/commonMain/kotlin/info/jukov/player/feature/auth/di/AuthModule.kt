@@ -5,7 +5,6 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import info.jukov.player.feature.auth.data.AuthApi
 import info.jukov.player.feature.auth.data.AuthStorage
-import info.jukov.player.feature.auth.data.AuthStorageImpl
 import info.jukov.player.feature.auth.data.DefaultAuthRepository
 import info.jukov.player.feature.auth.data.SubsonicAuthApi
 import info.jukov.player.feature.auth.domain.AuthRepository
@@ -19,10 +18,6 @@ import info.jukov.player.feature.download.domain.DownloadsRepository
 
 @BindingContainer
 object AuthModule {
-    @Provides
-    @SingleIn(AppScope::class)
-    fun provideAuthStorage(): AuthStorage = AuthStorageImpl()
-
     @Provides
     @SingleIn(AppScope::class)
     fun provideAuthApi(client: SubsonicApiClient): AuthApi = SubsonicAuthApi(client)

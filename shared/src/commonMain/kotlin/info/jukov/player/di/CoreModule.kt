@@ -44,29 +44,27 @@ object CoreModule {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun provideHttpClient(json: Json): HttpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-        install(Logging) {
-            level = LogLevel.HEADERS
-            logger = object : Logger {
-                override fun log(message: String) {
-                    println("KtorHttp ${message.maskSubsonicCredentials()}")
-                }
-            }
-            sanitizeHeader { header ->
-                header == HttpHeaders.Authorization ||
-                    header == HttpHeaders.Cookie ||
-                    header == HttpHeaders.SetCookie
-            }
-        }
-    }
-
-    @Provides
-    @SingleIn(AppScope::class)
     fun provideSubsonicApiClient(client: HttpClient, json: Json): SubsonicApiClient =
         SubsonicApiClient(client, json)
+}
+
+fun createHttpClient(json: Json = Json { ignoreUnknownKeys = true }): HttpClient = HttpClient {
+    install(ContentNegotiation) {
+        json(json)
+    }
+    install(Logging) {
+        level = LogLevel.HEADERS
+        logger = object : Logger {
+            override fun log(message: String) {
+                println("KtorHttp ${message.maskSubsonicCredentials()}")
+            }
+        }
+        sanitizeHeader { header ->
+            header == HttpHeaders.Authorization ||
+                header == HttpHeaders.Cookie ||
+                header == HttpHeaders.SetCookie
+        }
+    }
 }
 
 private fun String.maskSubsonicCredentials(): String = replace(

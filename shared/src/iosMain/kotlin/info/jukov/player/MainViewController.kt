@@ -5,21 +5,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import info.jukov.player.di.createAppGraph
 import info.jukov.player.core.data.cache.cacheDatabaseBuilder
 import info.jukov.player.core.presentation.ui.IosArtworkPaletteExtractor
 import info.jukov.player.core.presentation.ui.LocalArtworkPaletteExtractor
-import info.jukov.player.feature.download.IosOfflinePlatform
-import info.jukov.player.feature.download.IosOfflinePlatformFactory
+import info.jukov.player.di.createAppGraph
+import info.jukov.player.di.createHttpClient
+import info.jukov.player.feature.auth.data.AuthStorageImpl
 import info.jukov.player.feature.auth.domain.AuthState
 import info.jukov.player.feature.auth.domain.accountKey
+import info.jukov.player.feature.download.IosOfflinePlatform
+import info.jukov.player.feature.download.IosOfflinePlatformFactory
 import info.jukov.player.feature.playback.IosPlaybackControllerFactory
+import info.jukov.player.feature.playback.data.SettingsPlaybackStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import platform.Foundation.NSLock
 
 object IosAppRuntime {
@@ -27,10 +31,14 @@ object IosAppRuntime {
     private val recoveryLock = NSLock()
     private var recoveryStarted = false
     val graph by lazy {
+        val json = Json { ignoreUnknownKeys = true }
         createAppGraph(
-            IosPlaybackControllerFactory,
-            cacheDatabaseBuilder(),
-            IosOfflinePlatformFactory(),
+            playbackControllerFactory = IosPlaybackControllerFactory,
+            cacheDatabaseBuilder = cacheDatabaseBuilder(),
+            offlinePlatformFactory = IosOfflinePlatformFactory(),
+            httpClient = createHttpClient(json),
+            authStorage = AuthStorageImpl(),
+            playbackStore = SettingsPlaybackStore(json),
         ).also { it.playbackController }
     }
 

@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import info.jukov.player.feature.auth.presentation.AuthUiState
 import info.jukov.player.feature.auth.presentation.AuthViewModel
 import info.jukov.player.core.domain.LoadableState
@@ -38,7 +39,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 enabled = !isLoading,
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("login.server"),
             )
             OutlinedTextField(
                 value = state.username,
@@ -46,7 +47,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 label = { Text(stringResource(Res.string.username)) },
                 enabled = !isLoading,
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("login.username"),
             )
             OutlinedTextField(
                 value = state.password,
@@ -56,7 +57,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 enabled = !isLoading,
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("login.password"),
             )
             (state.auth as? LoadableState.Failure)?.error?.let {
                 Text(it.localizedMessage(), color = MaterialTheme.colorScheme.error)
@@ -64,7 +65,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
             Button(
                 onClick = viewModel::login,
                 enabled = !isLoading,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp).testTag("login.submit"),
             ) {
                 if (isLoading) {
                     LoadingIndicator(Modifier.size(22.dp))

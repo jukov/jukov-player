@@ -18,7 +18,20 @@ dependencies {
     implementation(libs.compose.uiToolingPreview)
     implementation(libs.androidx.room3.runtime)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.ktor.client.core)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.multiplatform.settings.no.arg)
     debugImplementation(libs.compose.uiTooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    androidTestImplementation(libs.kotlin.testJunit)
+    androidTestImplementation(libs.androidx.testExt.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.ktor.client.mock)
+    androidTestImplementation(libs.multiplatform.settings.test)
 }
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -58,6 +71,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "info.jukov.player.JukovTestRunner"
     }
     packaging {
         resources {
@@ -95,6 +109,28 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    testOptions {
+        managedDevices {
+            localDevices {
+                create("pixel2Api28") {
+                    device = "Pixel 2"
+                    apiLevel = 28
+                    systemImageSource = "aosp"
+                }
+                create("pixel2Api36") {
+                    device = "Pixel 2"
+                    apiLevel = 36
+                    systemImageSource = "aosp"
+                }
+            }
+            groups {
+                create("androidSmoke") {
+                    targetDevices.add(localDevices["pixel2Api28"])
+                    targetDevices.add(localDevices["pixel2Api36"])
+                }
+            }
+        }
     }
 }
 
