@@ -2,6 +2,8 @@ package info.jukov.player.feature.playback
 
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.LoadableState
+import info.jukov.player.feature.favorite.domain.FavoriteMutator
+import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackControllerFactory
@@ -19,6 +21,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import platform.AVFAudio.*
 import platform.AVFoundation.*
 import platform.CoreMedia.CMTimeGetSeconds
@@ -35,6 +42,7 @@ import platform.MediaPlayer.MPNowPlayingInfoPropertyPlaybackRate
 import platform.MediaPlayer.MPMediaItemArtwork
 import platform.MediaPlayer.MPRemoteCommandCenter
 import platform.MediaPlayer.MPRemoteCommandEvent
+import platform.MediaPlayer.MPFeedbackCommandEvent
 import platform.MediaPlayer.MPRemoteCommandHandlerStatusCommandFailed
 import platform.MediaPlayer.MPRemoteCommandHandlerStatusNoSuchContent
 import platform.MediaPlayer.MPRemoteCommandHandlerStatusSuccess
@@ -42,20 +50,28 @@ import platform.MediaPlayer.MPChangePlaybackPositionCommandEvent
 import platform.UIKit.*
 import platform.darwin.dispatch_get_main_queue
 import platform.darwin.dispatch_sync
+import jukovplayer.shared.generated.resources.Res
+import jukovplayer.shared.generated.resources.add_to_favorites
+import jukovplayer.shared.generated.resources.remove_from_favorites
+import org.jetbrains.compose.resources.getString
 import kotlin.math.roundToLong
 
 object IosPlaybackControllerFactory : PlaybackControllerFactory {
-    override fun create(playbackStore: PlaybackStore): PlaybackController =
-        IosPlaybackController(playbackStore)
+    override fun create(
+        playbackStore: PlaybackStore,
+        favoriteMutator: FavoriteMutator,
+    ): PlaybackController = IosPlaybackController(playbackStore, favoriteMutator)
 }
 
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 internal class IosPlaybackController(
     private val playbackStore: PlaybackStore,
+    private val favoriteMutator: FavoriteMutator,
     private val player: AVQueuePlayer = AVQueuePlayer(),
     private val installSystemIntegrations: Boolean = true,
     private val audioSessionActivation: () -> Boolean = ::activateIosAudioSession,
 ) : PlaybackController {
+    private val integrationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val notificationCenter = NSNotificationCenter.defaultCenter
     private val nowPlayingCenter = MPNowPlayingInfoCenter.defaultCenter()
     private val remoteCommands = MPRemoteCommandCenter.sharedCommandCenter()
@@ -71,6 +87,8 @@ internal class IosPlaybackController(
     private var playerItems = emptyList<AVPlayerItem>()
     private var timeObserver: Any? = null
     private val notificationTokens = mutableListOf<Any>()
+    private var addFavoriteTitle = "Add to favorites"
+    private var removeFavoriteTitle = "Remove from favorites"
 
     private val _state = MutableStateFlow<LoadableState<PlaybackSnapshot>>(
         LoadableState.Loading(restoredSnapshot()),
@@ -81,6 +99,8 @@ internal class IosPlaybackController(
         if (installSystemIntegrations) {
             installNotifications()
             installRemoteCommands()
+            observeFavoriteState()
+            loadFavoriteTitles()
             timeObserver = player.addPeriodicTimeObserverForInterval(
                 interval = CMTimeMakeWithSeconds(0.5, preferredTimescale = 600),
                 queue = dispatch_get_main_queue(),
@@ -269,6 +289,7 @@ internal class IosPlaybackController(
         invalidateNowPlayingArtwork()
         playbackStore.clear()
         nowPlayingCenter.nowPlayingInfo = null
+        updateFavoriteCommand(null)
         runCatching { AVAudioSession.sharedInstance().setActive(active = false, error = null) }
         _state.value = LoadableState.Content(PlaybackSnapshot())
     }
@@ -445,6 +466,35 @@ internal class IosPlaybackController(
         remoteCommands.changePlaybackPositionCommand.addTargetWithHandler { event ->
             onMainQueue { remoteSeek(event) }
         }
+        remoteCommands.likeCommand.addTargetWithHandler { event ->
+            val feedbackEvent = event as? MPFeedbackCommandEvent
+                ?: return@addTargetWithHandler MPRemoteCommandHandlerStatusCommandFailed
+            onMainQueue { remoteFavorite(feedbackEvent.negative) }
+        }
+        updateFavoriteCommand(null)
+    }
+
+    private fun observeFavoriteState() {
+        integrationScope.launch {
+            favoriteMutator.changes.collect { change ->
+                if (change.target is FavoriteTarget.Track) {
+                    updateFavoriteState(change.target.id, change.isFavorite)
+                }
+            }
+        }
+        integrationScope.launch {
+            favoriteMutator.pending.collectLatest {
+                updateFavoriteCommand(queue.getOrNull(currentIndex))
+            }
+        }
+    }
+
+    private fun loadFavoriteTitles() {
+        integrationScope.launch {
+            addFavoriteTitle = getString(Res.string.add_to_favorites)
+            removeFavoriteTitle = getString(Res.string.remove_from_favorites)
+            updateFavoriteCommand(queue.getOrNull(currentIndex))
+        }
     }
 
     private fun onMainQueue(command: () -> Long): Long {
@@ -502,6 +552,22 @@ internal class IosPlaybackController(
         return MPRemoteCommandHandlerStatusSuccess
     }
 
+    internal fun remoteFavorite(isNegative: Boolean): Long {
+        val track = queue.getOrNull(currentIndex)
+            ?: return MPRemoteCommandHandlerStatusNoSuchContent
+        if (track.id in favoriteMutator.pending.value) {
+            return MPRemoteCommandHandlerStatusSuccess
+        }
+        val isFavorite = !isNegative
+        updateFavoriteState(track.id, isFavorite)
+        integrationScope.launch {
+            favoriteMutator.set(track, isFavorite = isFavorite) { updated ->
+                updateFavoriteState(track.id, updated)
+            }
+        }
+        return MPRemoteCommandHandlerStatusSuccess
+    }
+
     private fun remoteSeek(event: MPRemoteCommandEvent?): Long {
         val changeEvent = event as? MPChangePlaybackPositionCommandEvent
             ?: return MPRemoteCommandHandlerStatusCommandFailed
@@ -556,6 +622,7 @@ internal class IosPlaybackController(
         val track = snapshot.currentTrack
         if (track == null) {
             nowPlayingCenter.nowPlayingInfo = null
+            updateFavoriteCommand(null)
             return
         }
         val identity = track.artworkIdentity()
@@ -581,8 +648,42 @@ internal class IosPlaybackController(
         nowPlayingCenter.nowPlayingInfo = info
         remoteCommands.nextTrackCommand.enabled = snapshot.hasNext
         remoteCommands.previousTrackCommand.enabled = snapshot.hasPrevious || snapshot.positionMs > 0
+        updateFavoriteCommand(track)
         if (trackChanged) {
             loadNowPlayingArtwork(track, artworkGeneration, identity)
+        }
+    }
+
+    private fun updateFavoriteState(trackId: String, isFavorite: Boolean) {
+        val updatedQueue = queue.map { track ->
+            if (track.id == trackId) {
+                track.copy(isFavorite = isFavorite)
+            } else {
+                track
+            }
+        }
+        if (updatedQueue == queue) {
+            updateFavoriteCommand(queue.getOrNull(currentIndex))
+            return
+        }
+        queue = updatedQueue
+        persist()
+        publish()
+    }
+
+    private fun updateFavoriteCommand(track: Track?) {
+        if (!installSystemIntegrations) {
+            return
+        }
+        remoteCommands.likeCommand.apply {
+            enabled = track != null && track.id !in favoriteMutator.pending.value
+            active = track?.isFavorite == true
+            localizedTitle = if (track?.isFavorite == true) {
+                removeFavoriteTitle
+            } else {
+                addFavoriteTitle
+            }
+            localizedShortTitle = localizedTitle
         }
     }
 
