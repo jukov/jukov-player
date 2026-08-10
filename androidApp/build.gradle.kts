@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import com.github.triplet.gradle.androidpublisher.ReleaseStatus
 import java.util.Properties
 
 plugins {
@@ -6,6 +7,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.googleServices)
     alias(libs.plugins.firebaseCrashlytics)
+    alias(libs.plugins.gradlePlayPublisher)
 }
 
 kotlin {
@@ -60,6 +62,15 @@ val hasReleaseSigning = listOf(
     releaseKeyPassword,
 ).all { it != null }
 
+val releaseVersionCode = providers.environmentVariable("JUKOV_VERSION_CODE")
+    .orElse("1")
+    .map { value ->
+        value.toIntOrNull()?.takeIf { it > 0 }
+            ?: error("JUKOV_VERSION_CODE must be a positive integer, got '$value'.")
+    }
+val releaseVersionName = providers.environmentVariable("JUKOV_VERSION_NAME")
+    .orElse("1.0")
+
 android {
     namespace = "info.jukov.player"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -74,8 +85,8 @@ android {
         applicationId = "info.jukov.player"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = releaseVersionCode.get()
+        versionName = releaseVersionName.get()
         testInstrumentationRunner = "info.jukov.player.JukovTestRunner"
     }
     packaging {
@@ -98,7 +109,12 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            ndk {
+                // Native symbols are packaged into the AAB and uploaded with it.
+                debugSymbolLevel = "FULL"
+            }
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -137,6 +153,12 @@ android {
             }
         }
     }
+}
+
+play {
+    defaultToAppBundles.set(true)
+    track.set("internal")
+    releaseStatus.set(ReleaseStatus.COMPLETED)
 }
 
 val validateReleaseSigning by tasks.registering(ValidateReleaseSigningTask::class) {

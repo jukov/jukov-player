@@ -31,6 +31,7 @@ kover = "0.9.9"
 firebase-bom = "34.16.0"
 google-services = "4.5.0"
 firebase-crashlytics-plugin = "3.0.7"
+gradle-play-publisher = "4.0.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -93,3 +94,4 @@ androidxRoom3 = { id = "androidx.room3", version.ref = "room3" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 googleServices = { id = "com.google.gms.google-services", version.ref = "google-services" }
 firebaseCrashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebase-crashlytics-plugin" }
+gradlePlayPublisher = { id = "com.github.triplet.play", version.ref = "gradle-play-publisher" }
