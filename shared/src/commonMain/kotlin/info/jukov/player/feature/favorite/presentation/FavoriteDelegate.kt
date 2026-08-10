@@ -4,6 +4,7 @@ import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.toAppError
 
 import info.jukov.player.feature.favorite.domain.FavoriteChange
+import info.jukov.player.feature.favorite.domain.FavoriteMutator
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.FavoritesRepository
 import info.jukov.player.feature.track.domain.Track
@@ -15,14 +16,14 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-class FavoriteDelegate(private val repository: FavoritesRepository) {
+class FavoriteDelegate(private val repository: FavoritesRepository) : FavoriteMutator {
     private val _pending = MutableStateFlow<Set<String>>(emptySet())
-    val pending = _pending.asStateFlow()
+    override val pending = _pending.asStateFlow()
 
     private val _messages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
     val messages = _messages.asSharedFlow()
 
-    val changes: SharedFlow<FavoriteChange> = repository.changes
+    override val changes: SharedFlow<FavoriteChange> = repository.changes
 
     suspend fun toggle(
         target: FavoriteTarget,
@@ -40,7 +41,7 @@ class FavoriteDelegate(private val repository: FavoritesRepository) {
         _pending.update { it - target.id }
     }
 
-    suspend fun set(
+    override suspend fun set(
         track: Track,
         isFavorite: Boolean,
         updateFavorite: (Boolean) -> Unit,
