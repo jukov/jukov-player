@@ -27,7 +27,8 @@ available_in = [ "local" ]
 command = "./scripts/check-ios.sh"
 icon = "smartphone"
 
-[scripts.run.open-xcode]
+# Spotlight syncs the active workspace into the repository root watched by Xcode.
+[scripts.run.open-spotlight-xcode]
 available_in = [ "local" ]
 command = "open \"$CONDUCTOR_ROOT_PATH/iosApp/iosApp.xcodeproj\""
 icon = "app-window"
