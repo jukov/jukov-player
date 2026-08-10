@@ -5,7 +5,7 @@ import info.jukov.player.core.domain.LoadableState
 
 data class AuthUiState(
     val auth: LoadableState<AuthState> = LoadableState.Content(AuthState.LoggedOut),
-    val server: String = "https://music.jukov.info",
+    val server: String = "",
     val username: String = "",
     val password: String = "",
 )
