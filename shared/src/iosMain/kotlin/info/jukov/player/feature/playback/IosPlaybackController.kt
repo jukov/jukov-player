@@ -62,6 +62,7 @@ internal class IosPlaybackController(
     private var origin: PlaybackOrigin = PlaybackOrigin.TrackList
     private var playWhenReady = false
     private var interruptionActive = false
+    private var playbackError: AppError? = null
     private var artworkIdentity: String? = null
     private var artworkGeneration = 0L
     private var nowPlayingArtwork: MPMediaItemArtwork? = null
@@ -106,6 +107,7 @@ internal class IosPlaybackController(
             return
         }
         invalidateNowPlayingArtwork()
+        playbackError = null
         queue = playable
         currentIndex = 0
         this.origin = origin
@@ -141,6 +143,7 @@ internal class IosPlaybackController(
             fail(AppError.PlayerConnectionFailed)
             return
         }
+        playbackError = null
         player.play()
         updatePlaybackState()
     }
@@ -258,6 +261,7 @@ internal class IosPlaybackController(
         currentIndex = -1
         origin = PlaybackOrigin.TrackList
         interruptionActive = false
+        playbackError = null
         invalidateNowPlayingArtwork()
         playbackStore.clear()
         nowPlayingCenter.nowPlayingInfo = null
@@ -280,6 +284,7 @@ internal class IosPlaybackController(
     }
 
     private fun rebuildPlayer(autoplay: Boolean, positionMs: Long) {
+        playbackError = null
         playWhenReady = autoplay
         player.pause()
         player.removeAllItems()
@@ -353,6 +358,10 @@ internal class IosPlaybackController(
         if (notification?.`object` !== playerItems.firstOrNull()) {
             return
         }
+        val completedPositionMs = terminalPlaybackPositionMs(
+            nativeDurationMs = durationMs(),
+            trackDurationMs = queue.getOrNull(currentIndex)?.durationMs,
+        )
         playerItems = playerItems.drop(1)
         if (currentIndex < queue.lastIndex) {
             currentIndex++
@@ -360,7 +369,7 @@ internal class IosPlaybackController(
             updatePlaybackState(positionOverrideMs = 0)
         } else {
             playWhenReady = false
-            updatePlaybackState(positionOverrideMs = durationMs())
+            updatePlaybackState(positionOverrideMs = completedPositionMs)
         }
     }
 
@@ -401,6 +410,7 @@ internal class IosPlaybackController(
                         fail(AppError.PlayerConnectionFailed)
                         return
                     }
+                    playbackError = null
                     player.play()
                 } else {
                     playWhenReady = false
@@ -529,7 +539,7 @@ internal class IosPlaybackController(
             isLoading = isLoading,
             origin = origin,
         )
-        _state.value = LoadableState.Content(snapshot)
+        _state.value = playbackLoadableState(snapshot, playbackError)
         updateNowPlaying(snapshot)
     }
 
@@ -552,7 +562,11 @@ internal class IosPlaybackController(
             MPMediaItemPropertyAlbumTitle to (track.album ?: ""),
             MPMediaItemPropertyPlaybackDuration to snapshot.durationMs / 1_000.0,
             MPNowPlayingInfoPropertyElapsedPlaybackTime to snapshot.positionMs / 1_000.0,
-            MPNowPlayingInfoPropertyPlaybackRate to if (snapshot.isPlaying) 1.0 else 0.0,
+            MPNowPlayingInfoPropertyPlaybackRate to if (snapshot.isPlaying) {
+                1.0
+            } else {
+                0.0
+            },
         )
         nowPlayingArtwork?.let { info[MPMediaItemPropertyArtwork] = it }
         nowPlayingCenter.nowPlayingInfo = info
@@ -602,7 +616,11 @@ internal class IosPlaybackController(
 
     private fun CValue<platform.CoreMedia.CMTime>.validSeconds(): Double {
         val seconds = CMTimeGetSeconds(this)
-        return if (seconds.isFinite() && seconds >= 0) seconds else 0.0
+        return if (seconds.isFinite() && seconds >= 0) {
+            seconds
+        } else {
+            0.0
+        }
     }
 
     private fun Double.toMilliseconds(): Long = (this * 1_000).roundToLong().coerceAtLeast(0)
@@ -616,6 +634,7 @@ internal class IosPlaybackController(
     }
 
     private fun fail(error: AppError) {
+        playbackError = error
         _state.update { LoadableState.Failure(error, it.content) }
     }
 
@@ -634,7 +653,23 @@ internal fun indexAfterQueueAppend(
 internal enum class PlaybackToggleAction { Play, Pause }
 
 internal fun playbackToggleAction(playWhenReady: Boolean): PlaybackToggleAction =
-    if (playWhenReady) PlaybackToggleAction.Pause else PlaybackToggleAction.Play
+    if (playWhenReady) {
+        PlaybackToggleAction.Pause
+    } else {
+        PlaybackToggleAction.Play
+    }
+
+internal fun terminalPlaybackPositionMs(nativeDurationMs: Long, trackDurationMs: Long?): Long =
+    nativeDurationMs.takeIf { it > 0 } ?: trackDurationMs?.coerceAtLeast(0) ?: 0
+
+internal fun playbackLoadableState(
+    snapshot: PlaybackSnapshot,
+    error: AppError?,
+): LoadableState<PlaybackSnapshot> = if (error != null) {
+    LoadableState.Failure(error, snapshot)
+} else {
+    LoadableState.Content(snapshot)
+}
 
 internal fun shouldResumeAfterInterruption(
     playWhenReady: Boolean,

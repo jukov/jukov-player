@@ -1,5 +1,7 @@
 package info.jukov.player
 
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.download.safeComponent
 import info.jukov.player.feature.download.isSafeRelativePath
 import info.jukov.player.feature.download.iosTaskDescription
@@ -12,10 +14,13 @@ import info.jukov.player.feature.download.IosProgressCoalescer
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
+import info.jukov.player.feature.playback.playbackLoadableState
 import info.jukov.player.feature.playback.PlaybackToggleAction
+import info.jukov.player.feature.playback.domain.PlaybackSnapshot
 import info.jukov.player.feature.playback.isCurrentArtworkRequest
 import info.jukov.player.feature.playback.shouldResumeAfterInterruption
 import info.jukov.player.feature.playback.shouldPublishPlaybackFailure
+import info.jukov.player.feature.playback.terminalPlaybackPositionMs
 import info.jukov.player.core.data.cache.migrateLegacyDatabaseIfNeeded
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSFileManager
@@ -122,6 +127,27 @@ class SharedLogicIOSTest {
         assertTrue(shouldPublishPlaybackFailure(isCurrentItem = true, hasError = true))
         assertFalse(shouldPublishPlaybackFailure(isCurrentItem = false, hasError = true))
         assertFalse(shouldPublishPlaybackFailure(isCurrentItem = true, hasError = false))
+    }
+
+    @Test
+    fun terminalPlaybackPositionFallsBackToTrackDuration() {
+        assertEquals(12_345, terminalPlaybackPositionMs(0, 12_345))
+        assertEquals(12_000, terminalPlaybackPositionMs(12_000, 12_345))
+        assertEquals(0, terminalPlaybackPositionMs(0, null))
+    }
+
+    @Test
+    fun playbackFailureIsRetainedWhilePublishingProgress() {
+        val snapshot = PlaybackSnapshot(positionMs = 500)
+
+        assertEquals(
+            LoadableState.Failure(AppError.PlayerConnectionFailed, snapshot),
+            playbackLoadableState(snapshot, AppError.PlayerConnectionFailed),
+        )
+        assertEquals(
+            LoadableState.Content(snapshot),
+            playbackLoadableState(snapshot, null),
+        )
     }
 
     @Test

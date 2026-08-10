@@ -54,7 +54,11 @@ private fun Color.hue(): Float {
         green -> 60f * ((blue - red) / delta + 2f)
         else -> 60f * ((red - green) / delta + 4f)
     }
-    return if (raw < 0f) raw + 360f else raw
+    return if (raw < 0f) {
+        raw + 360f
+    } else {
+        raw
+    }
 }
 
 private fun Color.shiftHue(degrees: Float): Color {
@@ -62,7 +66,11 @@ private fun Color.shiftHue(degrees: Float): Color {
     val maximum = max(red, max(green, blue))
     val minimum = min(red, min(green, blue))
     val delta = maximum - minimum
-    val saturation = if (maximum == 0f) 0f else delta / maximum
+    val saturation = if (maximum == 0f) {
+        0f
+    } else {
+        delta / maximum
+    }
     val chroma = maximum * saturation
     val x = chroma * (1f - abs((hue / 60f) % 2f - 1f))
     val offset = maximum - chroma
