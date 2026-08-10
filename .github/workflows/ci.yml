@@ -114,6 +114,40 @@ jobs:
       - name: iOS checks
         run: ./scripts/check-ios.sh
 
+  pr-gate:
+    name: Required PR checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - linux-fast
+      - changes
+      - macos-ios
+    if: always() && github.event_name == 'pull_request'
+
+    steps:
+      - name: Verify required checks
+        env:
+          LINUX_FAST_RESULT: ${{ needs.linux-fast.result }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          MACOS_IOS_RESULT: ${{ needs.macos-ios.result }}
+        run: |
+          if [[ "$LINUX_FAST_RESULT" != "success" ]]; then
+            echo "Linux fast checks did not pass: $LINUX_FAST_RESULT"
+            exit 1
+          fi
+
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "Change detection did not pass: $CHANGES_RESULT"
+            exit 1
+          fi
+
+          if [[ "$MACOS_IOS_RESULT" != "success" && "$MACOS_IOS_RESULT" != "skipped" ]]; then
+            echo "macOS iOS checks did not pass: $MACOS_IOS_RESULT"
+            exit 1
+          fi
+
+          echo "All checks required for this pull request passed."
+
   android-apk-smoke:
     name: Android APK smoke
     runs-on: ubuntu-latest
