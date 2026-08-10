@@ -11,6 +11,7 @@ import info.jukov.player.feature.playback.domain.PlaybackControllerFactory
 import kotlinx.serialization.json.Json
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
+import info.jukov.player.feature.favorite.domain.FavoriteMutator
 import info.jukov.player.feature.download.domain.DownloadsRepository
 import info.jukov.player.feature.playback.domain.DefaultPlaybackQueueResolver
 import info.jukov.player.feature.playback.domain.PlaybackQueueResolver
@@ -26,7 +27,8 @@ object PlaybackModule {
     fun providePlaybackController(
         factory: PlaybackControllerFactory,
         playbackStore: PlaybackStore,
-    ): PlaybackController = factory.create(playbackStore)
+        favoriteMutator: FavoriteMutator,
+    ): PlaybackController = factory.create(playbackStore, favoriteMutator)
 
     @Provides
     fun providePlaybackQueueResolver(
