@@ -17,6 +17,7 @@ import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.favorite.domain.FavoriteMutator
+import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackControllerFactory
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
@@ -25,11 +26,16 @@ import info.jukov.player.feature.playback.domain.appendQueueItems
 import info.jukov.player.feature.playback.domain.moveFutureQueueItem
 import info.jukov.player.feature.playback.domain.moveFutureQueueItemsToTop
 import info.jukov.player.feature.playback.domain.removeFutureQueueItems
+import info.jukov.player.feature.playback.domain.withTrackFavorite
 import info.jukov.player.feature.track.domain.Track
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 class AndroidPlaybackControllerFactory(
     private val context: Context,
@@ -38,16 +44,18 @@ class AndroidPlaybackControllerFactory(
         playbackStore: PlaybackStore,
         favoriteMutator: FavoriteMutator,
     ): PlaybackController =
-        AndroidPlaybackController(context, playbackStore)
+        AndroidPlaybackController(context, playbackStore, favoriteMutator)
 }
 
 @OptIn(UnstableApi::class)
 private class AndroidPlaybackController(
     context: Context,
     private val playbackStore: PlaybackStore,
+    private val favoriteMutator: FavoriteMutator,
 ) : PlaybackController {
     private val appContext = context.applicationContext
     private val handler = Handler(Looper.getMainLooper())
+    private val integrationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var controller: MediaController? = null
     private var queuedAction: ((MediaController) -> Unit)? = null
 
@@ -72,6 +80,7 @@ private class AndroidPlaybackController(
     }
 
     init {
+        observeFavoriteChanges()
         val token = SessionToken(appContext, ComponentName(appContext, PlaybackService::class.java))
         val future = MediaController.Builder(appContext, token).buildAsync()
         future.addListener(
@@ -89,6 +98,28 @@ private class AndroidPlaybackController(
             },
             appContext.mainExecutor,
         )
+    }
+
+    private fun observeFavoriteChanges() {
+        integrationScope.launch {
+            favoriteMutator.changes.collect { change ->
+                if (change.target is FavoriteTarget.Track) {
+                    updateFavoriteState(change.target.id, change.isFavorite)
+                }
+            }
+        }
+    }
+
+    private fun updateFavoriteState(trackId: String, isFavorite: Boolean) {
+        val snapshot = _state.value.content ?: return
+        val queue = snapshot.queue.withTrackFavorite(trackId, isFavorite)
+        if (queue == snapshot.queue) {
+            return
+        }
+        playbackStore.write(queue, snapshot.currentIndex, snapshot.origin)
+        _state.update { current ->
+            current.mapContent { value -> value.copy(queue = queue) }
+        }
     }
 
     override fun play(tracks: List<Track>, startIndex: Int) {

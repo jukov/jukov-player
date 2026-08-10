@@ -4,6 +4,7 @@ import info.jukov.player.feature.playback.data.PersistedPlaybackState
 import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.track.domain.Track
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -22,6 +23,17 @@ class PlaybackFavoriteStateTest {
         assertFalse(store.saved.queue[0].isFavorite)
         assertTrue(store.saved.queue[1].isFavorite)
         assertTrue(store.saved.currentIndex == 1)
+    }
+
+    @Test
+    fun favoriteChangeSurvivesFollowingQueueAppend() {
+        val favoriteQueue = listOf(track("current"))
+            .withTrackFavorite("current", isFavorite = true)
+
+        val updatedQueue = appendQueueItems(favoriteQueue, listOf(track("next")))
+
+        assertTrue(updatedQueue.first().isFavorite)
+        assertEquals(listOf("current", "next"), updatedQueue.map(Track::id))
     }
 
     private fun track(id: String) = Track(
