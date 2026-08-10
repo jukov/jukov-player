@@ -54,7 +54,10 @@
 - Start by reading the relevant code and asking questions only when the requirements are materially ambiguous and cannot be answered from the repository.
 - Keep implementation, tests, and documentation changes in the same branch when they belong to the same task.
 - Before handoff, run `./scripts/check-fast.sh`. Run `./scripts/check-full.sh` when changes touch shared platform behavior, Gradle, CI, or iOS-relevant code.
-- Create or update a GitHub Pull Request after local checks pass. Merge remains manual.
+- Always create or update the GitHub Pull Request yourself after local checks pass; do not hand PR creation back to the user.
+- If the primary PR command fails, exhaust other available authenticated GitHub mechanisms before reporting a blocker. A compare link is only a fallback when the environment has no working PR-write capability.
+- Keep the PR title, description, verification results, residual risks, and reviewed head SHA current.
+- Merge remains manual.
 - Do not enable auto-merge or merge from an agent unless the user explicitly requests it.
 
 ## Testing Requirements
