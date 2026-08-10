@@ -37,6 +37,12 @@ macOS iOS checks run only when needed:
 - on nightly scheduled runs;
 - on manual `workflow_dispatch`.
 
+Every PR also reports a stable `Required PR checks` gate. Branch protection for `main`
+requires this gate and an up-to-date branch before merge. The gate requires Linux fast
+checks on every PR and macOS iOS checks whenever the changed paths make them relevant.
+Changes to `main` must go through a pull request; no approving GitHub review is required
+by branch protection because independent AI review is tracked separately in the PR.
+
 Android device smoke checks are manual-only in the MVP. Add real instrumented tests before making them required.
 
 ## Minutes Strategy
