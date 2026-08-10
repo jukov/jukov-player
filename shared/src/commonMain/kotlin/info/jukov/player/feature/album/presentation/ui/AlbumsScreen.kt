@@ -476,11 +476,11 @@ fun AlbumSelectionBadge(
 @Composable
 fun AlbumSelectionTopAppBar(
     selectedCount: Int,
-    allSelectedFavorite: Boolean,
     onClose: () -> Unit,
-    onFavorite: () -> Unit,
     onDownload: () -> Unit,
     onAddToQueue: () -> Unit,
+    allSelectedFavorite: Boolean = false,
+    onFavorite: (() -> Unit)? = null,
     onAddToPlaylist: (() -> Unit)? = null,
     removesDownloads: Boolean = false,
 ) {
@@ -492,19 +492,21 @@ fun AlbumSelectionTopAppBar(
             }
         },
         actions = {
-            IconButton(onClick = onFavorite) {
-                Icon(
-                    painterResource(
-                        if (allSelectedFavorite) Res.drawable.heart_outline else Res.drawable.heart,
-                    ),
-                    stringResource(
-                        if (allSelectedFavorite) {
-                            Res.string.remove_from_favorites
-                        } else {
-                            Res.string.favorite_selected_albums
-                        },
-                    ),
-                )
+            onFavorite?.let { action ->
+                IconButton(onClick = action) {
+                    Icon(
+                        painterResource(
+                            if (allSelectedFavorite) Res.drawable.heart_outline else Res.drawable.heart,
+                        ),
+                        stringResource(
+                            if (allSelectedFavorite) {
+                                Res.string.remove_from_favorites
+                            } else {
+                                Res.string.favorite_selected_albums
+                            },
+                        ),
+                    )
+                }
             }
             IconButton(onClick = onDownload) {
                 Icon(

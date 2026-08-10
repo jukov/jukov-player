@@ -16,7 +16,6 @@ import info.jukov.player.feature.download.presentation.DownloadDelegate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.subsonic.data.SubsonicApiClient
 
 @BindingContainer
@@ -50,6 +49,5 @@ object DownloadsModule {
     @Provides
     fun provideDownloadsViewModel(
         repository: DownloadsRepository,
-        favoriteDelegate: FavoriteDelegate,
-    ): DownloadsViewModel = DownloadsViewModel(repository, favoriteDelegate)
+    ): DownloadsViewModel = DownloadsViewModel(repository)
 }

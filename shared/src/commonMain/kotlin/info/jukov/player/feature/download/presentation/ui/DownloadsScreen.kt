@@ -110,11 +110,7 @@ fun DownloadsScreen(
                 if (trackSelectionState.isActive) {
                     TrackSelectionTopAppBar(
                         selectedCount = trackSelectionState.selectedCount,
-                        allSelectedFavorite = trackSelectionState.areAllSelectedFavorite(tracks),
                         onClose = trackSelectionState::clear,
-                        onFavorite = {
-                            trackSelectionState.finish(tracks, viewModel::toggleFavorites)
-                        },
                         onDownload = {
                             trackSelectionState.finish(tracks, viewModel::removeTracks)
                         },
@@ -124,11 +120,7 @@ fun DownloadsScreen(
                 } else if (albumSelectionState.isActive) {
                     AlbumSelectionTopAppBar(
                         selectedCount = albumSelectionState.selectedCount,
-                        allSelectedFavorite = albumSelectionState.areAllSelectedFavorite(albums),
                         onClose = albumSelectionState::clear,
-                        onFavorite = {
-                            albumSelectionState.finish(albums, viewModel::toggleFavoriteAlbums)
-                        },
                         onDownload = {
                             albumSelectionState.finish(albums, viewModel::removeAlbums)
                         },
@@ -201,7 +193,6 @@ fun DownloadsScreen(
                                     downloadStatuses = library.tracks.associate { it.track.id to it.status },
                                     onCancelDownload = viewModel::removeTrack,
                                     onRetryDownload = viewModel::retryTrack,
-                                    onFavoriteClick = viewModel::toggleFavorite,
                                     selectionMode = trackSelectionState.isActive,
                                     selectedIds = trackSelectionState.selectedIds,
                                     onSelectionChange = trackSelectionState::setSelected,
@@ -294,9 +285,7 @@ fun OfflineAlbumTracksScreen(
             if (selectionState.isActive) {
                 TrackSelectionTopAppBar(
                     selectedCount = selectionState.selectedCount,
-                    allSelectedFavorite = selectionState.areAllSelectedFavorite(tracks),
                     onClose = selectionState::clear,
-                    onFavorite = { selectionState.finish(tracks, viewModel::toggleFavorites) },
                     onDownload = { selectionState.finish(tracks, viewModel::removeTracks) },
                     onAddToQueue = { selectionState.finish(tracks, onAddToQueue) },
                     removesDownloads = true,
@@ -324,7 +313,6 @@ fun OfflineAlbumTracksScreen(
             downloadStatuses = offlineTracks.associate { it.track.id to it.status },
             onCancelDownload = viewModel::removeTrack,
             onRetryDownload = viewModel::retryTrack,
-            onFavoriteClick = viewModel::toggleFavorite,
             selectionMode = selectionState.isActive,
             selectedIds = selectionState.selectedIds,
             onSelectionChange = selectionState::setSelected,
