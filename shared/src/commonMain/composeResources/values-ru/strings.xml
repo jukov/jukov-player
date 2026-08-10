@@ -40,7 +40,6 @@
     <string name="back">Назад</string>
     <string name="more">Ещё</string>
     <string name="retry">Повторить</string>
-    <string name="all_albums">Все альбомы</string>
     <string name="all_tracks">Все треки</string>
     <string name="sign_out">Выйти</string>
     <string name="sign_out_title">Выйти из аккаунта?</string>

@@ -40,7 +40,6 @@
     <string name="back">Back</string>
     <string name="more">More</string>
     <string name="retry">Retry</string>
-    <string name="all_albums">All albums</string>
     <string name="all_tracks">All tracks</string>
     <string name="sign_out">Sign out</string>
     <string name="sign_out_title">Sign out?</string>
