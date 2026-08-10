@@ -190,7 +190,6 @@ fun AppNavigation(
                             onArtistClick = { artist ->
                                 backStack.add(Routes.Albums(artist.id, artist.name))
                             },
-                            onAllAlbumsClick = { backStack.add(Routes.Albums()) },
                         )
                     }
                 }
