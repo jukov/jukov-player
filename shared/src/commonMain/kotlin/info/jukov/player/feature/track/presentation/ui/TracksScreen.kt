@@ -969,11 +969,11 @@ private fun SelectionBadge(selected: Boolean, title: String, modifier: Modifier 
 @Composable
 fun TrackSelectionTopAppBar(
     selectedCount: Int,
-    allSelectedFavorite: Boolean,
     onClose: () -> Unit,
-    onFavorite: () -> Unit,
     onDownload: () -> Unit,
     onAddToQueue: () -> Unit,
+    allSelectedFavorite: Boolean = false,
+    onFavorite: (() -> Unit)? = null,
     onAddToPlaylist: (() -> Unit)? = null,
     removesDownloads: Boolean = false,
 ) {
@@ -985,23 +985,25 @@ fun TrackSelectionTopAppBar(
             }
         },
         actions = {
-            IconButton(onClick = onFavorite) {
-                Icon(
-                    painterResource(
-                        if (allSelectedFavorite) {
-                            Res.drawable.heart_outline
-                        } else {
-                            Res.drawable.heart
-                        },
-                    ),
-                    stringResource(
-                        if (allSelectedFavorite) {
-                            Res.string.remove_from_favorites
-                        } else {
-                            Res.string.favorite_selected_tracks
-                        },
-                    ),
-                )
+            onFavorite?.let { action ->
+                IconButton(onClick = action) {
+                    Icon(
+                        painterResource(
+                            if (allSelectedFavorite) {
+                                Res.drawable.heart_outline
+                            } else {
+                                Res.drawable.heart
+                            },
+                        ),
+                        stringResource(
+                            if (allSelectedFavorite) {
+                                Res.string.remove_from_favorites
+                            } else {
+                                Res.string.favorite_selected_tracks
+                            },
+                        ),
+                    )
+                }
             }
             IconButton(onClick = onDownload) {
                 Icon(
