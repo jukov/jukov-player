@@ -34,6 +34,7 @@ fun PlaylistsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val pending by viewModel.pending.collectAsStateWithLifecycle()
     var creating by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     var error by remember { mutableStateOf<AppError?>(null) }
@@ -130,9 +131,11 @@ fun PlaylistsScreen(
     }
     if (creating) {
         CreatePlaylistDialog(
-            pending = false,
+            pending = pending,
             onDismiss = { creating = false },
-            onCreate = { viewModel.create(it) { creating = false } },
+            onCreate = { name, isPublic ->
+                viewModel.create(name, isPublic) { creating = false }
+            },
         )
     }
 }

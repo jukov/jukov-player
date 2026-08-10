@@ -34,12 +34,14 @@ fun PlaylistScreen(
 ) {
     LaunchedEffect(id) { viewModel.load(id) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val pending by viewModel.pending.collectAsStateWithLifecycle()
     val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val playlist = state.content
     val tracks = playlist?.tracks.orEmpty()
     var selected by remember(id) { mutableStateOf<Set<String>>(emptySet()) }
-    var confirmDelete by remember { mutableStateOf(false) }
+    var editing by remember(id) { mutableStateOf(false) }
+    var confirmDelete by remember(id) { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     var error by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { error = it } }
@@ -96,7 +98,7 @@ fun PlaylistScreen(
                             editable = editable,
                             onDownload = { viewModel.download(tracks) },
                             onAddToQueue = { onAddToQueue(tracks) },
-                            onDelete = { confirmDelete = true },
+                            onEdit = { editing = true },
                         )
                     }
                 },
@@ -140,14 +142,23 @@ fun PlaylistScreen(
             )
         }
     }
+    if (editing && playlist != null) {
+        EditPlaylistDialog(
+            playlist = playlist,
+            pending = pending,
+            onDismiss = { editing = false },
+            onSave = { name, isPublic ->
+                viewModel.update(name, isPublic) { editing = false }
+            },
+            onDelete = { confirmDelete = true },
+        )
+    }
     if (confirmDelete) {
         DeletePlaylistDialog(
             name = playlist?.name ?: title,
+            pending = pending,
             onDismiss = { confirmDelete = false },
-            onConfirm = {
-                confirmDelete = false
-                viewModel.delete(onDeleted)
-            },
+            onConfirm = { viewModel.delete(onDeleted) },
         )
     }
 }
@@ -195,7 +206,7 @@ private fun PlaylistActions(
     editable: Boolean,
     onDownload: () -> Unit,
     onAddToQueue: () -> Unit,
-    onDelete: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     IconButton(onClick = onDownload, enabled = tracks.isNotEmpty()) {
         Icon(
@@ -210,8 +221,8 @@ private fun PlaylistActions(
         )
     }
     if (editable) {
-        IconButton(onClick = onDelete) {
-            Icon(painterResource(Res.drawable.delete), stringResource(Res.string.delete_playlist))
+        IconButton(onClick = onEdit) {
+            Icon(painterResource(Res.drawable.edit), stringResource(Res.string.edit_playlist))
         }
     }
 }

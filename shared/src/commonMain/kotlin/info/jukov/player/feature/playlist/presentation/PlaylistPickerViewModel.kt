@@ -79,8 +79,12 @@ class PlaylistPickerViewModel(private val repository: PlaylistsRepository) : Vie
         repository.addTracks(playlist.id, _state.value.tracks.map(Track::id))
     }
 
-    fun create(name: String) = submit {
-        repository.createPlaylist(name.trim(), _state.value.tracks.map(Track::id))
+    fun create(name: String, isPublic: Boolean) = submit {
+        repository.createPlaylist(
+            name = name.trim(),
+            isPublic = isPublic,
+            songIds = _state.value.tracks.map(Track::id),
+        )
     }
 
     private fun submit(action: suspend () -> Result<Unit>) = viewModelScope.launch {

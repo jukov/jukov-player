@@ -20,10 +20,31 @@ class SubsonicPlaylistsApi(private val client: SubsonicApiClient) : PlaylistsApi
             ).response.playlist,
         ).toDomain(session)
 
-    override suspend fun createPlaylist(session: AuthSession, name: String, songIds: List<String>) {
-        mutate("createPlaylist", session, Parameters.build {
+    override suspend fun createPlaylist(
+        session: AuthSession,
+        name: String,
+        isPublic: Boolean,
+        songIds: List<String>,
+    ) {
+        val created = requireNotNull(
+            mutate("createPlaylist", session, Parameters.build {
+                append("name", name)
+                songIds.forEach { append("songId", it) }
+            }).response.playlist,
+        )
+        updatePlaylist(session, created.id, name, isPublic)
+    }
+
+    override suspend fun updatePlaylist(
+        session: AuthSession,
+        id: String,
+        name: String,
+        isPublic: Boolean,
+    ) {
+        mutate("updatePlaylist", session, Parameters.build {
+            append("playlistId", id)
             append("name", name)
-            songIds.forEach { append("songId", it) }
+            append("public", isPublic.toString())
         })
     }
 
@@ -45,13 +66,12 @@ class SubsonicPlaylistsApi(private val client: SubsonicApiClient) : PlaylistsApi
         mutate("deletePlaylist", session, Parameters.build { append("id", id) })
     }
 
-    private suspend fun mutate(endpoint: String, session: AuthSession, parameters: Parameters) {
+    private suspend fun mutate(endpoint: String, session: AuthSession, parameters: Parameters) =
         client.get(endpoint, session, PlaylistResponseDto.serializer(), parameters)
-    }
 
     private fun PlaylistDto.toDomain(session: AuthSession) = Playlist(
         id = id, name = name, owner = owner, songCount = songCount,
-        durationSeconds = duration, readOnly = readOnly,
+        durationSeconds = duration, readOnly = readOnly, isPublic = isPublic,
         tracks = entry.map { it.toDomain(session) },
     )
 
@@ -71,6 +91,7 @@ class SubsonicPlaylistsApi(private val client: SubsonicApiClient) : PlaylistsApi
 @Serializable private data class PlaylistDto(
     val id: String, val name: String, val owner: String? = null, val songCount: Int = 0,
     val duration: Long = 0, @SerialName("readonly") val readOnly: Boolean = false,
+    @SerialName("public") val isPublic: Boolean = false,
     val entry: List<PlaylistTrackDto> = emptyList(),
 )
 @Serializable private data class PlaylistTrackDto(

@@ -85,9 +85,20 @@ class DefaultPlaylistsRepository(
                 .map { Unit }
         }
 
-    override suspend fun createPlaylist(name: String, songIds: List<String>): Result<Unit> =
-        runCatching { api.createPlaylist(session(), name, songIds) }
+    override suspend fun createPlaylist(
+        name: String,
+        isPublic: Boolean,
+        songIds: List<String>,
+    ): Result<Unit> =
+        runCatching { api.createPlaylist(session(), name, isPublic, songIds) }
             .onSuccess { loadPlaylists(forceRefresh = true) }
+
+    override suspend fun updatePlaylist(id: String, name: String, isPublic: Boolean): Result<Unit> =
+        runCatching { api.updatePlaylist(session(), id, name, isPublic) }
+            .onSuccess {
+                loadPlaylist(id, forceRefresh = true)
+                loadPlaylists(forceRefresh = true)
+            }
 
     override suspend fun addTracks(playlistId: String, songIds: List<String>): Result<Unit> =
         runCatching { api.addTracks(session(), playlistId, songIds) }
