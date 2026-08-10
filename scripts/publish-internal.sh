@@ -9,8 +9,9 @@ Publishes a signed, minified App Bundle to Google Play Internal Testing.
 
 Authentication (choose one):
   1. Save the service-account key as ./play-service-account.json
-  2. Set GOOGLE_PLAY_SERVICE_ACCOUNT_FILE to its path
-  3. Set ANDROID_PUBLISHER_CREDENTIALS to the JSON contents
+  2. Save it in the repository's primary Git worktree
+  3. Set GOOGLE_PLAY_SERVICE_ACCOUNT_FILE to its path
+  4. Set ANDROID_PUBLISHER_CREDENTIALS to the JSON contents
 
 Example:
   ./scripts/publish-internal.sh 2 1.0.1
@@ -42,6 +43,13 @@ fi
 
 if [[ -z "${ANDROID_PUBLISHER_CREDENTIALS:-}" ]]; then
   credentials_file="${GOOGLE_PLAY_SERVICE_ACCOUNT_FILE:-play-service-account.json}"
+  if [[ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_FILE:-}" ]] && [[ ! -f "$credentials_file" ]]; then
+    primary_worktree="$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -n 1)"
+    primary_credentials_file="$primary_worktree/play-service-account.json"
+    if [[ -n "$primary_worktree" ]] && [[ -f "$primary_credentials_file" ]]; then
+      credentials_file="$primary_credentials_file"
+    fi
+  fi
   if [[ ! -f "$credentials_file" ]]; then
     echo "Google Play credentials not found at: $credentials_file" >&2
     echo "See --help for supported authentication options." >&2

@@ -50,7 +50,9 @@ native debug symbols, to Google Play Internal Testing:
 1. Create a Google Play service account with access to the app and enable the
    Android Publisher API.
 2. Save its JSON key as `play-service-account.json` in the project root (the
-   file is ignored by Git), or set `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`.
+   file is ignored by Git), or set `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`. When the
+   command runs from another Git worktree, it also looks for the ignored file in
+   the repository's primary worktree.
 3. Use a new version code for every upload:
 
 ```shell
