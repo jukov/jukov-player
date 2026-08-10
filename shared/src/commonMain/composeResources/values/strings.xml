@@ -81,6 +81,8 @@
     <string name="remove_track_from_queue">Remove %1$s from queue</string>
     <string name="pause">Pause</string>
     <string name="play">Play</string>
+    <string name="track_loading">Track is loading</string>
+    <string name="track_playing">Track is playing</string>
     <string name="remove_from_favorites">Remove from favorites</string>
     <string name="add_to_favorites">Add to favorites</string>
 
