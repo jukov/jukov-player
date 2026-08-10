@@ -30,6 +30,8 @@ class PlaylistsViewModel(private val repository: PlaylistsRepository) : ViewMode
     }.stateIn(viewModelScope, SharingStarted.Eagerly, repository.playlists.value)
     private val _messages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
     val messages = _messages.asSharedFlow()
+    private val _pending = MutableStateFlow(false)
+    val pending = _pending.asStateFlow()
     fun isEditable(playlist: Playlist) = repository.isEditable(playlist)
     fun openSearch() { _searchActive.value = true }
     fun updateSearchQuery(value: String) { _searchQuery.value = value }
@@ -41,11 +43,16 @@ class PlaylistsViewModel(private val repository: PlaylistsRepository) : ViewMode
         }
     }
 
-    fun create(name: String, onCreated: () -> Unit = {}) = viewModelScope.launch {
-        repository.createPlaylist(name.trim())
-            .onSuccess {
+    fun create(name: String, isPublic: Boolean, onCreated: () -> Unit = {}) = viewModelScope.launch {
+        _pending.value = true
+        repository.createPlaylist(name.trim(), isPublic)
+            .onSuccess { result ->
+                if (!result.settingsSynced) {
+                    _messages.tryEmit(AppError.PlaylistUpdateFailed)
+                }
                 onCreated()
             }
             .onFailure { _messages.tryEmit(it.toAppError(AppError.PlaylistUpdateFailed)) }
+        _pending.value = false
     }
 }

@@ -1,12 +1,14 @@
 package info.jukov.player.feature.playlist.presentation.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import info.jukov.player.core.domain.AppError
@@ -27,50 +29,79 @@ fun PlaylistPickerHost(viewModel: PlaylistPickerViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var error by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { error = it } }
-    if (!state.visible) return
-    val dismissBlocked by rememberUpdatedState(state.pending)
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { target ->
-            target != SheetValue.Hidden || !dismissBlocked
-        },
-    )
-    LaunchedEffect(state.submission) {
-        if (state.submission == PlaylistPickerSubmission.Success) {
-            delay(SUCCESS_DISPLAY_DURATION_MILLIS)
-            viewModel.dismiss()
+    val snackbar = remember { SnackbarHostState() }
+    val errorMessage = error?.localizedMessage()
+    LaunchedEffect(errorMessage, state.visible) {
+        if (errorMessage != null && !state.visible) {
+            snackbar.showSnackbar(errorMessage)
+            error = null
         }
     }
-    ModalBottomSheet(
-        onDismissRequest = viewModel::dismiss,
-        sheetState = sheetState,
-    ) {
-        when (state.submission) {
-            PlaylistPickerSubmission.Idle -> PlaylistPickerContent(
-                playlists = state.playlists,
-                error = error,
-                onCreate = viewModel::showCreate,
-                onAddTo = viewModel::addTo,
-            )
-            PlaylistPickerSubmission.Pending -> PlaylistPickerStatus(
-                message = stringResource(Res.string.adding_to_playlist),
-            ) {
-                LoadingIndicator()
+    if (state.visible) {
+        val dismissBlocked by rememberUpdatedState(state.pending)
+        val sheetState = rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { target ->
+                target != SheetValue.Hidden || !dismissBlocked
+            },
+        )
+        LaunchedEffect(state.submission) {
+            if (state.submission == PlaylistPickerSubmission.Success) {
+                delay(SUCCESS_DISPLAY_DURATION_MILLIS)
+                viewModel.dismiss()
             }
-            PlaylistPickerSubmission.Success -> PlaylistPickerStatus(
-                message = stringResource(Res.string.added_to_playlist),
-            ) {
-                Icon(
-                    painter = painterResource(Res.drawable.check),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp),
+        }
+        ModalBottomSheet(
+            onDismissRequest = viewModel::dismiss,
+            sheetState = sheetState,
+        ) {
+            when (state.submission) {
+                PlaylistPickerSubmission.Idle -> PlaylistPickerContent(
+                    playlists = state.playlists,
+                    error = error.takeUnless { state.creating },
+                    onCreate = {
+                        error = null
+                        viewModel.showCreate()
+                    },
+                    onAddTo = { playlist ->
+                        error = null
+                        viewModel.addTo(playlist)
+                    },
                 )
+                PlaylistPickerSubmission.Pending -> PlaylistPickerStatus(
+                    message = stringResource(Res.string.adding_to_playlist),
+                ) {
+                    LoadingIndicator()
+                }
+                PlaylistPickerSubmission.Success -> PlaylistPickerStatus(
+                    message = stringResource(Res.string.added_to_playlist),
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.check),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp),
+                    )
+                }
             }
         }
+        if (state.creating) {
+            CreatePlaylistDialog(
+                pending = state.pending,
+                errorMessage = errorMessage,
+                onDismiss = viewModel::hideCreate,
+                onCreate = { name, isPublic ->
+                    error = null
+                    viewModel.create(name, isPublic)
+                },
+            )
+        }
     }
-    if (state.creating) {
-        CreatePlaylistDialog(state.pending, viewModel::hideCreate, viewModel::create)
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        SnackbarHost(
+            hostState = snackbar,
+            modifier = Modifier.navigationBarsPadding().padding(Padding.medium),
+        )
     }
 }
 
@@ -139,25 +170,47 @@ private fun PlaylistPickerStatus(
 @Composable
 internal fun CreatePlaylistDialog(
     pending: Boolean,
+    errorMessage: String? = null,
     onDismiss: () -> Unit,
-    onCreate: (String) -> Unit,
+    onCreate: (String, Boolean) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
+    var isPublic by remember { mutableStateOf(false) }
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            if (!pending) {
+                onDismiss()
+            }
+        },
         title = { Text(stringResource(Res.string.create_playlist)) },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                enabled = !pending,
-                singleLine = true,
-                label = { Text(stringResource(Res.string.playlist_name)) },
-            )
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    enabled = !pending,
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.playlist_name)) },
+                )
+                Spacer(Modifier.height(Padding.medium))
+                PlaylistVisibilityControl(
+                    isPublic = isPublic,
+                    enabled = !pending,
+                    onChange = { isPublic = it },
+                )
+                if (errorMessage != null) {
+                    Spacer(Modifier.height(Padding.medium))
+                    Text(
+                        errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
         },
         confirmButton = {
             TextButton(
-                onClick = { onCreate(name.trim()) },
+                onClick = { onCreate(name.trim(), isPublic) },
                 enabled = name.isNotBlank() && !pending,
             ) {
                 if (pending) {
@@ -181,28 +234,131 @@ internal fun CreatePlaylistDialog(
 private const val SUCCESS_DISPLAY_DURATION_MILLIS = 1_500L
 
 @Composable
-internal fun DeletePlaylistDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+internal fun EditPlaylistDialog(
+    playlist: Playlist,
+    pending: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String, Boolean) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var name by remember(playlist.id, playlist.name) { mutableStateOf(playlist.name) }
+    var isPublic by remember(playlist.id, playlist.isPublic) { mutableStateOf(playlist.isPublic) }
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            if (!pending) {
+                onDismiss()
+            }
+        },
+        title = { Text(stringResource(Res.string.edit_playlist)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    enabled = !pending,
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.playlist_name)) },
+                )
+                Spacer(Modifier.height(Padding.medium))
+                PlaylistVisibilityControl(
+                    isPublic = isPublic,
+                    enabled = !pending,
+                    onChange = { isPublic = it },
+                )
+                Spacer(Modifier.height(Padding.medium))
+                TextButton(onClick = onDelete, enabled = !pending) {
+                    Text(
+                        stringResource(Res.string.delete_playlist),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(name.trim(), isPublic) },
+                enabled = name.isNotBlank() && !pending,
+            ) { Text(stringResource(Res.string.save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !pending) {
+                Text(stringResource(Res.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun PlaylistVisibilityControl(
+    isPublic: Boolean,
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().toggleable(
+            value = isPublic,
+            enabled = enabled,
+            role = Role.Switch,
+            onValueChange = onChange,
+        ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(Res.string.public_playlist))
+            Text(
+                stringResource(Res.string.public_playlist_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = isPublic, onCheckedChange = null, enabled = enabled)
+    }
+}
+
+@Composable
+internal fun DeletePlaylistDialog(
+    name: String,
+    pending: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = {
+            if (!pending) {
+                onDismiss()
+            }
+        },
         title = { Text(stringResource(Res.string.delete_playlist_title)) },
         text = { Text(stringResource(Res.string.delete_playlist_message, name)) },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(Res.string.delete)) }
+            TextButton(onClick = onConfirm, enabled = !pending) {
+                Text(stringResource(Res.string.delete))
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
+            TextButton(onClick = onDismiss, enabled = !pending) {
+                Text(stringResource(Res.string.cancel))
+            }
         },
     )
 }
 
 @Composable
 internal fun ReadOnlyPill() {
+    PlaylistPill(
+        text = stringResource(Res.string.read_only),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+    )
+}
+
+@Composable
+private fun PlaylistPill(text: String, color: Color) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = color,
     ) {
         Text(
-            stringResource(Res.string.read_only),
+            text,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.padding(horizontal = Padding.small, vertical = Padding.xSmall),
         )
