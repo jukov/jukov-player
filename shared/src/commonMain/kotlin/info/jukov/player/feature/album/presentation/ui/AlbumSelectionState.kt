@@ -44,10 +44,17 @@ class AlbumSelectionState internal constructor() {
 @Composable
 fun rememberAlbumSelectionState(
     albums: List<Album>,
+    active: Boolean = true,
     key: Any? = Unit,
 ): AlbumSelectionState {
     val state = remember(key) { AlbumSelectionState() }
     val validIds = albums.mapTo(mutableSetOf(), Album::id)
-    LaunchedEffect(state, validIds) { state.retain(validIds) }
+    LaunchedEffect(state, active, validIds) {
+        if (active) {
+            state.retain(validIds)
+        } else {
+            state.clear()
+        }
+    }
     return state
 }

@@ -447,7 +447,7 @@ private fun AlbumDownloadBadge(
 }
 
 @Composable
-private fun AlbumSelectionBadge(
+fun AlbumSelectionBadge(
     selected: Boolean,
     title: String,
     modifier: Modifier = Modifier,
@@ -474,14 +474,15 @@ private fun AlbumSelectionBadge(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AlbumSelectionTopAppBar(
+fun AlbumSelectionTopAppBar(
     selectedCount: Int,
     allSelectedFavorite: Boolean,
     onClose: () -> Unit,
     onFavorite: () -> Unit,
     onDownload: () -> Unit,
     onAddToQueue: () -> Unit,
-    onAddToPlaylist: () -> Unit,
+    onAddToPlaylist: (() -> Unit)? = null,
+    removesDownloads: Boolean = false,
 ) {
     TopAppBar(
         title = { Text(stringResource(Res.string.selected_albums, selectedCount)) },
@@ -507,8 +508,20 @@ private fun AlbumSelectionTopAppBar(
             }
             IconButton(onClick = onDownload) {
                 Icon(
-                    painterResource(Res.drawable.download),
-                    stringResource(Res.string.download_selected_albums),
+                    painterResource(
+                        if (removesDownloads) {
+                            Res.drawable.download_off
+                        } else {
+                            Res.drawable.download
+                        },
+                    ),
+                    stringResource(
+                        if (removesDownloads) {
+                            Res.string.remove_selected_downloads
+                        } else {
+                            Res.string.download_selected_albums
+                        },
+                    ),
                 )
             }
             IconButton(onClick = onAddToQueue) {
@@ -517,8 +530,10 @@ private fun AlbumSelectionTopAppBar(
                     stringResource(Res.string.add_selected_albums_to_queue),
                 )
             }
-            IconButton(onClick = onAddToPlaylist) {
-                Icon(painterResource(Res.drawable.playlist_plus), stringResource(Res.string.add_to_playlist))
+            onAddToPlaylist?.let { action ->
+                IconButton(onClick = action) {
+                    Icon(painterResource(Res.drawable.playlist_plus), stringResource(Res.string.add_to_playlist))
+                }
             }
         },
     )

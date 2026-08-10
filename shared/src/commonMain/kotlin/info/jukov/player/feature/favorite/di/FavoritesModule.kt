@@ -16,6 +16,7 @@ import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.core.data.cache.CacheDao
 import info.jukov.player.core.data.cache.LibraryCachePolicy
 import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.track.domain.GetTracksUseCase
 
 @BindingContainer
 object FavoritesModule {
@@ -35,7 +36,8 @@ object FavoritesModule {
     fun provideViewModel(
         repository: FavoritesRepository,
         downloadDelegate: DownloadDelegate,
-    ): FavoritesViewModel = FavoritesViewModel(repository, downloadDelegate)
+        getTracksUseCase: GetTracksUseCase,
+    ): FavoritesViewModel = FavoritesViewModel(repository, downloadDelegate, getTracksUseCase)
 
     @Provides @SingleIn(AppScope::class)
     fun provideFavoriteDelegate(repository: FavoritesRepository): FavoriteDelegate =

@@ -16,6 +16,7 @@ import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.favoriteStateForSelection
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.album.domain.Album
 
 enum class DownloadsTab { Tracks, Albums }
 
@@ -53,6 +54,9 @@ class DownloadsViewModel(
         repository.removeTracks(tracks.map(Track::id))
     }
     fun removeAlbum(id: String) = viewModelScope.launch { repository.cancelAlbum(id) }
+    fun removeAlbums(albums: List<Album>) = viewModelScope.launch {
+        albums.forEach { repository.cancelAlbum(it.id) }
+    }
     fun removeAll() = viewModelScope.launch { repository.clearCurrentAccount() }
     fun retryTrack(id: String) = viewModelScope.launch { repository.retryTrack(id) }
     fun albumTracks(id: String): Flow<List<OfflineTrack>> = repository.observeAlbumTracks(id)
@@ -62,5 +66,9 @@ class DownloadsViewModel(
     fun toggleFavorites(tracks: List<Track>) = viewModelScope.launch {
         val desired = favoriteStateForSelection(tracks)
         favoriteDelegate.set(tracks, desired) { _, _ -> }
+    }
+    fun toggleFavoriteAlbums(albums: List<Album>) = viewModelScope.launch {
+        val desired = albums.any { !it.isFavorite }
+        favoriteDelegate.setAlbums(albums, desired) { _, _ -> }
     }
 }

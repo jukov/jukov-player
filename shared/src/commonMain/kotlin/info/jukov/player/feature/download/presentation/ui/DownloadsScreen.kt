@@ -1,6 +1,7 @@
 package info.jukov.player.feature.download.presentation.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,6 +28,9 @@ import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import info.jukov.player.feature.download.domain.*
+import info.jukov.player.feature.album.presentation.ui.AlbumSelectionBadge
+import info.jukov.player.feature.album.presentation.ui.AlbumSelectionTopAppBar
+import info.jukov.player.feature.album.presentation.ui.rememberAlbumSelectionState
 import info.jukov.player.feature.download.presentation.DownloadsTab
 import info.jukov.player.feature.download.presentation.DownloadsViewModel
 import info.jukov.player.feature.track.domain.Track
@@ -60,6 +64,7 @@ fun DownloadsScreen(
     var confirmRemoveAll by remember { mutableStateOf(false) }
     val library = state.content ?: OfflineLibrary()
     val tracks = library.tracks.map { it.track }
+    val albums = library.albums.map { it.album }
     val browseTracksListState = rememberLazyListState()
     val searchTracksListState = rememberLazyListState()
     val browseAlbumsListState = rememberLazyListState()
@@ -84,25 +89,58 @@ fun DownloadsScreen(
             searchAlbumsListState.scrollToItem(0)
         }
     }
-    val selectionState = rememberTrackSelectionState(
+    val trackSelectionState = rememberTrackSelectionState(
         tracks = tracks,
         active = tab == DownloadsTab.Tracks,
     )
+    val albumSelectionState = rememberAlbumSelectionState(
+        albums = albums,
+        active = tab == DownloadsTab.Albums,
+    )
     PlayerBackHandler(
-        enabled = selectionState.isActive,
-        onBack = selectionState::clear,
+        enabled = trackSelectionState.isActive || albumSelectionState.isActive,
+        onBack = {
+            trackSelectionState.clear()
+            albumSelectionState.clear()
+        },
     )
     Scaffold(
         topBar = {
             Column {
-                if (selectionState.isActive) {
+                if (trackSelectionState.isActive) {
                     TrackSelectionTopAppBar(
-                        selectedCount = selectionState.selectedCount,
-                        allSelectedFavorite = selectionState.areAllSelectedFavorite(tracks),
-                        onClose = selectionState::clear,
-                        onFavorite = { selectionState.finish(tracks, viewModel::toggleFavorites) },
-                        onDownload = { selectionState.finish(tracks, viewModel::removeTracks) },
-                        onAddToQueue = { selectionState.finish(tracks, onAddToQueue) },
+                        selectedCount = trackSelectionState.selectedCount,
+                        allSelectedFavorite = trackSelectionState.areAllSelectedFavorite(tracks),
+                        onClose = trackSelectionState::clear,
+                        onFavorite = {
+                            trackSelectionState.finish(tracks, viewModel::toggleFavorites)
+                        },
+                        onDownload = {
+                            trackSelectionState.finish(tracks, viewModel::removeTracks)
+                        },
+                        onAddToQueue = { trackSelectionState.finish(tracks, onAddToQueue) },
+                        removesDownloads = true,
+                    )
+                } else if (albumSelectionState.isActive) {
+                    AlbumSelectionTopAppBar(
+                        selectedCount = albumSelectionState.selectedCount,
+                        allSelectedFavorite = albumSelectionState.areAllSelectedFavorite(albums),
+                        onClose = albumSelectionState::clear,
+                        onFavorite = {
+                            albumSelectionState.finish(albums, viewModel::toggleFavoriteAlbums)
+                        },
+                        onDownload = {
+                            albumSelectionState.finish(albums, viewModel::removeAlbums)
+                        },
+                        onAddToQueue = {
+                            albumSelectionState.finish(albums) { selected ->
+                                val selectedIds = selected.mapTo(mutableSetOf()) { it.id }
+                                onAddToQueue(
+                                    library.albums.filter { it.album.id in selectedIds }
+                                        .flatMap { album -> album.tracks.map { it.track } },
+                                )
+                            }
+                        },
                         removesDownloads = true,
                     )
                 } else {
@@ -164,9 +202,9 @@ fun DownloadsScreen(
                                     onCancelDownload = viewModel::removeTrack,
                                     onRetryDownload = viewModel::retryTrack,
                                     onFavoriteClick = viewModel::toggleFavorite,
-                                    selectionMode = selectionState.isActive,
-                                    selectedIds = selectionState.selectedIds,
-                                    onSelectionChange = selectionState::setSelected,
+                                    selectionMode = trackSelectionState.isActive,
+                                    selectedIds = trackSelectionState.selectedIds,
+                                    onSelectionChange = trackSelectionState::setSelected,
                                     trailingAction = TrackTrailingAction.RemoveDownload,
                                     listState = if (searchActive) searchTracksListState else browseTracksListState,
                                 )
@@ -193,6 +231,11 @@ fun DownloadsScreen(
                                         isPlaying = isPlaying &&
                                             album.tracks.any { it.track.id == activeTrackId },
                                         isLoading = album.tracks.any { it.track.id == loadingTrackId },
+                                        selectionMode = albumSelectionState.isActive,
+                                        selected = album.album.id in albumSelectionState.selectedIds,
+                                        onSelectedChange = {
+                                            albumSelectionState.setSelected(album.album.id, it)
+                                        },
                                     )
                                 }
                             }
@@ -291,6 +334,7 @@ fun OfflineAlbumTracksScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun OfflineAlbumRow(
     album: OfflineAlbum,
@@ -299,9 +343,21 @@ private fun OfflineAlbumRow(
     onPlay: () -> Unit,
     isPlaying: Boolean,
     isLoading: Boolean,
+    selectionMode: Boolean,
+    selected: Boolean,
+    onSelectedChange: (Boolean) -> Unit,
 ) {
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier.combinedClickable(
+            onClick = {
+                if (selectionMode) {
+                    onSelectedChange(!selected)
+                } else {
+                    onClick()
+                }
+            },
+            onLongClick = { onSelectedChange(true) },
+        ),
         leadingContent = {
             Box(
                 modifier = Modifier.size(56.dp)
@@ -325,24 +381,33 @@ private fun OfflineAlbumRow(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                if (selectionMode) {
+                    AlbumSelectionBadge(
+                        selected = selected,
+                        title = album.album.name,
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                    )
+                }
             }
         },
         headlineContent = { Text(album.album.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(album.album.artist, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         trailingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onRemove) {
-                    Icon(
-                        painter = painterResource(Res.drawable.delete),
-                        contentDescription = stringResource(Res.string.remove_download),
+            if (!selectionMode) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onRemove) {
+                        Icon(
+                            painter = painterResource(Res.drawable.delete),
+                            contentDescription = stringResource(Res.string.remove_download),
+                        )
+                    }
+                    DownloadPlayButton(
+                        isPlaying = isPlaying,
+                        isLoading = isLoading,
+                        onClick = onPlay,
+                        status = album.status,
                     )
                 }
-                DownloadPlayButton(
-                    isPlaying = isPlaying,
-                    isLoading = isLoading,
-                    onClick = onPlay,
-                    status = album.status,
-                )
             }
         },
     )
