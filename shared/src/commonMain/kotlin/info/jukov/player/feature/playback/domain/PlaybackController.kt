@@ -3,6 +3,7 @@ package info.jukov.player.feature.playback.domain
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.playback.data.PlaybackStore
+import info.jukov.player.feature.favorite.domain.FavoriteMutator
 import kotlinx.coroutines.flow.StateFlow
 
 interface PlaybackController {
@@ -27,5 +28,8 @@ interface PlaybackController {
 }
 
 fun interface PlaybackControllerFactory {
-    fun create(playbackStore: PlaybackStore): PlaybackController
+    fun create(
+        playbackStore: PlaybackStore,
+        favoriteMutator: FavoriteMutator,
+    ): PlaybackController
 }

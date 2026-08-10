@@ -18,6 +18,7 @@ import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
 import info.jukov.player.feature.favorite.di.FavoritesModule
 import info.jukov.player.feature.favorite.presentation.FavoritesViewModel
+import info.jukov.player.feature.favorite.domain.FavoriteMutator
 import androidx.room3.RoomDatabase
 import info.jukov.player.core.data.cache.CacheDatabase
 import info.jukov.player.core.data.cache.CacheDao
@@ -59,6 +60,7 @@ interface AppGraph {
     val playbackStore: PlaybackStore
     val playerViewModel: PlayerViewModel
     val favoritesViewModel: FavoritesViewModel
+    val favoriteMutator: FavoriteMutator
     val downloadsRepository: DownloadsRepository
     val offlinePlatform: OfflinePlatform
     val cacheDao: CacheDao

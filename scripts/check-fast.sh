@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-./gradlew --no-daemon --stacktrace \
+./scripts/test-configure-android-sdk.sh
+
+./gradlew --stacktrace \
   :shared:testAndroidHostTest \
   :androidApp:assembleDebug \
   :androidApp:lintDebug

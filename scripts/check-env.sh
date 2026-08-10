@@ -18,10 +18,7 @@ if [[ ! -x "./gradlew" ]]; then
   exit 1
 fi
 
-if [[ -z "${ANDROID_HOME:-}" && -z "${ANDROID_SDK_ROOT:-}" && ! -f "local.properties" ]]; then
-  echo "Android SDK location is not configured. Set ANDROID_HOME, ANDROID_SDK_ROOT, or provide local.properties." >&2
-  exit 1
-fi
+./scripts/configure-android-sdk.sh
 
 if [[ "${CONDUCTOR_IS_LOCAL:-0}" == "1" ]]; then
   xcode_developer_dir="${XCODE_DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
