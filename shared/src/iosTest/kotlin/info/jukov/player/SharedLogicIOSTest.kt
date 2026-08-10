@@ -18,6 +18,7 @@ import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
 import info.jukov.player.feature.playback.playbackLoadableState
+import info.jukov.player.feature.playback.playbackPositionMs
 import info.jukov.player.feature.playback.PlaybackToggleAction
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
 import info.jukov.player.feature.playback.isCurrentArtworkRequest
@@ -139,6 +140,26 @@ class SharedLogicIOSTest {
         assertEquals(12_345, terminalPlaybackPositionMs(0, 12_345))
         assertEquals(12_000, terminalPlaybackPositionMs(12_000, 12_345))
         assertEquals(0, terminalPlaybackPositionMs(0, null))
+    }
+
+    @Test
+    fun pendingSeekPositionIsStableUntilNativeSeekCompletes() {
+        assertEquals(
+            8_000,
+            playbackPositionMs(
+                positionOverrideMs = null,
+                pendingSeekPositionMs = 8_000,
+                currentPositionMs = 2_000,
+            ),
+        )
+        assertEquals(
+            9_000,
+            playbackPositionMs(
+                positionOverrideMs = 9_000,
+                pendingSeekPositionMs = 8_000,
+                currentPositionMs = 2_000,
+            ),
+        )
     }
 
     @Test
