@@ -9,9 +9,8 @@ interface PlaylistsApi {
     suspend fun createPlaylist(
         session: AuthSession,
         name: String,
-        isPublic: Boolean,
         songIds: List<String>,
-    )
+    ): Playlist?
     suspend fun updatePlaylist(session: AuthSession, id: String, name: String, isPublic: Boolean)
     suspend fun addTracks(session: AuthSession, playlistId: String, songIds: List<String>)
     suspend fun removeTracks(session: AuthSession, playlistId: String, songIndexes: List<Int>)

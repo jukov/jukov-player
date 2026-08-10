@@ -46,7 +46,10 @@ class PlaylistsViewModel(private val repository: PlaylistsRepository) : ViewMode
     fun create(name: String, isPublic: Boolean, onCreated: () -> Unit = {}) = viewModelScope.launch {
         _pending.value = true
         repository.createPlaylist(name.trim(), isPublic)
-            .onSuccess {
+            .onSuccess { result ->
+                if (!result.settingsSynced) {
+                    _messages.tryEmit(AppError.PlaylistUpdateFailed)
+                }
                 onCreated()
             }
             .onFailure { _messages.tryEmit(it.toAppError(AppError.PlaylistUpdateFailed)) }

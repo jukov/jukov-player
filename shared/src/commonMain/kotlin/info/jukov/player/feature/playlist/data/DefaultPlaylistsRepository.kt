@@ -7,6 +7,7 @@ import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.domain.toAppError
 import info.jukov.player.feature.playlist.domain.Playlist
+import info.jukov.player.feature.playlist.domain.PlaylistCreationResult
 import info.jukov.player.feature.playlist.domain.PlaylistsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -89,9 +90,27 @@ class DefaultPlaylistsRepository(
         name: String,
         isPublic: Boolean,
         songIds: List<String>,
-    ): Result<Unit> =
-        runCatching { api.createPlaylist(session(), name, isPublic, songIds) }
+    ): Result<PlaylistCreationResult> {
+        val session = session()
+        val previousIds = _playlists.value.content?.mapTo(mutableSetOf(), Playlist::id).orEmpty()
+        return runCatching { api.createPlaylist(session, name, songIds) }
+            .map { responsePlaylist ->
+                val created = responsePlaylist ?: runCatching { api.getPlaylists(session) }
+                    .getOrNull()
+                    ?.singleOrNull { playlist ->
+                        playlist.id !in previousIds && playlist.name == name
+                    }
+                val settingsSynced = when {
+                    created == null -> false
+                    created.isPublic == isPublic -> true
+                    else -> runCatching {
+                        api.updatePlaylist(session, created.id, name, isPublic)
+                    }.isSuccess
+                }
+                PlaylistCreationResult(settingsSynced = settingsSynced)
+            }
             .onSuccess { loadPlaylists(forceRefresh = true) }
+    }
 
     override suspend fun updatePlaylist(id: String, name: String, isPublic: Boolean): Result<Unit> =
         runCatching { api.updatePlaylist(session(), id, name, isPublic) }

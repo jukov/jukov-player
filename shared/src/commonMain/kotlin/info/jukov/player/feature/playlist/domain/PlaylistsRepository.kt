@@ -13,7 +13,7 @@ interface PlaylistsRepository {
         name: String,
         isPublic: Boolean,
         songIds: List<String> = emptyList(),
-    ): Result<Unit>
+    ): Result<PlaylistCreationResult>
     suspend fun updatePlaylist(id: String, name: String, isPublic: Boolean): Result<Unit>
     suspend fun addTracks(playlistId: String, songIds: List<String>): Result<Unit>
     suspend fun removeTracks(playlistId: String, songIndexes: List<Int>): Result<Unit>

@@ -23,17 +23,11 @@ class SubsonicPlaylistsApi(private val client: SubsonicApiClient) : PlaylistsApi
     override suspend fun createPlaylist(
         session: AuthSession,
         name: String,
-        isPublic: Boolean,
         songIds: List<String>,
-    ) {
-        val created = requireNotNull(
-            mutate("createPlaylist", session, Parameters.build {
-                append("name", name)
-                songIds.forEach { append("songId", it) }
-            }).response.playlist,
-        )
-        updatePlaylist(session, created.id, name, isPublic)
-    }
+    ): Playlist? = mutate("createPlaylist", session, Parameters.build {
+        append("name", name)
+        songIds.forEach { append("songId", it) }
+    }).response.playlist?.toDomain(session)
 
     override suspend fun updatePlaylist(
         session: AuthSession,

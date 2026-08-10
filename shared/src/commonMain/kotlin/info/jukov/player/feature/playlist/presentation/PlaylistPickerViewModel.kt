@@ -84,7 +84,11 @@ class PlaylistPickerViewModel(private val repository: PlaylistsRepository) : Vie
             name = name.trim(),
             isPublic = isPublic,
             songIds = _state.value.tracks.map(Track::id),
-        )
+        ).map { result ->
+            if (!result.settingsSynced) {
+                _messages.tryEmit(AppError.PlaylistUpdateFailed)
+            }
+        }
     }
 
     private fun submit(action: suspend () -> Result<Unit>) = viewModelScope.launch {

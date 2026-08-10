@@ -15,3 +15,5 @@ data class Playlist(
     fun isEditableBy(username: String): Boolean =
         !readOnly && (owner == null || owner.equals(username, ignoreCase = true))
 }
+
+data class PlaylistCreationResult(val settingsSynced: Boolean)
