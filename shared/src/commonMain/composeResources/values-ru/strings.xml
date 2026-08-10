@@ -12,7 +12,7 @@
     <string name="playlists">Плейлисты</string>
     <string name="playlist">Плейлист</string><string name="playlists_not_found">Плейлисты не найдены</string><string name="playlist_tracks_count">Треков: %1$d</string><string name="playlist_public_label">Публичный</string><string name="read_only">Только чтение</string>
     <string name="create_playlist">Создать плейлист</string><string name="edit_playlist">Редактировать плейлист</string><string name="playlist_name">Название плейлиста</string><string name="public_playlist">Публичный плейлист</string><string name="public_playlist_description">Виден всем пользователям</string><string name="create">Создать</string><string name="save">Сохранить</string><string name="cancel">Отмена</string>
-    <string name="add_to_playlist">Добавить в плейлист</string><string name="choose_playlist">Выберите плейлист</string><string name="create_and_add">Создать новый плейлист</string>
+    <string name="add_to_playlist">Добавить в плейлист</string><string name="choose_playlist">Выберите плейлист</string><string name="create_and_add">Создать новый плейлист</string><string name="adding_to_playlist">Добавляем в плейлист…</string><string name="added_to_playlist">Добавлено в плейлист</string>
     <string name="download_playlist">Скачать плейлист</string><string name="add_playlist_to_queue">Добавить плейлист в очередь</string><string name="delete_playlist">Удалить плейлист</string>
     <string name="delete_playlist_title">Удалить плейлист?</string><string name="delete_playlist_message">Плейлист «%1$s» будет навсегда удалён с сервера.</string><string name="delete">Удалить</string><string name="remove_from_playlist">Удалить выбранные треки из плейлиста</string>
     <string name="tracks">Треки</string>
