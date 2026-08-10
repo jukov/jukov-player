@@ -858,9 +858,8 @@ fun TrackRow(
 @Composable
 private fun TrackLoadingIndicator() {
     val description = stringResource(Res.string.track_loading)
-    CircularProgressIndicator(
-        modifier = Modifier.size(20.dp).semantics { contentDescription = description },
-        strokeWidth = 2.dp,
+    LoadingIndicator(
+        modifier = Modifier.size(16.dp).semantics { contentDescription = description },
     )
 }
 
@@ -888,7 +887,7 @@ private fun PlayingEqualizer() {
     val color = MaterialTheme.colorScheme.primary
     val description = stringResource(Res.string.track_playing)
     Canvas(
-        Modifier.size(20.dp).semantics { contentDescription = description },
+        Modifier.size(16.dp).semantics { contentDescription = description },
     ) {
         val barWidth = size.width * 0.18f
         val gap = size.width * 0.12f
