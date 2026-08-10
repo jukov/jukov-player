@@ -5,7 +5,10 @@ import androidx.lifecycle.viewModelScope
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.toAppError
 import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.track.domain.GetTracksUseCase
+import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.favoriteStateForSelection
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
@@ -25,6 +29,7 @@ enum class FavoritesTab { Tracks, Albums, Artists }
 class FavoritesViewModel(
     private val repository: FavoritesRepository,
     private val downloadDelegate: DownloadDelegate,
+    private val getTracksUseCase: GetTracksUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<Favorites>>(
         LoadableState.Loading(content = null),
@@ -128,6 +133,44 @@ class FavoritesViewModel(
             }
         }
     }
+
+    fun toggleFavoriteAlbums(albums: List<Album>) = viewModelScope.launch {
+        val desired = albums.any { !it.isFavorite }
+        val targets = albums.filter { it.isFavorite != desired }
+            .map { FavoriteTarget.Album(it.id) }
+        if (targets.isEmpty()) {
+            return@launch
+        }
+        _pending.update { it + targets }
+        repository.setFavorites(targets, desired)
+            .onSuccess {
+                _state.update { current ->
+                    LoadableState.Content(
+                        targets.fold(current.content ?: Favorites()) { favorites, target ->
+                            favorites.updateFavorite(target, desired)
+                        },
+                    )
+                }
+            }
+            .onFailure { error ->
+                _messages.tryEmit(error.toAppError(AppError.FavoriteUpdateFailed))
+            }
+        _pending.update { it - targets.toSet() }
+    }
+
+    fun downloadAlbums(albums: List<Album>) = viewModelScope.launch {
+        albums.forEach { downloadDelegate.download(it) }
+    }
+
+    fun addAlbumsToQueue(albums: List<Album>, onTracksReady: (List<Track>) -> Unit) =
+        viewModelScope.launch {
+            val tracks = albums.flatMap { album ->
+                getTracksUseCase(TracksFilter.ByAlbum(album.id))
+                    .first { it !is LoadableState.Loading }
+                    .content.orEmpty()
+            }
+            onTracksReady(tracks)
+        }
 
     private fun Favorites.updateFavorite(target: FavoriteTarget, isFavorite: Boolean) = when (target) {
         is FavoriteTarget.Track -> copy(

@@ -46,6 +46,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.album.presentation.ui.AlbumsGrid
+import info.jukov.player.feature.album.presentation.ui.AlbumSelectionTopAppBar
+import info.jukov.player.feature.album.presentation.ui.rememberAlbumSelectionState
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.artist.presentation.ui.ArtistRow
 import info.jukov.player.feature.artist.domain.Artist
@@ -91,13 +93,21 @@ fun FavoritesScreen(
     val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val visibleTracks = state.content?.tracks.orEmpty()
-    val selectionState = rememberTrackSelectionState(
+    val visibleAlbums = state.content?.albums.orEmpty()
+    val trackSelectionState = rememberTrackSelectionState(
         tracks = visibleTracks,
         active = selectedTab == FavoritesTab.Tracks,
     )
+    val albumSelectionState = rememberAlbumSelectionState(
+        albums = visibleAlbums,
+        active = selectedTab == FavoritesTab.Albums,
+    )
     PlayerBackHandler(
-        enabled = selectionState.isActive,
-        onBack = selectionState::clear,
+        enabled = trackSelectionState.isActive || albumSelectionState.isActive,
+        onBack = {
+            trackSelectionState.clear()
+            albumSelectionState.clear()
+        },
     )
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
@@ -136,16 +146,49 @@ fun FavoritesScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             Column {
-                if (selectionState.isActive) {
+                if (trackSelectionState.isActive) {
                     TrackSelectionTopAppBar(
-                        selectedCount = selectionState.selectedCount,
-                        allSelectedFavorite = selectionState.areAllSelectedFavorite(visibleTracks),
-                        onClose = selectionState::clear,
-                        onFavorite = { selectionState.finish(visibleTracks, viewModel::toggleFavorites) },
-                        onDownload = { selectionState.finish(visibleTracks, viewModel::downloadTracks) },
-                        onAddToQueue = { selectionState.finish(visibleTracks, onAddToQueue) },
+                        selectedCount = trackSelectionState.selectedCount,
+                        allSelectedFavorite = trackSelectionState.areAllSelectedFavorite(visibleTracks),
+                        onClose = trackSelectionState::clear,
+                        onFavorite = {
+                            trackSelectionState.finish(visibleTracks, viewModel::toggleFavorites)
+                        },
+                        onDownload = {
+                            trackSelectionState.finish(visibleTracks, viewModel::downloadTracks)
+                        },
+                        onAddToQueue = { trackSelectionState.finish(visibleTracks, onAddToQueue) },
                         onAddToPlaylist = {
-                            onAddToPlaylist(selectionState.selectedTracks(visibleTracks), selectionState::clear)
+                            onAddToPlaylist(
+                                trackSelectionState.selectedTracks(visibleTracks),
+                                trackSelectionState::clear,
+                            )
+                        },
+                    )
+                } else if (albumSelectionState.isActive) {
+                    AlbumSelectionTopAppBar(
+                        selectedCount = albumSelectionState.selectedCount,
+                        allSelectedFavorite = albumSelectionState.areAllSelectedFavorite(visibleAlbums),
+                        onClose = albumSelectionState::clear,
+                        onFavorite = {
+                            albumSelectionState.finish(
+                                visibleAlbums,
+                                viewModel::toggleFavoriteAlbums,
+                            )
+                        },
+                        onDownload = {
+                            albumSelectionState.finish(visibleAlbums, viewModel::downloadAlbums)
+                        },
+                        onAddToQueue = {
+                            albumSelectionState.finish(visibleAlbums) { albums ->
+                                viewModel.addAlbumsToQueue(albums, onAddToQueue)
+                            }
+                        },
+                        onAddToPlaylist = {
+                            val selectedAlbums = albumSelectionState.selectedAlbums(visibleAlbums)
+                            viewModel.addAlbumsToQueue(selectedAlbums) { tracks ->
+                                onAddToPlaylist(tracks, albumSelectionState::clear)
+                            }
                         },
                     )
                 } else {
@@ -239,9 +282,9 @@ fun FavoritesScreen(
                             onCancelDownload = viewModel::cancelTrackDownload,
                             onRetryDownload = viewModel::retryTrackDownload,
                             artworkUris = artworkUris,
-                            selectionMode = selectionState.isActive,
-                            selectedIds = selectionState.selectedIds,
-                            onSelectionChange = selectionState::setSelected,
+                            selectionMode = trackSelectionState.isActive,
+                            selectedIds = trackSelectionState.selectedIds,
+                            onSelectionChange = trackSelectionState::setSelected,
                             modifier = Modifier,
                         )
                         FavoritesTab.Albums -> if (content.albums.isEmpty()) {
@@ -260,6 +303,9 @@ fun FavoritesScreen(
                                 )
                             },
                             artworkUris = artworkUris,
+                            selectionMode = albumSelectionState.isActive,
+                            selectedIds = albumSelectionState.selectedIds,
+                            onSelectionChange = albumSelectionState::setSelected,
                             modifier = Modifier,
                         )
                         FavoritesTab.Artists -> if (content.artists.isEmpty()) {

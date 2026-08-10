@@ -12,17 +12,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import info.jukov.player.feature.download.domain.OfflineTrack
-import info.jukov.player.feature.favorite.domain.FavoriteTarget
-import info.jukov.player.feature.favorite.domain.favoriteStateForSelection
-import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.album.domain.Album
 
 enum class DownloadsTab { Tracks, Albums }
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class DownloadsViewModel(
     private val repository: DownloadsRepository,
-    private val favoriteDelegate: FavoriteDelegate,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<info.jukov.player.feature.download.domain.OfflineLibrary>>(
         LoadableState.Loading(content = null),
@@ -53,14 +50,10 @@ class DownloadsViewModel(
         repository.removeTracks(tracks.map(Track::id))
     }
     fun removeAlbum(id: String) = viewModelScope.launch { repository.cancelAlbum(id) }
+    fun removeAlbums(albums: List<Album>) = viewModelScope.launch {
+        albums.forEach { repository.cancelAlbum(it.id) }
+    }
     fun removeAll() = viewModelScope.launch { repository.clearCurrentAccount() }
     fun retryTrack(id: String) = viewModelScope.launch { repository.retryTrack(id) }
     fun albumTracks(id: String): Flow<List<OfflineTrack>> = repository.observeAlbumTracks(id)
-    fun toggleFavorite(track: Track) = viewModelScope.launch {
-        favoriteDelegate.toggle(FavoriteTarget.Track(track.id), track.isFavorite) { }
-    }
-    fun toggleFavorites(tracks: List<Track>) = viewModelScope.launch {
-        val desired = favoriteStateForSelection(tracks)
-        favoriteDelegate.set(tracks, desired) { _, _ -> }
-    }
 }
