@@ -76,7 +76,7 @@ fun LibraryScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             AppFlexibleTopAppBar(
-                title = stringResource(Res.string.library),
+                title = stringResource(Res.string.app_name),
                 scrollBehavior = scrollBehavior,
                 actions = {
                     SearchAction(viewModel::openSearch)
