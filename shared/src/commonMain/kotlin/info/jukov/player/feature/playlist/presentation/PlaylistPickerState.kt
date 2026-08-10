@@ -9,5 +9,14 @@ data class PlaylistPickerState(
     val tracks: List<Track> = emptyList(),
     val playlists: LoadableState<List<Playlist>> = LoadableState.Loading(null),
     val creating: Boolean = false,
-    val pending: Boolean = false,
-)
+    val submission: PlaylistPickerSubmission = PlaylistPickerSubmission.Idle,
+) {
+    val pending: Boolean
+        get() = submission == PlaylistPickerSubmission.Pending
+}
+
+enum class PlaylistPickerSubmission {
+    Idle,
+    Pending,
+    Success,
+}

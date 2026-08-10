@@ -46,6 +46,7 @@ class PlaylistPickerViewModel(private val repository: PlaylistsRepository) : Vie
     fun dismiss() {
         if (!_state.value.pending) {
             _state.value = PlaylistPickerState()
+            onSuccess = {}
         }
     }
 
@@ -84,16 +85,26 @@ class PlaylistPickerViewModel(private val repository: PlaylistsRepository) : Vie
     }
 
     private fun submit(action: suspend () -> Result<Unit>) = viewModelScope.launch {
-        _state.update { it.copy(pending = true) }
+        if (_state.value.submission != PlaylistPickerSubmission.Idle) {
+            return@launch
+        }
+        _state.update { it.copy(submission = PlaylistPickerSubmission.Pending) }
         action()
             .onSuccess {
                 onSuccess()
                 onSuccess = {}
-                _state.value = PlaylistPickerState()
+                _state.update { state ->
+                    state.copy(
+                        creating = false,
+                        submission = PlaylistPickerSubmission.Success,
+                    )
+                }
             }
             .onFailure {
                 _messages.tryEmit(it.toAppError(AppError.PlaylistUpdateFailed))
-                _state.update { state -> state.copy(pending = false) }
+                _state.update { state ->
+                    state.copy(submission = PlaylistPickerSubmission.Idle)
+                }
             }
     }
 }

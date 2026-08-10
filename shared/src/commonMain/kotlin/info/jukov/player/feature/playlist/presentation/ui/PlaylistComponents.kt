@@ -7,13 +7,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.localizedMessage
+import info.jukov.player.feature.playlist.domain.Playlist
+import info.jukov.player.feature.playlist.presentation.PlaylistPickerSubmission
 import info.jukov.player.feature.playlist.presentation.PlaylistPickerViewModel
 import jukovplayer.shared.generated.resources.*
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -24,53 +28,112 @@ fun PlaylistPickerHost(viewModel: PlaylistPickerViewModel) {
     var error by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { error = it } }
     if (!state.visible) return
-    ModalBottomSheet(onDismissRequest = viewModel::dismiss) {
-        Text(
-            stringResource(Res.string.choose_playlist),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(Padding.medium),
-        )
-        ListItem(
-            modifier = Modifier.clickable(
-                enabled = !state.pending,
-                onClick = viewModel::showCreate,
-            ),
-            leadingContent = { Icon(painterResource(Res.drawable.add), null) },
-            headlineContent = { Text(stringResource(Res.string.create_and_add)) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        )
-        when (val playlists = state.playlists) {
-            is LoadableState.Loading -> Box(
-                Modifier.fillMaxWidth().padding(Padding.large),
-                contentAlignment = Alignment.Center,
-            ) { LoadingIndicator() }
-            is LoadableState.Failure -> Text(
-                playlists.error.localizedMessage(),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(Padding.medium),
+    val dismissBlocked by rememberUpdatedState(state.pending)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { target ->
+            target != SheetValue.Hidden || !dismissBlocked
+        },
+    )
+    LaunchedEffect(state.submission) {
+        if (state.submission == PlaylistPickerSubmission.Success) {
+            delay(SUCCESS_DISPLAY_DURATION_MILLIS)
+            viewModel.dismiss()
+        }
+    }
+    ModalBottomSheet(
+        onDismissRequest = viewModel::dismiss,
+        sheetState = sheetState,
+    ) {
+        when (state.submission) {
+            PlaylistPickerSubmission.Idle -> PlaylistPickerContent(
+                playlists = state.playlists,
+                error = error,
+                onCreate = viewModel::showCreate,
+                onAddTo = viewModel::addTo,
             )
-            is LoadableState.Content -> playlists.content.forEach { playlist ->
-                ListItem(
-                    modifier = Modifier.clickable(enabled = !state.pending) {
-                        viewModel.addTo(playlist)
-                    },
-                    headlineContent = { Text(playlist.name) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            PlaylistPickerSubmission.Pending -> PlaylistPickerStatus(
+                message = stringResource(Res.string.adding_to_playlist),
+            ) {
+                LoadingIndicator()
+            }
+            PlaylistPickerSubmission.Success -> PlaylistPickerStatus(
+                message = stringResource(Res.string.added_to_playlist),
+            ) {
+                Icon(
+                    painter = painterResource(Res.drawable.check),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
                 )
             }
         }
-        error?.let {
-            Text(
-                it.localizedMessage(),
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(Padding.medium),
-            )
-        }
-        Spacer(Modifier.height(Padding.large))
     }
     if (state.creating) {
         CreatePlaylistDialog(state.pending, viewModel::hideCreate, viewModel::create)
     }
+}
+
+@Composable
+private fun PlaylistPickerContent(
+    playlists: LoadableState<List<Playlist>>,
+    error: AppError?,
+    onCreate: () -> Unit,
+    onAddTo: (Playlist) -> Unit,
+) {
+    Text(
+        stringResource(Res.string.choose_playlist),
+        style = MaterialTheme.typography.titleLarge,
+        modifier = Modifier.padding(Padding.medium),
+    )
+    ListItem(
+        modifier = Modifier.clickable(onClick = onCreate),
+        leadingContent = { Icon(painterResource(Res.drawable.add), null) },
+        headlineContent = { Text(stringResource(Res.string.create_and_add)) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
+    when (playlists) {
+        is LoadableState.Loading -> Box(
+            Modifier.fillMaxWidth().padding(Padding.large),
+            contentAlignment = Alignment.Center,
+        ) { LoadingIndicator() }
+        is LoadableState.Failure -> Text(
+            playlists.error.localizedMessage(),
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(Padding.medium),
+        )
+        is LoadableState.Content -> playlists.content.forEach { playlist ->
+            ListItem(
+                modifier = Modifier.clickable { onAddTo(playlist) },
+                headlineContent = { Text(playlist.name) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
+        }
+    }
+    error?.let {
+        Text(
+            it.localizedMessage(),
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(Padding.medium),
+        )
+    }
+    Spacer(Modifier.height(Padding.large))
+}
+
+@Composable
+private fun PlaylistPickerStatus(
+    message: String,
+    indicator: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(Padding.large),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Padding.medium),
+    ) {
+        indicator()
+        Text(message, style = MaterialTheme.typography.titleMedium)
+    }
+    Spacer(Modifier.height(Padding.large))
 }
 
 @Composable
@@ -96,7 +159,16 @@ internal fun CreatePlaylistDialog(
             TextButton(
                 onClick = { onCreate(name.trim()) },
                 enabled = name.isNotBlank() && !pending,
-            ) { Text(stringResource(Res.string.create)) }
+            ) {
+                if (pending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text(stringResource(Res.string.create))
+                }
+            }
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !pending) {
@@ -105,6 +177,8 @@ internal fun CreatePlaylistDialog(
         },
     )
 }
+
+private const val SUCCESS_DISPLAY_DURATION_MILLIS = 1_500L
 
 @Composable
 internal fun DeletePlaylistDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {

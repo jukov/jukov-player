@@ -12,7 +12,7 @@
     <string name="playlists">Playlists</string>
     <string name="playlist">Playlist</string><string name="playlists_not_found">No playlists found</string><string name="playlist_tracks_count">Tracks: %1$d</string><string name="read_only">Read only</string>
     <string name="create_playlist">Create playlist</string><string name="playlist_name">Playlist name</string><string name="create">Create</string><string name="cancel">Cancel</string>
-    <string name="add_to_playlist">Add to playlist</string><string name="choose_playlist">Choose playlist</string><string name="create_and_add">Create new playlist</string>
+    <string name="add_to_playlist">Add to playlist</string><string name="choose_playlist">Choose playlist</string><string name="create_and_add">Create new playlist</string><string name="adding_to_playlist">Adding to playlist…</string><string name="added_to_playlist">Added to playlist</string>
     <string name="download_playlist">Download playlist</string><string name="add_playlist_to_queue">Add playlist to queue</string><string name="delete_playlist">Delete playlist</string>
     <string name="delete_playlist_title">Delete playlist?</string><string name="delete_playlist_message">“%1$s” will be permanently deleted from the server.</string><string name="delete">Delete</string><string name="remove_from_playlist">Remove selected tracks from playlist</string>
     <string name="tracks">Tracks</string>
