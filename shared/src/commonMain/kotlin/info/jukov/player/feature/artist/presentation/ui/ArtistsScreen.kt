@@ -105,10 +105,13 @@ fun ArtistsScreen(
                         allSelectedFavorite = selectionState.areAllSelectedFavorite(artists),
                         onClose = selectionState::clear,
                         onFavorite = { selectionState.finish(artists, viewModel::toggleFavorites) },
-                        onDownload = { selectionState.finish(artists, viewModel::downloadArtists) },
+                        onDownload = {
+                            viewModel.downloadArtists(selectionState.selectedArtists(artists), selectionState::clear)
+                        },
                         onAddToQueue = {
-                            selectionState.finish(artists) {
-                                viewModel.addArtistsToQueue(it, onAddToQueue)
+                            viewModel.addArtistsToQueue(selectionState.selectedArtists(artists)) { tracks ->
+                                onAddToQueue(tracks)
+                                selectionState.clear()
                             }
                         },
                         onAddToPlaylist = {

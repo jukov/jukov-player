@@ -25,6 +25,8 @@ import info.jukov.player.feature.track.domain.GetTracksUseCase
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.merge
 
 class ArtistsViewModel(
     private val getArtistsUseCase: GetArtistsUseCase,
@@ -41,7 +43,8 @@ class ArtistsViewModel(
     private val _loadingOrigin = MutableStateFlow<LoadingOrigin?>(LoadingOrigin.Initial)
     val loadingOrigin: StateFlow<LoadingOrigin?> = _loadingOrigin.asStateFlow()
     val pending = favoriteDelegate.pending
-    val messages = favoriteDelegate.messages
+    private val actionMessages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
+    val messages = merge(favoriteDelegate.messages, actionMessages)
     private val searchDelegate = PagedSearchDelegate(viewModelScope, search::artists)
     val searchActive = searchDelegate.active
     val searchQuery = searchDelegate.query
@@ -95,19 +98,33 @@ class ArtistsViewModel(
         }
     }
 
-    fun downloadArtists(artists: List<Artist>) = resolveArtistTracks(artists) { tracks ->
-        tracks.forEach { downloadDelegate.download(it) }
-    }
+    fun downloadArtists(artists: List<Artist>, onComplete: () -> Unit = {}) =
+        resolveArtistTracks(artists) { tracks ->
+            tracks.forEach { downloadDelegate.download(it) }
+            onComplete()
+        }
 
-    fun addArtistsToQueue(artists: List<Artist>, onTracksReady: (List<Track>) -> Unit) =
-        resolveArtistTracks(artists, onTracksReady)
+    fun addArtistsToQueue(
+        artists: List<Artist>,
+        onTracksReady: (List<Track>) -> Unit,
+    ) = resolveArtistTracks(artists) { tracks ->
+        onTracksReady(tracks)
+    }
 
     private fun resolveArtistTracks(artists: List<Artist>, action: suspend (List<Track>) -> Unit) =
         viewModelScope.launch {
-            val tracks = artists.flatMap { artist ->
-                getTracksUseCase(TracksFilter.ByArtist(artist.id))
-                    .first { it !is LoadableState.Loading }
-                    .content.orEmpty()
+            val tracks = buildList {
+                for (artist in artists) {
+                    when (val state = getTracksUseCase(TracksFilter.ByArtist(artist.id))
+                        .first { it !is LoadableState.Loading }) {
+                        is LoadableState.Content -> addAll(state.content)
+                        is LoadableState.Failure -> {
+                            actionMessages.emit(state.error)
+                            return@launch
+                        }
+                        is LoadableState.Loading -> Unit
+                    }
+                }
             }
             action(tracks)
         }
