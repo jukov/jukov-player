@@ -16,13 +16,16 @@ internal class RecordingDownloadsRepository(
 ) : DownloadsRepository {
     private val libraryFlow = MutableStateFlow(library)
     val downloadedAlbums = mutableListOf<Album>()
+    val downloadedTracks = mutableListOf<Track>()
     val cancelledAlbumIds = mutableListOf<String>()
 
     override fun observeLibrary(): Flow<OfflineLibrary> = libraryFlow
     override fun searchLibrary(query: String): Flow<OfflineLibrary> = libraryFlow
     override fun observeTrackStatuses(): Flow<Map<String, DownloadStatus>> = flowOf(emptyMap())
     override fun observeAlbumTracks(albumId: String): Flow<List<OfflineTrack>> = emptyFlow()
-    override suspend fun downloadTrack(track: Track) = Unit
+    override suspend fun downloadTrack(track: Track) {
+        downloadedTracks += track
+    }
     override suspend fun downloadAlbum(album: Album) {
         downloadedAlbums += album
     }

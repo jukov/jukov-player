@@ -11,6 +11,8 @@ import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.playback.domain.PlaybackQueueResolver
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.download.presentation.RecordingDownloadsRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +20,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -32,6 +36,27 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerViewModelTest {
+    @Test
+    fun downloadsCurrentTrack() = runTest {
+        kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val repository = RecordingDownloadsRepository()
+        val controller = FakePlaybackController().apply {
+            state.value = LoadableState.Content(PlaybackSnapshot(queue = listOf(TRACK), currentIndex = 0))
+        }
+        val viewModel = PlayerViewModel(
+            controller = controller,
+            favoriteDelegate = FavoriteDelegate(FakeFavoritesRepository()),
+            queueResolver = DeferredResolver(),
+            downloadDelegate = DownloadDelegate(repository, backgroundScope),
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.state.collect {} }
+
+        viewModel.downloadCurrentTrack()
+        advanceUntilIdle()
+
+        assertEquals(listOf(TRACK), repository.downloadedTracks)
+    }
+
     @AfterTest
     fun resetMainDispatcher() {
         kotlinx.coroutines.Dispatchers.resetMain()
@@ -81,6 +106,10 @@ class PlayerViewModelTest {
         controller = controller,
         favoriteDelegate = FavoriteDelegate(FakeFavoritesRepository()),
         queueResolver = resolver,
+        downloadDelegate = DownloadDelegate(
+            RecordingDownloadsRepository(),
+            CoroutineScope(Dispatchers.Unconfined),
+        ),
     )
 
     private class DeferredResolver : PlaybackQueueResolver {

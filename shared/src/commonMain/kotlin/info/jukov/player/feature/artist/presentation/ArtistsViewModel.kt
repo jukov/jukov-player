@@ -20,12 +20,19 @@ import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
 import info.jukov.player.feature.search.domain.SearchUseCase
 import info.jukov.player.feature.search.presentation.PagedSearchDelegate
+import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.track.domain.GetTracksUseCase
+import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.track.domain.TracksFilter
+import kotlinx.coroutines.flow.first
 
 class ArtistsViewModel(
     private val getArtistsUseCase: GetArtistsUseCase,
     authRepository: AuthRepository,
     private val favoriteDelegate: FavoriteDelegate,
     search: SearchUseCase,
+    private val getTracksUseCase: GetTracksUseCase,
+    private val downloadDelegate: DownloadDelegate,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Artist>>>(
         LoadableState.Loading(content = null),
@@ -80,6 +87,30 @@ class ArtistsViewModel(
             }
         }
     }
+
+    fun toggleFavorites(artists: List<Artist>) = viewModelScope.launch {
+        val desired = artists.any { !it.isFavorite }
+        favoriteDelegate.setArtists(artists, desired) { artist, isFavorite ->
+            updateFavorite(artist.id, isFavorite)
+        }
+    }
+
+    fun downloadArtists(artists: List<Artist>) = resolveArtistTracks(artists) { tracks ->
+        tracks.forEach { downloadDelegate.download(it) }
+    }
+
+    fun addArtistsToQueue(artists: List<Artist>, onTracksReady: (List<Track>) -> Unit) =
+        resolveArtistTracks(artists, onTracksReady)
+
+    private fun resolveArtistTracks(artists: List<Artist>, action: suspend (List<Track>) -> Unit) =
+        viewModelScope.launch {
+            val tracks = artists.flatMap { artist ->
+                getTracksUseCase(TracksFilter.ByArtist(artist.id))
+                    .first { it !is LoadableState.Loading }
+                    .content.orEmpty()
+            }
+            action(tracks)
+        }
 
     private fun updateFavorite(id: String, isFavorite: Boolean) {
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }

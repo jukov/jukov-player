@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import info.jukov.player.feature.playback.domain.PlaybackQueueResolver
+import info.jukov.player.feature.download.presentation.DownloadDelegate
 
 data class PlayerUiState(
     val queue: List<PlayerQueueItem> = emptyList(),
@@ -42,6 +43,7 @@ class PlayerViewModel(
     private val controller: PlaybackController,
     private val favoriteDelegate: FavoriteDelegate,
     private val queueResolver: PlaybackQueueResolver,
+    private val downloadDelegate: DownloadDelegate,
 ) : ViewModel() {
     private var playJob: Job? = null
     private var nextQueueItemId = 0L
@@ -164,6 +166,11 @@ class PlayerViewModel(
                 updateFavorite(track.id, it)
             }
         }
+    }
+
+    fun downloadCurrentTrack() {
+        val track = state.value.content?.currentTrack ?: return
+        viewModelScope.launch { downloadDelegate.download(track) }
     }
 
     private fun updateFavorite(trackId: String, isFavorite: Boolean) {

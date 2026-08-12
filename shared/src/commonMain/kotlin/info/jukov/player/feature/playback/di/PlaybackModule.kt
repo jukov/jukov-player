@@ -13,6 +13,7 @@ import info.jukov.player.feature.favorite.domain.FavoriteMutator
 import info.jukov.player.feature.download.domain.DownloadsRepository
 import info.jukov.player.feature.playback.domain.DefaultPlaybackQueueResolver
 import info.jukov.player.feature.playback.domain.PlaybackQueueResolver
+import info.jukov.player.feature.download.presentation.DownloadDelegate
 
 @BindingContainer
 object PlaybackModule {
@@ -34,5 +35,6 @@ object PlaybackModule {
         controller: PlaybackController,
         favoriteDelegate: FavoriteDelegate,
         queueResolver: PlaybackQueueResolver,
-    ): PlayerViewModel = PlayerViewModel(controller, favoriteDelegate, queueResolver)
+        downloadDelegate: DownloadDelegate,
+    ): PlayerViewModel = PlayerViewModel(controller, favoriteDelegate, queueResolver, downloadDelegate)
 }

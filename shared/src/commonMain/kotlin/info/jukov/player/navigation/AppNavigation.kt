@@ -190,6 +190,8 @@ fun AppNavigation(
                             onArtistClick = { artist ->
                                 backStack.add(Routes.Albums(artist.id, artist.name))
                             },
+                            onAddToQueue = playerViewModel::addToQueue,
+                            onAddToPlaylist = playlistPickerViewModel::open,
                         )
                     }
                 }

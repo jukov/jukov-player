@@ -507,6 +507,11 @@ private fun FullPlayer(
                 enabled = favoriteEnabled,
             )
             PlayerIconButton(
+                resource = Res.drawable.download,
+                description = stringResource(Res.string.download_track),
+                onClick = viewModel::downloadCurrentTrack,
+            )
+            PlayerIconButton(
                 resource = Res.drawable.playlist_plus,
                 description = stringResource(Res.string.add_to_playlist),
                 onClick = { onAddToPlaylist(listOf(track)) },
