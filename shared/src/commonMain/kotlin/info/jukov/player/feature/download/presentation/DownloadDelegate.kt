@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -74,7 +76,9 @@ class DownloadDelegate(
         } catch (error: Throwable) {
             _messages.emit(error.toAppError(AppError.DownloadFailed))
         } finally {
-            pendingMutex.withLock { pending.remove(target) }
+            withContext(NonCancellable) {
+                pendingMutex.withLock { pending.remove(target) }
+            }
         }
     }
 }

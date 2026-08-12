@@ -6,6 +6,7 @@ import info.jukov.player.feature.track.domain.Track
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -53,6 +54,31 @@ class DownloadDelegateTest {
         runCurrent()
 
         assertEquals(AppError.DownloadFailed, message)
+    }
+
+    @Test
+    fun cancelledRequestDoesNotBlockLaterDownloadForSameAlbum() = runTest {
+        val requestStarted = CompletableDeferred<Unit>()
+        val keepFirstRequestRunning = CompletableDeferred<Unit>()
+        var requestCount = 0
+        val repository = RecordingDownloadsRepository(
+            onDownloadAlbum = {
+                requestCount += 1
+                if (requestCount == 1) {
+                    requestStarted.complete(Unit)
+                    keepFirstRequestRunning.await()
+                }
+            },
+        )
+        val delegate = DownloadDelegate(repository, backgroundScope)
+        val album = album("album")
+
+        val first = launch { delegate.download(album) }
+        requestStarted.await()
+        first.cancelAndJoin()
+        delegate.download(album)
+
+        assertEquals(2, requestCount)
     }
 
     private fun album(id: String) = Album(
