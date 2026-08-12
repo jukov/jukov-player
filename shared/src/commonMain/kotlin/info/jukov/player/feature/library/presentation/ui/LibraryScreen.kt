@@ -68,6 +68,13 @@ fun LibraryScreen(
     val resultItems = results.content.orEmpty()
     var selectedIds by remember(query) { mutableStateOf<Set<String>>(emptySet()) }
     val selectedItems = resultItems.filter { it.id in selectedIds }
+    val allSelectedFavorite = selectedItems.all { item ->
+        when (item) {
+            is LibrarySearchItem.ArtistItem -> item.artist.isFavorite
+            is LibrarySearchItem.AlbumItem -> item.album.isFavorite
+            is LibrarySearchItem.TrackItem -> item.track.isFavorite
+        }
+    }
     PlayerBackHandler(enabled = selectedIds.isNotEmpty(), onBack = { selectedIds = emptySet() })
     val browseListState = rememberLazyListState()
     val searchListState = rememberLazyListState()
@@ -107,7 +114,15 @@ fun LibraryScreen(
                     },
                     actions = {
                         IconButton(onClick = { viewModel.toggleFavorites(selectedItems); selectedIds = emptySet() }) {
-                            Icon(painterResource(Res.drawable.heart), stringResource(Res.string.add_to_favorites))
+                            Icon(
+                                painterResource(
+                                    if (allSelectedFavorite) Res.drawable.heart_outline else Res.drawable.heart,
+                                ),
+                                stringResource(
+                                    if (allSelectedFavorite) Res.string.remove_from_favorites
+                                    else Res.string.add_to_favorites,
+                                ),
+                            )
                         }
                         IconButton(onClick = { viewModel.download(selectedItems) { selectedIds = emptySet() } }) {
                             Icon(painterResource(Res.drawable.download), stringResource(Res.string.downloads))
