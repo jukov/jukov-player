@@ -490,10 +490,7 @@ private fun FullPlayer(
         Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(
-                space = 16.dp,
-                alignment = Alignment.CenterHorizontally,
-            ),
+            horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             PlayerIconButton(
                 Res.drawable.shuffle,
