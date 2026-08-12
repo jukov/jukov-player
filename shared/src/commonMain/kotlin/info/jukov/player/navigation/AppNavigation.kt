@@ -17,6 +17,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.savedstate.serialization.SavedStateConfiguration
 import androidx.navigation3.ui.NavDisplay
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.artist.presentation.ui.ArtistsScreen
 import info.jukov.player.feature.album.presentation.ui.AlbumsScreen
 import info.jukov.player.feature.auth.domain.AuthState
@@ -27,6 +28,7 @@ import info.jukov.player.feature.library.presentation.ui.LibraryScreen
 import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.feature.track.presentation.ui.TracksScreen
 import info.jukov.player.feature.playback.presentation.ui.PlayerHost
+import info.jukov.player.feature.playback.presentation.PlayerUiState
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.favorite.presentation.ui.FavoritesScreen
@@ -46,6 +48,8 @@ fun AppNavigation(
     graph: AppGraph,
     openDownloads: Boolean = false,
     onOpenDownloadsConsumed: () -> Unit = {},
+    openPlayerRequest: Long = 0L,
+    onOpenPlayerConsumed: () -> Unit = {},
 ) {
     val authUiState by authViewModel.state.collectAsStateWithLifecycle()
     val playbackState by playerViewModel.state.collectAsStateWithLifecycle()
@@ -72,6 +76,23 @@ fun AppNavigation(
         if (openDownloads && authState is AuthState.LoggedIn) {
             if (backStack.lastOrNull() != Routes.Downloads) backStack.add(Routes.Downloads)
             onOpenDownloadsConsumed()
+        }
+    }
+
+    LaunchedEffect(openPlayerRequest, authState) {
+        if (openPlayerRequest != 0L && authState is AuthState.LoggedIn) {
+            backStack.clear()
+            backStack.add(Routes.Library)
+        }
+    }
+
+    val playerNotificationResolution = resolvePlayerNotification(
+        requested = openPlayerRequest != 0L && authState is AuthState.LoggedIn,
+        playbackState = playbackState,
+    )
+    LaunchedEffect(playerNotificationResolution) {
+        if (playerNotificationResolution == PlayerNotificationResolution.ShowLibrary) {
+            onOpenPlayerConsumed()
         }
     }
 
@@ -259,6 +280,14 @@ fun AppNavigation(
         if (authState is AuthState.LoggedIn) {
             PlayerHost(
                 viewModel = playerViewModel,
+                expandRequest = if (
+                    playerNotificationResolution == PlayerNotificationResolution.OpenPlayer
+                ) {
+                    openPlayerRequest
+                } else {
+                    0L
+                },
+                onExpandRequestConsumed = onOpenPlayerConsumed,
                 onAddToPlaylist = { tracks -> playlistPickerViewModel.open(tracks) },
                 onArtistClick = { track ->
                     track.artistId?.let { artistId ->
@@ -286,6 +315,30 @@ fun AppNavigation(
         } else {
             navigationContent()
         }
+    }
+}
+
+internal enum class PlayerNotificationResolution {
+    None,
+    WaitForPlayback,
+    OpenPlayer,
+    ShowLibrary,
+}
+
+internal fun resolvePlayerNotification(
+    requested: Boolean,
+    playbackState: LoadableState<PlayerUiState>,
+): PlayerNotificationResolution {
+    if (!requested) {
+        return PlayerNotificationResolution.None
+    }
+    if (playbackState.content?.currentTrack != null) {
+        return PlayerNotificationResolution.OpenPlayer
+    }
+    return if (playbackState is LoadableState.Loading) {
+        PlayerNotificationResolution.WaitForPlayback
+    } else {
+        PlayerNotificationResolution.ShowLibrary
     }
 }
 

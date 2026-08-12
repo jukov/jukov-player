@@ -11,6 +11,8 @@ fun App(
     graph: AppGraph,
     openDownloads: Boolean = false,
     onOpenDownloadsConsumed: () -> Unit = {},
+    openPlayerRequest: Long = 0L,
+    onOpenPlayerConsumed: () -> Unit = {},
 ) {
     val authViewModel = viewModel { graph.authViewModel }
     val playerViewModel = viewModel { graph.playerViewModel }
@@ -21,6 +23,8 @@ fun App(
             graph,
             openDownloads,
             onOpenDownloadsConsumed,
+            openPlayerRequest,
+            onOpenPlayerConsumed,
         )
     }
 }
