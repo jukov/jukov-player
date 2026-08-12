@@ -17,6 +17,7 @@ fun AppError.localizedMessage(): String = when (this) {
     AppError.TracksLoadFailed -> stringResource(Res.string.error_tracks_load_failed)
     AppError.FavoritesLoadFailed -> stringResource(Res.string.error_favorites_load_failed)
     AppError.FavoriteUpdateFailed -> stringResource(Res.string.error_favorite_update_failed)
+    AppError.DownloadFailed -> stringResource(Res.string.error_download_failed)
     AppError.PlaylistsLoadFailed -> stringResource(Res.string.error_playlists_load_failed)
     AppError.PlaylistLoadFailed -> stringResource(Res.string.error_playlist_load_failed)
     AppError.PlaylistUpdateFailed -> stringResource(Res.string.error_playlist_update_failed)

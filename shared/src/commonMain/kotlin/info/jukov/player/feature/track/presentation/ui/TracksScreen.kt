@@ -100,6 +100,8 @@ import info.jukov.player.core.presentation.ui.localizedMessage
 import info.jukov.player.core.presentation.ui.withPlayerBottomInset
 import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
+import info.jukov.player.core.presentation.ui.playerGradientColors
+import info.jukov.player.core.presentation.ui.rememberArtworkPalette
 import info.jukov.player.core.presentation.LoadingOrigin
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.playback.presentation.ui.PlayerBackHandler
@@ -459,14 +461,22 @@ private fun ExpandedAlbumTracksHeader(
     onDownloadClick: () -> Unit,
     onArtistClick: (String, String) -> Unit,
 ) {
+    val palette = rememberArtworkPalette(
+        key = header.coverArtId ?: header.coverArtUrl ?: header.albumId,
+        url = header.coverArtUrl,
+    )
+    val gradientColors = palette.playerGradientColors(
+        surface = MaterialTheme.colorScheme.surface,
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.primaryContainer,
-                        MaterialTheme.colorScheme.surfaceContainer,
+                    colorStops = arrayOf(
+                        0f to gradientColors[0],
+                        .48f to gradientColors[1],
+                        1f to gradientColors[2],
                     ),
                 ),
             )

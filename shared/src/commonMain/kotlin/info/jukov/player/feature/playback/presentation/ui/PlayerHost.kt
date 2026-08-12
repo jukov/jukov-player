@@ -49,13 +49,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -75,7 +73,8 @@ import info.jukov.player.core.presentation.ui.rememberArtworkRequest
 import info.jukov.player.core.presentation.ui.LARGE_ARTWORK_SIZE
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.ArtworkPalette
-import info.jukov.player.core.presentation.ui.LocalArtworkPaletteExtractor
+import info.jukov.player.core.presentation.ui.playerGradientColors
+import info.jukov.player.core.presentation.ui.rememberArtworkPalette
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.feature.playback.presentation.PlayerUiState
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
@@ -91,6 +90,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 @Composable
 fun PlayerHost(
     viewModel: PlayerViewModel,
+    expandRequest: Long = 0L,
+    onExpandRequestConsumed: () -> Unit = {},
     onAddToPlaylist: (List<Track>) -> Unit,
     onArtistClick: (Track) -> Unit,
     onAlbumClick: (Track) -> Unit,
@@ -117,6 +118,13 @@ fun PlayerHost(
     val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var queueVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(expandRequest) {
+        if (expandRequest != 0L) {
+            sheetState.expand()
+            onExpandRequestConsumed()
+        }
+    }
 
     CompositionLocalProvider(LocalPlayerBottomInset provides peekHeight) {
         BottomSheetScaffold(
@@ -183,28 +191,6 @@ private val Track.artistAndYear: String
 
 private val MINI_PLAYER_HEIGHT = 64.dp
 private val MINI_PLAYER_CONTENT_INSET = MINI_PLAYER_HEIGHT
-@Composable
-private fun rememberArtworkPalette(
-    key: String?,
-    url: String?,
-): ArtworkPalette {
-    val extractor = LocalArtworkPaletteExtractor.current
-    val hash = key.orEmpty().fold(17) { result, char -> result * 31 + char.code }
-    val hue = ((hash.toLong() and 0x7fffffff) % 360).toFloat()
-    val fallback = ArtworkPalette(
-        primary = Color.hsv(hue, .45f, .68f),
-        secondary = Color.hsv((hue + 42f) % 360f, .35f, .55f),
-    )
-    var extracted by remember(key) { mutableStateOf<ArtworkPalette?>(null) }
-    LaunchedEffect(key, url, extractor) {
-        extracted = if (key != null && url != null) extractor?.extract(key, url) else null
-    }
-    val target = extracted ?: fallback
-    val primary by animateColorAsState(target.primary)
-    val secondary by animateColorAsState(target.secondary)
-    return ArtworkPalette(primary, secondary)
-}
-
 @Composable
 private fun PlayerSheetContent(
     snapshot: PlayerUiState,
@@ -376,9 +362,15 @@ private fun FullPlayer(
         modifier = modifier
             .background(
                 Brush.verticalGradient(
-                    0f to palette.primary.copy(alpha = .72f),
-                    .48f to palette.secondary.copy(alpha = .35f),
-                    1f to MaterialTheme.colorScheme.surface,
+                    colorStops = palette.playerGradientColors(
+                        surface = MaterialTheme.colorScheme.surface,
+                    ).let { colors ->
+                        arrayOf(
+                            0f to colors[0],
+                            .48f to colors[1],
+                            1f to colors[2],
+                        )
+                    },
                 ),
             )
             .statusBarsPadding()

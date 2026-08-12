@@ -60,7 +60,9 @@ class PlaybackService : MediaLibraryService() {
                 }
             },
         )
-        session = MediaLibrarySession.Builder(this, player, LibraryCallback()).build()
+        session = MediaLibrarySession.Builder(this, player, LibraryCallback())
+            .setSessionActivity(PlaybackNotificationIntent.pendingIntent(this))
+            .build()
         observeFavoriteState()
         refreshFavoriteButton()
     }
