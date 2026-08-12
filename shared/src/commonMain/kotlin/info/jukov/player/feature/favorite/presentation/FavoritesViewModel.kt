@@ -97,7 +97,7 @@ class FavoritesViewModel(
         }
     }
 
-    fun downloadTrack(track: Track) = viewModelScope.launch { downloadDelegate.download(track) }
+    fun downloadTrack(track: Track) = viewModelScope.launch { download(track) }
     fun cancelTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelTrack(id) }
     fun retryTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.retry(id) }
     fun toggleFavorites(tracks: List<Track>) = viewModelScope.launch {
@@ -127,7 +127,7 @@ class FavoritesViewModel(
         val statuses = downloadStatuses.value
         tracks.forEach { track ->
             when (statuses[track.id]?.state) {
-                null -> downloadDelegate.download(track)
+                null -> download(track)
                 info.jukov.player.feature.download.domain.DownloadState.Failed -> downloadDelegate.retry(track.id)
                 else -> Unit
             }
@@ -159,7 +159,19 @@ class FavoritesViewModel(
     }
 
     fun downloadAlbums(albums: List<Album>) = viewModelScope.launch {
-        albums.forEach { downloadDelegate.download(it) }
+        albums.forEach { album -> download(album) }
+    }
+
+    private suspend fun download(track: Track) {
+        downloadDelegate.download(track).onFailure { error ->
+            _messages.tryEmit(error.toAppError(AppError.DownloadFailed))
+        }
+    }
+
+    private suspend fun download(album: Album) {
+        downloadDelegate.download(album).onFailure { error ->
+            _messages.tryEmit(error.toAppError(AppError.DownloadFailed))
+        }
     }
 
     fun addAlbumsToQueue(albums: List<Album>, onTracksReady: (List<Track>) -> Unit) =
