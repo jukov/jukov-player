@@ -21,10 +21,12 @@ import androidx.compose.runtime.remember
 import info.jukov.player.core.presentation.ui.AndroidArtworkPaletteExtractor
 import info.jukov.player.core.presentation.ui.LocalArtworkPaletteExtractor
 import info.jukov.player.feature.download.DownloadForegroundService
+import info.jukov.player.feature.playback.PlaybackNotificationIntent
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var openDownloads by mutableStateOf(false)
+    private var openPlayerRequest by mutableStateOf(0L)
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -54,6 +56,8 @@ class MainActivity : ComponentActivity() {
                     graph = (application as JukovApplication).graph,
                     openDownloads = openDownloads,
                     onOpenDownloadsConsumed = { openDownloads = false },
+                    openPlayerRequest = openPlayerRequest,
+                    onOpenPlayerConsumed = { openPlayerRequest = 0L },
                 )
             }
         }
@@ -69,6 +73,10 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra(DownloadForegroundService.EXTRA_OPEN_DOWNLOADS, false) == true) {
             openDownloads = true
             intent.removeExtra(DownloadForegroundService.EXTRA_OPEN_DOWNLOADS)
+        }
+        if (intent?.getBooleanExtra(PlaybackNotificationIntent.EXTRA_OPEN_PLAYER, false) == true) {
+            openPlayerRequest++
+            intent.removeExtra(PlaybackNotificationIntent.EXTRA_OPEN_PLAYER)
         }
     }
 
