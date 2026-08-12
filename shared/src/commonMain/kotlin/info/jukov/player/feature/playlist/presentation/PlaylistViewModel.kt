@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 
@@ -27,7 +28,7 @@ class PlaylistViewModel(
     private val _state = MutableStateFlow<LoadableState<Playlist>>(LoadableState.Loading(null))
     val state = _state.asStateFlow()
     private val _messages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
-    val messages = _messages.asSharedFlow()
+    val messages = merge(_messages.asSharedFlow(), downloadDelegate.messages)
     private val _pending = MutableStateFlow(false)
     val pending = _pending.asStateFlow()
     val downloadStatuses = downloadDelegate.trackStatuses
