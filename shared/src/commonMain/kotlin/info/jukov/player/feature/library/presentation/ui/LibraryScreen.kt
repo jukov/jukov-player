@@ -85,6 +85,14 @@ fun LibraryScreen(
         LibraryItem("downloads", stringResource(Res.string.downloads), Res.drawable.download, onDownloadsClick),
     )
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var actionError by remember { mutableStateOf<info.jukov.player.core.domain.AppError?>(null) }
+    LaunchedEffect(viewModel) { viewModel.messages.collect { actionError = it } }
+    val actionErrorMessage = actionError?.localizedMessage()
+    LaunchedEffect(actionErrorMessage) {
+        actionErrorMessage?.let { snackbarHostState.showSnackbar(it) }
+        actionError = null
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -118,10 +126,11 @@ fun LibraryScreen(
                         }
                     },
                 )
-            } else AppFlexibleTopAppBar(
-                title = stringResource(Res.string.app_name),
-                scrollBehavior = scrollBehavior,
-                actions = {
+            } else {
+                AppFlexibleTopAppBar(
+                    title = stringResource(Res.string.app_name),
+                    scrollBehavior = scrollBehavior,
+                    actions = {
                     SearchAction(viewModel::openSearch)
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
@@ -141,12 +150,14 @@ fun LibraryScreen(
                             },
                         )
                     }
-                },
-                searchQuery = query.takeIf { searchActive },
-                onSearchQueryChange = viewModel::updateSearchQuery,
-                onSearchClose = viewModel::closeSearch,
-            )
+                    },
+                    searchQuery = query.takeIf { searchActive },
+                    onSearchQueryChange = viewModel::updateSearchQuery,
+                    onSearchClose = viewModel::closeSearch,
+                )
+            }
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         if (!searchActive || query.trim().length < 2) {
             LazyVerticalGrid(
