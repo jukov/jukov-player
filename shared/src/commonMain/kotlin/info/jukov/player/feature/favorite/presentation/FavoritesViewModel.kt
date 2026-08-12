@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
@@ -42,7 +43,7 @@ class FavoritesViewModel(
     private val _pending = MutableStateFlow<Set<FavoriteTarget>>(emptySet())
     val pending = _pending.asStateFlow()
     private val _messages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
-    val messages = _messages.asSharedFlow()
+    val messages = merge(_messages.asSharedFlow(), downloadDelegate.messages)
     val downloadStatuses = downloadDelegate.trackStatuses
     val artworkUris = downloadDelegate.artworkUris
     private var initialized = false

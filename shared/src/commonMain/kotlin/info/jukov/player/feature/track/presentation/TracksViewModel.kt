@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
 import kotlinx.coroutines.launch
@@ -39,7 +40,7 @@ class TracksViewModel(
     private val _albumIsFavorite = MutableStateFlow(false)
     val albumIsFavorite: StateFlow<Boolean> = _albumIsFavorite.asStateFlow()
     val pending = favoriteDelegate.pending
-    val messages = favoriteDelegate.messages
+    val messages = merge(favoriteDelegate.messages, downloadDelegate.messages)
     val downloadStatuses = downloadDelegate.trackStatuses
     val albumDownloadStatuses = downloadDelegate.albumStatuses
     val artworkUris = downloadDelegate.artworkUris

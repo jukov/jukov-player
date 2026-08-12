@@ -22,6 +22,7 @@ import info.jukov.player.feature.track.domain.GetTracksUseCase
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.merge
 import info.jukov.player.feature.search.domain.SearchUseCase
 import info.jukov.player.feature.search.presentation.PagedSearchDelegate
 
@@ -39,7 +40,7 @@ class AlbumsViewModel(
     private val _loadingOrigin = MutableStateFlow<LoadingOrigin?>(LoadingOrigin.Initial)
     val loadingOrigin: StateFlow<LoadingOrigin?> = _loadingOrigin.asStateFlow()
     val pending = favoriteDelegate.pending
-    val messages = favoriteDelegate.messages
+    val messages = merge(favoriteDelegate.messages, downloadDelegate.messages)
     val artworkUris = downloadDelegate.artworkUris
     val downloadStatuses = downloadDelegate.albumStatuses
     private val _hasMore = MutableStateFlow(false)

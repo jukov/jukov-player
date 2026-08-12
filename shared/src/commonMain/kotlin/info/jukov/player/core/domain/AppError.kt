@@ -12,6 +12,7 @@ sealed interface AppError {
     data object TracksLoadFailed : AppError
     data object FavoritesLoadFailed : AppError
     data object FavoriteUpdateFailed : AppError
+    data object DownloadFailed : AppError
     data object PlaylistsLoadFailed : AppError
     data object PlaylistLoadFailed : AppError
     data object PlaylistUpdateFailed : AppError
