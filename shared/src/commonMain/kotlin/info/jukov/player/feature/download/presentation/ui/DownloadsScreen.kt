@@ -43,6 +43,9 @@ import info.jukov.player.feature.playback.presentation.ui.PlayerBackHandler
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import info.jukov.player.core.domain.*
+import info.jukov.player.core.presentation.ui.SortAction
+import info.jukov.player.core.presentation.ui.SortMenuItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +64,8 @@ fun DownloadsScreen(
     val tab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val trackSort by viewModel.trackSort.collectAsStateWithLifecycle()
+    val albumSort by viewModel.albumSort.collectAsStateWithLifecycle()
     var confirmRemoveAll by remember { mutableStateOf(false) }
     val library = state.content ?: OfflineLibrary()
     val tracks = library.tracks.map { it.track }
@@ -144,6 +149,22 @@ fun DownloadsScreen(
                             }
                         },
                         actions = {
+                            if (!searchActive) {
+                                if (tab == DownloadsTab.Tracks) {
+                                    SortAction(trackSort, listOf(
+                                        SortMenuItem(DownloadTrackSortCriterion.Title, stringResource(Res.string.sort_title)),
+                                        SortMenuItem(DownloadTrackSortCriterion.Artist, stringResource(Res.string.sort_artist)),
+                                        SortMenuItem(DownloadTrackSortCriterion.Added, stringResource(Res.string.sort_added)),
+                                    ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending), viewModel::updateTrackSort)
+                                } else {
+                                    SortAction(albumSort, listOf(
+                                        SortMenuItem(DownloadAlbumSortCriterion.Title, stringResource(Res.string.sort_title)),
+                                        SortMenuItem(DownloadAlbumSortCriterion.Artist, stringResource(Res.string.sort_artist)),
+                                        SortMenuItem(DownloadAlbumSortCriterion.Year, stringResource(Res.string.sort_year)),
+                                        SortMenuItem(DownloadAlbumSortCriterion.Added, stringResource(Res.string.sort_added)),
+                                    ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending), viewModel::updateAlbumSort)
+                                }
+                            }
                             SearchAction(viewModel::openSearch)
                             IconButton(onClick = { confirmRemoveAll = true }) {
                                 Icon(

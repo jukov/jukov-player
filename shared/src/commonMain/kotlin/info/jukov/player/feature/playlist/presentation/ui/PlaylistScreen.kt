@@ -139,6 +139,8 @@ fun PlaylistScreen(
                 },
                 selectionKey = { index, _ -> index.toString() },
                 modifier = Modifier.padding(padding),
+                reorderEnabled = true,
+                onMove = viewModel::moveTrack,
             )
         }
     }

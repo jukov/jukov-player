@@ -19,9 +19,14 @@ import info.jukov.player.core.data.cache.buildCacheDatabase
 import info.jukov.player.core.data.cache.LibraryCachePolicy
 import info.jukov.player.core.data.cache.ScanApi
 import info.jukov.player.core.data.cache.SubsonicScanApi
+import info.jukov.player.core.domain.SettingsSortPreferences
+import info.jukov.player.core.domain.SortPreferences
 
 @BindingContainer
 object CoreModule {
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideSortPreferences(): SortPreferences = SettingsSortPreferences()
     @Provides
     @SingleIn(AppScope::class)
     fun provideCacheDatabase(builder: RoomDatabase.Builder<CacheDatabase>): CacheDatabase =

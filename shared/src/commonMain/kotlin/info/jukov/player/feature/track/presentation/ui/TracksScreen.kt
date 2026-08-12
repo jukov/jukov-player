@@ -59,6 +59,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.CornerRadius
@@ -83,6 +85,9 @@ import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.SearchAction
 import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBar
 import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBarState
+import info.jukov.player.core.domain.TrackSortCriterion
+import info.jukov.player.core.presentation.ui.SortAction
+import info.jukov.player.core.presentation.ui.SortMenuItem
 import info.jukov.player.core.presentation.ui.rememberAppCollapsingTopAppBarState
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.PlayPauseButton
@@ -135,6 +140,7 @@ fun TracksScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchState by viewModel.searchState.collectAsStateWithLifecycle()
     val searchHasMore by viewModel.searchHasMore.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val currentAlbumIsFavorite by viewModel.albumIsFavorite.collectAsStateWithLifecycle()
@@ -236,6 +242,12 @@ fun TracksScreen(
                         scrollBehavior = scrollBehavior,
                         navigationIcon = { BackButton(onBack) },
                         actions = {
+                            if (filter is TracksFilter.ByArtist && !searchActive) {
+                                SortAction(sort, listOf(
+                                    SortMenuItem(TrackSortCriterion.Title, stringResource(Res.string.sort_title)),
+                                    SortMenuItem(TrackSortCriterion.Artist, stringResource(Res.string.sort_artist)),
+                                ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending), viewModel::updateSort)
+                            }
                             if (filter !is TracksFilter.ByAlbum) {
                                 SearchAction(viewModel::openSearch)
                             }
@@ -657,6 +669,8 @@ fun TracksList(
     trailingAction: TrackTrailingAction = TrackTrailingAction.Favorite,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
+    reorderEnabled: Boolean = false,
+    onMove: (Int, Int) -> Unit = { _, _ -> },
 ) {
     LazyColumn(
         state = listState,
@@ -693,6 +707,38 @@ fun TracksList(
                 selected = selectionKey(index, track) in selectedIds,
                 onSelectedChange = { onSelectionChange(selectionKey(index, track), it) },
                 trailingAction = trailingAction,
+                dragHandle = if (reorderEnabled && !selectionMode) {
+                    {
+                        var accumulated by remember(track.id) { androidx.compose.runtime.mutableFloatStateOf(0f) }
+                        var dragIndex by remember(track.id) { androidx.compose.runtime.mutableIntStateOf(index) }
+                        LaunchedEffect(index) { dragIndex = index }
+                        Icon(
+                            painterResource(Res.drawable.drag_handle),
+                            stringResource(Res.string.move_track, track.title),
+                            Modifier.size(48.dp).padding(12.dp).pointerInput(track.id, index) {
+                                detectVerticalDragGestures(
+                                    onVerticalDrag = { change, amount ->
+                                        change.consume()
+                                        accumulated += amount
+                                        val threshold = 56.dp.toPx()
+                                        while (accumulated > threshold && dragIndex < tracks.lastIndex) {
+                                            onMove(dragIndex, dragIndex + 1)
+                                            dragIndex += 1
+                                            accumulated -= threshold
+                                        }
+                                        while (accumulated < -threshold && dragIndex > 0) {
+                                            onMove(dragIndex, dragIndex - 1)
+                                            dragIndex -= 1
+                                            accumulated += threshold
+                                        }
+                                    },
+                                    onDragEnd = { accumulated = 0f },
+                                    onDragCancel = { accumulated = 0f },
+                                )
+                            },
+                        )
+                    }
+                } else null,
             )
         }
         if (isLoadingMore) {
@@ -730,6 +776,7 @@ fun TrackRow(
     selected: Boolean = false,
     onSelectedChange: (Boolean) -> Unit = {},
     trailingAction: TrackTrailingAction = TrackTrailingAction.Favorite,
+    dragHandle: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -847,6 +894,7 @@ fun TrackRow(
             status = downloadStatus,
             modifier = Modifier.padding(end = Padding.small),
         )
+        dragHandle?.invoke()
     }
 }
 

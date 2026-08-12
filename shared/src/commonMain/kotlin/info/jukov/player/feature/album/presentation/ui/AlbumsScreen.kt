@@ -51,6 +51,10 @@ import info.jukov.player.feature.download.domain.DownloadStatus
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import info.jukov.player.core.domain.AlbumSortCriterion
+import info.jukov.player.core.domain.SortDirection
+import info.jukov.player.core.presentation.ui.SortAction
+import info.jukov.player.core.presentation.ui.SortMenuItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,6 +93,7 @@ fun AlbumsScreen(
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
@@ -144,7 +149,17 @@ fun AlbumsScreen(
                                 )
                             }
                         },
-                        actions = { SearchAction(viewModel::openSearch) },
+                        actions = {
+                            if (!searchActive) {
+                                val alphaDirections = if (artistId == null) setOf(SortDirection.Ascending) else SortDirection.entries.toSet()
+                                SortAction(sort, listOf(
+                                    SortMenuItem(AlbumSortCriterion.Title, stringResource(Res.string.sort_title), alphaDirections),
+                                    SortMenuItem(AlbumSortCriterion.Artist, stringResource(Res.string.sort_artist), alphaDirections),
+                                    SortMenuItem(AlbumSortCriterion.Year, stringResource(Res.string.sort_year)),
+                                ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending), viewModel::updateSort)
+                            }
+                            SearchAction(viewModel::openSearch)
+                        },
                         searchQuery = searchQuery.takeIf { searchActive },
                         onSearchQueryChange = viewModel::updateSearchQuery,
                         onSearchClose = viewModel::closeSearch,

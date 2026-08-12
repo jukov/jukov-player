@@ -40,6 +40,9 @@ import info.jukov.player.core.presentation.LoadingOrigin
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import info.jukov.player.core.domain.ArtistSortCriterion
+import info.jukov.player.core.presentation.ui.SortAction
+import info.jukov.player.core.presentation.ui.SortMenuItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +57,7 @@ fun ArtistsScreen(
     val searchState by viewModel.searchState.collectAsStateWithLifecycle()
     val searchHasMore by viewModel.searchHasMore.collectAsStateWithLifecycle()
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
     val displayedState = if (searchActive && searchQuery.trim().length >= 2) searchState else state
     val artists = displayedState.content.orEmpty()
     val browseListState = rememberLazyListState()
@@ -97,6 +101,8 @@ fun ArtistsScreen(
                     onSearchQueryChange = viewModel::updateSearchQuery,
                     onSearchClose = viewModel::closeSearch,
                     scrollBehavior = topAppBarScrollBehavior,
+                    sort = sort,
+                    onSort = viewModel::updateSort,
                 )
                 if (loadingOrigin == LoadingOrigin.Automatic && artists.isNotEmpty()) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -149,6 +155,8 @@ private fun ArtistsTopAppBar(
     onSearchQueryChange: (String) -> Unit,
     onSearchClose: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
+    sort: info.jukov.player.core.domain.SortOption<ArtistSortCriterion>,
+    onSort: (info.jukov.player.core.domain.SortOption<ArtistSortCriterion>) -> Unit,
 ) {
     AppFlexibleTopAppBar(
         title = stringResource(Res.string.artists),
@@ -165,6 +173,9 @@ private fun ArtistsTopAppBar(
             }
         },
         actions = {
+            if (searchQuery == null) {
+                SortAction(sort, listOf(SortMenuItem(ArtistSortCriterion.Name, stringResource(Res.string.sort_name))), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending), onSort)
+            }
             SearchAction(onSearchClick)
         },
     )
