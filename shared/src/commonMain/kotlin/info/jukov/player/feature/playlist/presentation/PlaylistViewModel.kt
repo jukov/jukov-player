@@ -40,6 +40,7 @@ class PlaylistViewModel(
     fun load(id: String, forceRefresh: Boolean = false) {
         if (this.id == id && !forceRefresh) return
         if (this.id != id) {
+            manualTrackOrder = null
             this.id = id
             observeJob?.cancel()
             observeJob = viewModelScope.launch {

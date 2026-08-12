@@ -666,6 +666,7 @@ fun TracksList(
     selectedIds: Set<String> = emptySet(),
     onSelectionChange: (String, Boolean) -> Unit = { _, _ -> },
     selectionKey: (Int, Track) -> String = { _, track -> track.id },
+    itemKey: (Int, Track) -> Any = selectionKey,
     trailingAction: TrackTrailingAction = TrackTrailingAction.Favorite,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
@@ -682,7 +683,7 @@ fun TracksList(
         error?.let { message ->
             item { Text(message.localizedMessage(), color = MaterialTheme.colorScheme.error) }
         }
-        itemsIndexed(tracks, key = selectionKey) { index, track ->
+        itemsIndexed(tracks, key = itemKey) { index, track ->
             if (hasMore && index >= tracks.lastIndex - LOAD_MORE_THRESHOLD) {
                 LaunchedEffect(tracks.size) { onLoadMore() }
             }
@@ -715,7 +716,7 @@ fun TracksList(
                         Icon(
                             painterResource(Res.drawable.drag_handle),
                             stringResource(Res.string.move_track, track.title),
-                            Modifier.size(48.dp).padding(12.dp).pointerInput(track.id, index) {
+                            Modifier.size(48.dp).padding(12.dp).pointerInput(itemKey(index, track)) {
                                 detectVerticalDragGestures(
                                     onVerticalDrag = { change, amount ->
                                         change.consume()

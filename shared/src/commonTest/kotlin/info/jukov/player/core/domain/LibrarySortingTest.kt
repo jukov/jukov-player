@@ -21,6 +21,11 @@ class LibrarySortingTest {
         assertEquals(listOf("old", "new", "missing"), albums.sortedAlbums(SortOption(AlbumSortCriterion.Year, SortDirection.Ascending)).map { it.id })
     }
 
+    @Test fun albumsWithMissingYearAreLastDescending() {
+        val albums = listOf(album("missing", null), album("new", 2024), album("old", 1999))
+        assertEquals(listOf("new", "old", "missing"), albums.sortedAlbums(SortOption(AlbumSortCriterion.Year, SortDirection.Descending)).map { it.id })
+    }
+
     @Test fun downloadDateSortsNewestFirst() {
         val items = listOf(offline("old", 1), offline("new", 2))
         assertEquals(listOf("new", "old"), items.sortedDownloadTracks(SortOption(DownloadTrackSortCriterion.Added, SortDirection.Descending)).map { it.track.id })

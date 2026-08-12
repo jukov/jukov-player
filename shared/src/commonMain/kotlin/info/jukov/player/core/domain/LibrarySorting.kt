@@ -68,10 +68,16 @@ fun List<Track>.sortedTracks(option: SortOption<TrackSortCriterion>): List<Track
 }
 
 fun List<Album>.sortedAlbums(option: SortOption<AlbumSortCriterion>): List<Album> {
+    if (option.criterion == AlbumSortCriterion.Year) {
+        val yearComparator = compareBy<Album> { it.year ?: 0 }.let {
+            if (option.direction == SortDirection.Ascending) it else it.reversed()
+        }
+        return sortedWith(compareBy<Album> { it.year == null }.then(yearComparator).thenBy { it.name.lowercase() }.thenBy(Album::id))
+    }
     val comparator = when (option.criterion) {
         AlbumSortCriterion.Title -> compareBy<Album>({ it.name.lowercase() }, Album::name, { it.artist.lowercase() }, Album::id)
         AlbumSortCriterion.Artist -> compareBy<Album>({ it.artist.lowercase() }, Album::artist, { it.name.lowercase() }, Album::id)
-        AlbumSortCriterion.Year -> compareBy<Album>({ it.year == null }, { it.year ?: 0 }, { it.name.lowercase() }, Album::id)
+        AlbumSortCriterion.Year -> error("Handled above")
     }
     return sorted(option, comparator)
 }
@@ -86,10 +92,16 @@ fun List<OfflineTrack>.sortedDownloadTracks(option: SortOption<DownloadTrackSort
 }
 
 fun List<OfflineAlbum>.sortedDownloadAlbums(option: SortOption<DownloadAlbumSortCriterion>): List<OfflineAlbum> {
+    if (option.criterion == DownloadAlbumSortCriterion.Year) {
+        val yearComparator = compareBy<OfflineAlbum> { it.album.year ?: 0 }.let {
+            if (option.direction == SortDirection.Ascending) it else it.reversed()
+        }
+        return sortedWith(compareBy<OfflineAlbum> { it.album.year == null }.then(yearComparator).thenBy { it.album.name.lowercase() }.thenBy { it.album.id })
+    }
     val comparator = when (option.criterion) {
         DownloadAlbumSortCriterion.Title -> compareBy<OfflineAlbum>({ it.album.name.lowercase() }, { it.album.name }, { it.album.id })
         DownloadAlbumSortCriterion.Artist -> compareBy<OfflineAlbum>({ it.album.artist.lowercase() }, { it.album.artist }, { it.album.name.lowercase() }, { it.album.id })
-        DownloadAlbumSortCriterion.Year -> compareBy<OfflineAlbum>({ it.album.year == null }, { it.album.year ?: 0 }, { it.album.name.lowercase() }, { it.album.id })
+        DownloadAlbumSortCriterion.Year -> error("Handled above")
         DownloadAlbumSortCriterion.Added -> compareBy<OfflineAlbum>({ it.requestedAtMs }, { it.album.id })
     }
     return sorted(option, comparator)
