@@ -90,6 +90,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 @Composable
 fun PlayerHost(
     viewModel: PlayerViewModel,
+    expandRequest: Long = 0L,
+    onExpandRequestConsumed: () -> Unit = {},
     onAddToPlaylist: (List<Track>) -> Unit,
     onArtistClick: (Track) -> Unit,
     onAlbumClick: (Track) -> Unit,
@@ -116,6 +118,13 @@ fun PlayerHost(
     val queueSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var queueVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(expandRequest) {
+        if (expandRequest != 0L) {
+            sheetState.expand()
+            onExpandRequestConsumed()
+        }
+    }
 
     CompositionLocalProvider(LocalPlayerBottomInset provides peekHeight) {
         BottomSheetScaffold(
