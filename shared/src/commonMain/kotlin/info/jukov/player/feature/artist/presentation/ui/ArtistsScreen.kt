@@ -266,13 +266,14 @@ fun ArtistRow(
             onClick = { if (selectionMode) onSelectedChange(!selected) else onClick() },
             onLongClick = { onSelectedChange(!selected) },
         ),
-        leadingContent = if (selectionMode) {
-            { Checkbox(checked = selected, onCheckedChange = onSelectedChange) }
-        } else null,
         headlineContent = { Text(artist.name, fontWeight = FontWeight.Medium) },
         supportingContent = { Text(stringResource(Res.string.albums_count, artist.albumCount)) },
         trailingContent = {
-            FavoriteToggleButton(artist.isFavorite, onFavoriteClick, favoriteEnabled)
+            if (selectionMode) {
+                Checkbox(checked = selected, onCheckedChange = onSelectedChange)
+            } else {
+                FavoriteToggleButton(artist.isFavorite, onFavoriteClick, favoriteEnabled)
+            }
         },
     )
 }

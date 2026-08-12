@@ -1,6 +1,7 @@
 package info.jukov.player.feature.library.presentation.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +33,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.testTag
+import info.jukov.player.feature.playback.presentation.ui.PlayerBackHandler
 
 private data class LibraryItem(
     val id: String,
@@ -54,6 +56,8 @@ fun LibraryScreen(
     onArtistClick: (Artist) -> Unit,
     onAlbumClick: (Album) -> Unit,
     onTrackClick: (Track) -> Unit,
+    onAddToQueue: (List<Track>) -> Unit = {},
+    onAddToPlaylist: (List<Track>, () -> Unit) -> Unit = { _, _ -> },
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
@@ -61,6 +65,10 @@ fun LibraryScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
+    val resultItems = results.content.orEmpty()
+    var selectedIds by remember(query) { mutableStateOf<Set<String>>(emptySet()) }
+    val selectedItems = resultItems.filter { it.id in selectedIds }
+    PlayerBackHandler(enabled = selectedIds.isNotEmpty(), onBack = { selectedIds = emptySet() })
     val browseListState = rememberLazyListState()
     val searchListState = rememberLazyListState()
     LaunchedEffect(query) {
@@ -81,7 +89,36 @@ fun LibraryScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            AppFlexibleTopAppBar(
+            if (selectedIds.isNotEmpty()) {
+                TopAppBar(
+                    title = { Text(stringResource(Res.string.selected_items, selectedIds.size)) },
+                    navigationIcon = {
+                        IconButton(onClick = { selectedIds = emptySet() }) {
+                            Icon(painterResource(Res.drawable.arrow_back), stringResource(Res.string.clear_selection))
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.toggleFavorites(selectedItems); selectedIds = emptySet() }) {
+                            Icon(painterResource(Res.drawable.heart), stringResource(Res.string.add_to_favorites))
+                        }
+                        IconButton(onClick = { viewModel.download(selectedItems) { selectedIds = emptySet() } }) {
+                            Icon(painterResource(Res.drawable.download), stringResource(Res.string.downloads))
+                        }
+                        IconButton(onClick = {
+                            viewModel.resolveTracks(selectedItems) { onAddToQueue(it); selectedIds = emptySet() }
+                        }) {
+                            Icon(painterResource(Res.drawable.playlist_play), stringResource(Res.string.add_selected_to_queue))
+                        }
+                        IconButton(onClick = {
+                            viewModel.resolveTracks(selectedItems) { tracks ->
+                                onAddToPlaylist(tracks) { selectedIds = emptySet() }
+                            }
+                        }) {
+                            Icon(painterResource(Res.drawable.playlist_plus), stringResource(Res.string.add_to_playlist))
+                        }
+                    },
+                )
+            } else AppFlexibleTopAppBar(
                 title = stringResource(Res.string.app_name),
                 scrollBehavior = scrollBehavior,
                 actions = {
@@ -163,6 +200,10 @@ fun LibraryScreen(
                 onArtistClick = onArtistClick,
                 onAlbumClick = onAlbumClick,
                 onTrackClick = onTrackClick,
+                selectedIds = selectedIds,
+                onSelectionChange = { id, selected ->
+                    selectedIds = if (selected) selectedIds + id else selectedIds - id
+                },
             )
         }
     }
@@ -201,6 +242,8 @@ private fun LibrarySearchResults(
     onArtistClick: (Artist) -> Unit,
     onAlbumClick: (Album) -> Unit,
     onTrackClick: (Track) -> Unit,
+    selectedIds: Set<String>,
+    onSelectionChange: (String, Boolean) -> Unit,
 ) {
     val items = state.content.orEmpty()
     when {
@@ -225,6 +268,9 @@ private fun LibrarySearchResults(
                         imageUrl = null,
                         fallback = Res.drawable.account_multiple,
                         onClick = { onArtistClick(item.artist) },
+                        selected = item.id in selectedIds,
+                        selectionMode = selectedIds.isNotEmpty(),
+                        onSelectedChange = { onSelectionChange(item.id, it) },
                     )
                     is LibrarySearchItem.AlbumItem -> SearchRow(
                         title = item.album.name,
@@ -232,6 +278,9 @@ private fun LibrarySearchResults(
                         imageUrl = item.album.coverArtUrl,
                         fallback = Res.drawable.album,
                         onClick = { onAlbumClick(item.album) },
+                        selected = item.id in selectedIds,
+                        selectionMode = selectedIds.isNotEmpty(),
+                        onSelectedChange = { onSelectionChange(item.id, it) },
                     )
                     is LibrarySearchItem.TrackItem -> SearchRow(
                         title = item.track.title,
@@ -239,6 +288,9 @@ private fun LibrarySearchResults(
                         imageUrl = item.track.coverArtUrl,
                         fallback = Res.drawable.music_box_multiple,
                         onClick = { onTrackClick(item.track) },
+                        selected = item.id in selectedIds,
+                        selectionMode = selectedIds.isNotEmpty(),
+                        onSelectedChange = { onSelectionChange(item.id, it) },
                     )
                 }
             }
@@ -250,9 +302,21 @@ private fun LibrarySearchResults(
 }
 
 @Composable
-private fun SearchRow(title: String, subtitle: String, imageUrl: String?, fallback: DrawableResource, onClick: () -> Unit) {
+private fun SearchRow(
+    title: String,
+    subtitle: String,
+    imageUrl: String?,
+    fallback: DrawableResource,
+    onClick: () -> Unit,
+    selected: Boolean,
+    selectionMode: Boolean,
+    onSelectedChange: (Boolean) -> Unit,
+) {
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier.combinedClickable(
+            onClick = { if (selectionMode) onSelectedChange(!selected) else onClick() },
+            onLongClick = { onSelectedChange(!selected) },
+        ),
         headlineContent = { Text(title, maxLines = 1) },
         supportingContent = { if (subtitle.isNotBlank()) Text(subtitle, maxLines = 1) },
         leadingContent = {
@@ -262,5 +326,8 @@ private fun SearchRow(title: String, subtitle: String, imageUrl: String?, fallba
                 Icon(painterResource(fallback), null, modifier = Modifier.size(40.dp))
             }
         },
+        trailingContent = if (selectionMode) {
+            { Checkbox(checked = selected, onCheckedChange = onSelectedChange) }
+        } else null,
     )
 }

@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import info.jukov.player.feature.playback.domain.PlaybackQueueResolver
 import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.download.domain.DownloadStatus
 
 data class PlayerUiState(
     val queue: List<PlayerQueueItem> = emptyList(),
@@ -64,6 +65,7 @@ class PlayerViewModel(
             initialValue = controller.state.value.mapContent { it.toUiState(emptyMap()) },
         )
     val favoritePending = favoriteDelegate.pending
+    val downloadStatuses = downloadDelegate.trackStatuses
 
     init {
         viewModelScope.launch {

@@ -28,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -80,6 +81,8 @@ import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.feature.playback.presentation.PlayerUiState
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
 import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.download.domain.DownloadState
+import info.jukov.player.feature.download.domain.DownloadStatus
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -100,6 +103,7 @@ fun PlayerHost(
 ) {
     val loadable by viewModel.state.collectAsStateWithLifecycle()
     val favoritePending by viewModel.favoritePending.collectAsStateWithLifecycle()
+    val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
     val snapshot = loadable.content ?: PlayerUiState()
     val track = snapshot.currentTrack
 
@@ -138,6 +142,7 @@ fun PlayerHost(
                     error = (loadable as? LoadableState.Failure)?.error,
                     viewModel = viewModel,
                     favoriteEnabled = track.id !in favoritePending,
+                    downloadStatus = downloadStatuses[track.id],
                     peekHeight = peekHeight,
                     sheetOffset = { runCatching { sheetState.requireOffset() }.getOrNull() },
                     onExpand = { scope.launch { sheetState.expand() } },
@@ -220,6 +225,7 @@ private fun PlayerSheetContent(
     error: AppError?,
     viewModel: PlayerViewModel,
     favoriteEnabled: Boolean,
+    downloadStatus: DownloadStatus?,
     peekHeight: Dp,
     sheetOffset: () -> Float?,
     onExpand: () -> Unit,
@@ -252,6 +258,7 @@ private fun PlayerSheetContent(
             error = error,
             viewModel = viewModel,
             favoriteEnabled = favoriteEnabled,
+            downloadStatus = downloadStatus,
             onOpenQueue = onOpenQueue,
             onAddToPlaylist = onAddToPlaylist,
             onArtistClick = onArtistClick,
@@ -363,6 +370,7 @@ private fun FullPlayer(
     error: AppError?,
     viewModel: PlayerViewModel,
     favoriteEnabled: Boolean,
+    downloadStatus: DownloadStatus?,
     onOpenQueue: () -> Unit,
     onAddToPlaylist: (List<Track>) -> Unit,
     onArtistClick: (Track) -> Unit,
@@ -512,11 +520,7 @@ private fun FullPlayer(
                 onClick = viewModel::toggleFavorite,
                 enabled = favoriteEnabled,
             )
-            PlayerIconButton(
-                resource = Res.drawable.download,
-                description = stringResource(Res.string.download_track),
-                onClick = viewModel::downloadCurrentTrack,
-            )
+            PlayerDownloadButton(downloadStatus, viewModel::downloadCurrentTrack)
             PlayerIconButton(
                 resource = Res.drawable.playlist_plus,
                 description = stringResource(Res.string.add_to_playlist),
@@ -535,6 +539,37 @@ private fun FullPlayer(
             )
         }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun PlayerDownloadButton(status: DownloadStatus?, onClick: () -> Unit) {
+    Box {
+        PlayerIconButton(
+            resource = Res.drawable.download,
+            description = stringResource(Res.string.download_track),
+            enabled = status == null || status.state == DownloadState.Failed,
+            onClick = onClick,
+        )
+        when (status?.state) {
+            DownloadState.Queued, DownloadState.Downloading -> status.progress?.let { progress ->
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(14.dp).align(Alignment.BottomEnd),
+                    strokeWidth = 2.dp,
+                )
+            } ?: CircularProgressIndicator(
+                modifier = Modifier.size(14.dp).align(Alignment.BottomEnd),
+                strokeWidth = 2.dp,
+            )
+            DownloadState.Completed -> Icon(
+                painterResource(Res.drawable.check),
+                contentDescription = null,
+                modifier = Modifier.size(14.dp).align(Alignment.BottomEnd),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            else -> Unit
+        }
     }
 }
 
