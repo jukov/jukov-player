@@ -39,6 +39,17 @@ class LibrarySortingTest {
         assertEquals(SortOption(TrackSortCriterion.Artist, SortDirection.Descending), SettingsSortPreferences(settings).artistTracks)
     }
 
+    @Test fun globalAlbumsNormalizeUnsupportedDescendingAlphabeticalSort() {
+        assertEquals(
+            SortOption(AlbumSortCriterion.Title, SortDirection.Ascending),
+            SortOption(AlbumSortCriterion.Title, SortDirection.Descending).supportedForGlobalAlbums(),
+        )
+        assertEquals(
+            SortOption(AlbumSortCriterion.Year, SortDirection.Descending),
+            SortOption(AlbumSortCriterion.Year, SortDirection.Descending).supportedForGlobalAlbums(),
+        )
+    }
+
     private fun artist(id: String, name: String) = Artist(id, name, 0, null)
     private fun album(id: String, year: Int?) = Album(id, id, "Artist", null, coverArtUrl = null, year = year)
     private fun offline(id: String, added: Long) = OfflineTrack(track(id), DownloadStatus(DownloadState.Completed), added)

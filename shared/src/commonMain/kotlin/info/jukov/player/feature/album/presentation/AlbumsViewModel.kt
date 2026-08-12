@@ -30,6 +30,7 @@ import info.jukov.player.core.domain.SortOption
 import info.jukov.player.core.domain.SortPreferences
 import info.jukov.player.core.domain.sortedAlbums
 import info.jukov.player.core.domain.mapContent
+import info.jukov.player.core.domain.supportedForGlobalAlbums
 
 class AlbumsViewModel(
     private val getAlbumsUseCase: GetAlbumsUseCase,
@@ -78,6 +79,13 @@ class AlbumsViewModel(
         if (initialized && this.artistId == artistId) return
         closeSearch()
         this.artistId = artistId
+        if (artistId == null) {
+            val supportedSort = _sort.value.supportedForGlobalAlbums()
+            if (supportedSort != _sort.value) {
+                sortPreferences.albums = supportedSort
+                _sort.value = supportedSort
+            }
+        }
         initialized = true
         _hasMore.value = false
         _state.value = LoadableState.Loading(content = null)

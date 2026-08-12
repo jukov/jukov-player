@@ -16,6 +16,13 @@ enum class DownloadAlbumSortCriterion { Title, Artist, Year, Added }
 
 data class SortOption<C>(val criterion: C, val direction: SortDirection)
 
+fun SortOption<AlbumSortCriterion>.supportedForGlobalAlbums(): SortOption<AlbumSortCriterion> =
+    if (criterion != AlbumSortCriterion.Year && direction == SortDirection.Descending) {
+        copy(direction = SortDirection.Ascending)
+    } else {
+        this
+    }
+
 interface SortPreferences {
     var artists: SortOption<ArtistSortCriterion>
     var albums: SortOption<AlbumSortCriterion>
