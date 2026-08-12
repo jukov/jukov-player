@@ -13,6 +13,7 @@ import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.favoriteStateForSelection
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -40,7 +41,8 @@ class TracksViewModel(
     private val _albumIsFavorite = MutableStateFlow(false)
     val albumIsFavorite: StateFlow<Boolean> = _albumIsFavorite.asStateFlow()
     val pending = favoriteDelegate.pending
-    val messages = merge(favoriteDelegate.messages, downloadDelegate.messages)
+    private val _downloadMessages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
+    val messages = merge(favoriteDelegate.messages, _downloadMessages)
     val downloadStatuses = downloadDelegate.trackStatuses
     val albumDownloadStatuses = downloadDelegate.albumStatuses
     val artworkUris = downloadDelegate.artworkUris
@@ -124,7 +126,7 @@ class TracksViewModel(
         }
     }
 
-    fun downloadTrack(track: Track) = viewModelScope.launch { downloadDelegate.download(track) }
+    fun downloadTrack(track: Track) = viewModelScope.launch { download(track) }
     fun cancelTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelTrack(id) }
     fun retryTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.retry(id) }
     fun toggleFavorites(tracks: List<Track>) = viewModelScope.launch {
@@ -137,14 +139,26 @@ class TracksViewModel(
         val statuses = downloadStatuses.value
         tracks.forEach { track ->
             when (statuses[track.id]?.state) {
-                null -> downloadDelegate.download(track)
+                null -> download(track)
                 info.jukov.player.feature.download.domain.DownloadState.Failed -> downloadDelegate.retry(track.id)
                 else -> Unit
             }
         }
     }
-    fun downloadAlbum(album: Album) = viewModelScope.launch { downloadDelegate.download(album) }
+    fun downloadAlbum(album: Album) = viewModelScope.launch { download(album) }
     fun cancelAlbumDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelAlbum(id) }
+
+    private suspend fun download(track: Track) {
+        downloadDelegate.download(track).onFailure { error ->
+            _downloadMessages.tryEmit(error.toAppError(AppError.DownloadFailed))
+        }
+    }
+
+    private suspend fun download(album: Album) {
+        downloadDelegate.download(album).onFailure { error ->
+            _downloadMessages.tryEmit(error.toAppError(AppError.DownloadFailed))
+        }
+    }
 
     private fun updateFavorite(id: String, isFavorite: Boolean) {
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }

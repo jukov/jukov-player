@@ -1,16 +1,12 @@
 package info.jukov.player.feature.download.presentation
 
-import info.jukov.player.core.domain.AppError
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.track.domain.Track
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,20 +36,14 @@ class DownloadDelegateTest {
     }
 
     @Test
-    fun networkFailureIsReportedWithoutEscapingDownload() = runTest {
+    fun networkFailureIsReturnedWithoutEscapingDownload() = runTest {
         val repository = RecordingDownloadsRepository(
             onDownloadTrack = { throw IllegalStateException("network failed") },
         )
         val delegate = DownloadDelegate(repository, backgroundScope)
-        var message: AppError? = null
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            message = delegate.messages.first()
-        }
+        val result = delegate.download(track("track"))
 
-        delegate.download(track("track"))
-        runCurrent()
-
-        assertEquals(AppError.DownloadFailed, message)
+        assertEquals("network failed", result.exceptionOrNull()?.message)
     }
 
     @Test

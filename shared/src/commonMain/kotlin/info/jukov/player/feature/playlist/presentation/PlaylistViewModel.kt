@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 
@@ -28,7 +27,7 @@ class PlaylistViewModel(
     private val _state = MutableStateFlow<LoadableState<Playlist>>(LoadableState.Loading(null))
     val state = _state.asStateFlow()
     private val _messages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
-    val messages = merge(_messages.asSharedFlow(), downloadDelegate.messages)
+    val messages = _messages.asSharedFlow()
     private val _pending = MutableStateFlow(false)
     val pending = _pending.asStateFlow()
     val downloadStatuses = downloadDelegate.trackStatuses
@@ -53,11 +52,11 @@ class PlaylistViewModel(
     fun isEditable(playlist: Playlist) = repository.isEditable(playlist)
 
     fun download(tracks: List<Track>) = viewModelScope.launch {
-        tracks.forEach { downloadDelegate.download(it) }
+        tracks.forEach { track -> requestDownload(track) }
     }
 
     fun download(track: Track) = viewModelScope.launch {
-        downloadDelegate.download(track)
+        requestDownload(track)
     }
 
     fun cancelDownload(id: String) = viewModelScope.launch {
@@ -66,6 +65,12 @@ class PlaylistViewModel(
 
     fun retryDownload(id: String) = viewModelScope.launch {
         downloadDelegate.retry(id)
+    }
+
+    private suspend fun requestDownload(track: Track) {
+        downloadDelegate.download(track).onFailure { error ->
+            _messages.tryEmit(error.toAppError(AppError.DownloadFailed))
+        }
     }
 
     fun toggleFavorites(tracks: List<Track>) = viewModelScope.launch {
