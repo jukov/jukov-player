@@ -102,6 +102,7 @@
     <string name="error_tracks_load_failed">Не удалось загрузить треки</string>
     <string name="error_favorites_load_failed">Не удалось загрузить избранное</string>
     <string name="error_favorite_update_failed">Не удалось изменить избранное</string>
+    <string name="error_download_failed">Не удалось начать загрузку</string>
     <string name="error_playlists_load_failed">Не удалось загрузить плейлисты</string><string name="error_playlist_load_failed">Не удалось загрузить плейлист</string><string name="error_playlist_update_failed">Не удалось изменить плейлист</string>
     <string name="error_opensubsonic">OpenSubsonic вернул ошибку %1$d</string>
     <string name="error_http">Сервер вернул HTTP-ошибку %1$d</string>

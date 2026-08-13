@@ -13,11 +13,14 @@ import kotlinx.coroutines.flow.flowOf
 
 internal class RecordingDownloadsRepository(
     library: OfflineLibrary = OfflineLibrary(),
+    private val onDownloadTrack: suspend (Track) -> Unit = {},
+    private val onDownloadAlbum: suspend (Album) -> Unit = {},
 ) : DownloadsRepository {
     private val libraryFlow = MutableStateFlow(library)
     val downloadedAlbums = mutableListOf<Album>()
     val downloadedTracks = mutableListOf<Track>()
     val cancelledAlbumIds = mutableListOf<String>()
+    val cancelledTrackIds = mutableListOf<String>()
 
     override fun observeLibrary(): Flow<OfflineLibrary> = libraryFlow
     override fun searchLibrary(query: String): Flow<OfflineLibrary> = libraryFlow
@@ -25,11 +28,15 @@ internal class RecordingDownloadsRepository(
     override fun observeAlbumTracks(albumId: String): Flow<List<OfflineTrack>> = emptyFlow()
     override suspend fun downloadTrack(track: Track) {
         downloadedTracks += track
+        onDownloadTrack(track)
     }
     override suspend fun downloadAlbum(album: Album) {
         downloadedAlbums += album
+        onDownloadAlbum(album)
     }
-    override suspend fun cancelTrack(trackId: String) = Unit
+    override suspend fun cancelTrack(trackId: String) {
+        cancelledTrackIds += trackId
+    }
     override suspend fun removeTracks(trackIds: List<String>) = Unit
     override suspend fun cancelAlbum(albumId: String) {
         cancelledAlbumIds += albumId

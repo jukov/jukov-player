@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import info.jukov.player.feature.playback.domain.PlaybackQueueResolver
 import info.jukov.player.feature.download.presentation.DownloadDelegate
 import info.jukov.player.feature.download.domain.DownloadStatus
+import info.jukov.player.feature.download.domain.DownloadState
 
 data class PlayerUiState(
     val queue: List<PlayerQueueItem> = emptyList(),
@@ -170,9 +171,16 @@ class PlayerViewModel(
         }
     }
 
-    fun downloadCurrentTrack() {
+    fun toggleCurrentTrackDownload() {
         val track = state.value.content?.currentTrack ?: return
-        viewModelScope.launch { downloadDelegate.download(track) }
+        viewModelScope.launch {
+            when (downloadStatuses.value[track.id]?.state) {
+                DownloadState.Queued, DownloadState.Downloading -> downloadDelegate.cancelTrack(track.id)
+                DownloadState.Failed -> downloadDelegate.retry(track.id)
+                DownloadState.Completed -> Unit
+                null -> downloadDelegate.download(track)
+            }
+        }
     }
 
     private fun updateFavorite(trackId: String, isFavorite: Boolean) {

@@ -102,6 +102,7 @@
     <string name="error_tracks_load_failed">Could not load tracks</string>
     <string name="error_favorites_load_failed">Could not load favorites</string>
     <string name="error_favorite_update_failed">Could not update favorites</string>
+    <string name="error_download_failed">Could not start download</string>
     <string name="error_playlists_load_failed">Could not load playlists</string><string name="error_playlist_load_failed">Could not load playlist</string><string name="error_playlist_update_failed">Could not update playlist</string>
     <string name="error_opensubsonic">OpenSubsonic returned error %1$d</string>
     <string name="error_http">The server returned HTTP error %1$d</string>

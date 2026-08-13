@@ -13,6 +13,10 @@ import info.jukov.player.feature.playback.domain.PlaybackSnapshot
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.download.presentation.DownloadDelegate
 import info.jukov.player.feature.download.presentation.RecordingDownloadsRepository
+import info.jukov.player.feature.download.domain.DownloadState
+import info.jukov.player.feature.download.domain.DownloadStatus
+import info.jukov.player.feature.download.domain.OfflineLibrary
+import info.jukov.player.feature.download.domain.OfflineTrack
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +41,33 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerViewModelTest {
     @Test
+    fun secondDownloadClickCancelsActiveCurrentTrackDownload() = runTest {
+        kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val repository = RecordingDownloadsRepository(
+            OfflineLibrary(
+                tracks = listOf(OfflineTrack(TRACK, DownloadStatus(DownloadState.Downloading))),
+            ),
+        )
+        val controller = FakePlaybackController().apply {
+            state.value = LoadableState.Content(PlaybackSnapshot(queue = listOf(TRACK), currentIndex = 0))
+        }
+        val viewModel = PlayerViewModel(
+            controller = controller,
+            favoriteDelegate = FavoriteDelegate(FakeFavoritesRepository()),
+            queueResolver = DeferredResolver(),
+            downloadDelegate = DownloadDelegate(repository, backgroundScope),
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.state.collect {} }
+        runCurrent()
+
+        viewModel.toggleCurrentTrackDownload()
+        advanceUntilIdle()
+
+        assertEquals(listOf(TRACK.id), repository.cancelledTrackIds)
+        assertTrue(repository.downloadedTracks.isEmpty())
+    }
+
+    @Test
     fun downloadsCurrentTrack() = runTest {
         kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val repository = RecordingDownloadsRepository()
@@ -51,7 +82,7 @@ class PlayerViewModelTest {
         )
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.state.collect {} }
 
-        viewModel.downloadCurrentTrack()
+        viewModel.toggleCurrentTrackDownload()
         advanceUntilIdle()
 
         assertEquals(listOf(TRACK), repository.downloadedTracks)

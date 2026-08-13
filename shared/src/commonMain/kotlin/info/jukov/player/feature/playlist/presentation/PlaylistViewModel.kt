@@ -52,11 +52,11 @@ class PlaylistViewModel(
     fun isEditable(playlist: Playlist) = repository.isEditable(playlist)
 
     fun download(tracks: List<Track>) = viewModelScope.launch {
-        tracks.forEach { downloadDelegate.download(it) }
+        tracks.forEach { track -> requestDownload(track) }
     }
 
     fun download(track: Track) = viewModelScope.launch {
-        downloadDelegate.download(track)
+        requestDownload(track)
     }
 
     fun cancelDownload(id: String) = viewModelScope.launch {
@@ -65,6 +65,12 @@ class PlaylistViewModel(
 
     fun retryDownload(id: String) = viewModelScope.launch {
         downloadDelegate.retry(id)
+    }
+
+    private suspend fun requestDownload(track: Track) {
+        downloadDelegate.download(track).onFailure { error ->
+            _messages.tryEmit(error.toAppError(AppError.DownloadFailed))
+        }
     }
 
     fun toggleFavorites(tracks: List<Track>) = viewModelScope.launch {

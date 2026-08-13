@@ -10,6 +10,7 @@ import info.jukov.player.core.domain.updateItem
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -22,6 +23,7 @@ import info.jukov.player.feature.track.domain.GetTracksUseCase
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.merge
 import info.jukov.player.feature.search.domain.SearchUseCase
 import info.jukov.player.feature.search.presentation.PagedSearchDelegate
 
@@ -39,7 +41,8 @@ class AlbumsViewModel(
     private val _loadingOrigin = MutableStateFlow<LoadingOrigin?>(LoadingOrigin.Initial)
     val loadingOrigin: StateFlow<LoadingOrigin?> = _loadingOrigin.asStateFlow()
     val pending = favoriteDelegate.pending
-    val messages = favoriteDelegate.messages
+    private val _downloadMessages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
+    val messages = merge(favoriteDelegate.messages, _downloadMessages)
     val artworkUris = downloadDelegate.artworkUris
     val downloadStatuses = downloadDelegate.albumStatuses
     private val _hasMore = MutableStateFlow(false)
@@ -115,7 +118,11 @@ class AlbumsViewModel(
     }
 
     fun downloadAlbums(albums: List<Album>) = viewModelScope.launch {
-        albums.forEach { downloadDelegate.download(it) }
+        albums.forEach { album ->
+            downloadDelegate.download(album).onFailure { error ->
+                _downloadMessages.tryEmit(error.toAppError(AppError.DownloadFailed))
+            }
+        }
     }
 
     fun addAlbumsToQueue(albums: List<Album>, onTracksReady: (List<Track>) -> Unit) =
