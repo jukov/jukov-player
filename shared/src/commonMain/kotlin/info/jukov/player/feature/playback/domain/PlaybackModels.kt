@@ -42,8 +42,14 @@ data class PlaybackSnapshot(
     val origin: PlaybackOrigin = PlaybackOrigin.TrackList,
     val isShuffleEnabled: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.Off,
+    val canSkipPrevious: Boolean? = null,
+    val canSkipNext: Boolean? = null,
 ) {
     val currentTrack: Track? get() = queue.getOrNull(currentIndex)
-    val hasPrevious: Boolean get() = currentIndex > 0 || repeatMode == RepeatMode.All && queue.isNotEmpty()
-    val hasNext: Boolean get() = currentIndex in 0..<queue.lastIndex || repeatMode == RepeatMode.All && queue.isNotEmpty()
+    val hasPrevious: Boolean
+        get() = canSkipPrevious
+            ?: (currentIndex > 0 || repeatMode == RepeatMode.All && queue.isNotEmpty())
+    val hasNext: Boolean
+        get() = canSkipNext
+            ?: (currentIndex in 0..<queue.lastIndex || repeatMode == RepeatMode.All && queue.isNotEmpty())
 }

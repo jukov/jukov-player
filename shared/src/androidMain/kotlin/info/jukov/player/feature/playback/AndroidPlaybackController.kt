@@ -24,9 +24,6 @@ import info.jukov.player.feature.playback.domain.PlaybackControllerFactory
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.playback.domain.RepeatMode
-import info.jukov.player.feature.playback.domain.disableShuffle
-import info.jukov.player.feature.playback.domain.enableShuffle
-import info.jukov.player.feature.playback.domain.updateCanonicalQueue
 import info.jukov.player.feature.playback.domain.appendQueueItems
 import info.jukov.player.feature.playback.domain.moveFutureQueueItem
 import info.jukov.player.feature.playback.domain.moveFutureQueueItemsToTop
@@ -64,7 +61,6 @@ private class AndroidPlaybackController(
     private var controller: MediaController? = null
     private var queuedAction: ((MediaController) -> Unit)? = null
     private val restored = playbackStore.read()
-    private var canonicalQueue = restored?.canonicalQueue ?: restored?.queue.orEmpty()
     private var isShuffleEnabled = restored?.isShuffleEnabled == true
     private var repeatMode = restored?.repeatMode ?: RepeatMode.Off
 
@@ -101,6 +97,7 @@ private class AndroidPlaybackController(
                         controller = connected
                         connected.addListener(PlayerListener())
                         connected.repeatMode = repeatMode.toPlayerRepeatMode()
+                        connected.shuffleModeEnabled = isShuffleEnabled
                         queuedAction?.invoke(connected)
                         queuedAction = null
                         replaceFromPlayer(connected)
@@ -128,7 +125,6 @@ private class AndroidPlaybackController(
         if (queue == snapshot.queue) {
             return
         }
-        canonicalQueue = canonicalQueue.withTrackFavorite(trackId, isFavorite)
         persist(queue, snapshot.currentIndex, snapshot.origin)
         _state.update { current ->
             current.mapContent { value -> value.copy(queue = queue) }
@@ -141,18 +137,11 @@ private class AndroidPlaybackController(
 
     override fun play(tracks: List<Track>, startIndex: Int, origin: PlaybackOrigin) {
         if (tracks.isEmpty() || startIndex !in tracks.indices) return
-        val requestedQueue = tracks.drop(startIndex)
-        val order = if (isShuffleEnabled) {
-            enableShuffle(requestedQueue, currentIndex = 0)
-        } else {
-            enableShuffle(requestedQueue, currentIndex = -1)
-        }
-        val queue = order.queue
+        val queue = tracks.drop(startIndex)
         if (queue.any { it.streamUrl == null }) {
             fail(AppError.MissingTrackStreamUrl)
             return
         }
-        canonicalQueue = order.canonicalQueue
         persist(queue, 0, origin)
         _state.update {
             LoadableState.Content(
@@ -192,7 +181,6 @@ private class AndroidPlaybackController(
         val snapshot = _state.value.content ?: PlaybackSnapshot()
         val wasEmpty = snapshot.queue.isEmpty()
         val queue = appendQueueItems(snapshot.queue, tracks)
-        canonicalQueue = appendQueueItems(canonicalQueue, tracks)
         val currentIndex = if (wasEmpty) 0 else snapshot.currentIndex
         persist(queue, currentIndex, snapshot.origin)
         _state.update {
@@ -227,11 +215,6 @@ private class AndroidPlaybackController(
         val snapshot = _state.value.content ?: return
         val queue = moveFutureQueueItem(snapshot.queue, snapshot.currentIndex, fromIndex, toIndex)
         if (queue == snapshot.queue) return
-        if (isShuffleEnabled) {
-            canonicalQueue = updateCanonicalQueue(snapshot.queue, queue, canonicalQueue, snapshot.currentIndex)
-        } else {
-            canonicalQueue = queue
-        }
         persist(queue, snapshot.currentIndex, snapshot.origin)
         _state.update { it.mapContent { value -> value.copy(queue = queue) } }
         withController { it.moveMediaItem(fromIndex, toIndex) }
@@ -241,11 +224,6 @@ private class AndroidPlaybackController(
         val snapshot = _state.value.content ?: return
         val queue = moveFutureQueueItemsToTop(snapshot.queue, snapshot.currentIndex, indices)
         if (queue == snapshot.queue) return
-        if (isShuffleEnabled) {
-            canonicalQueue = updateCanonicalQueue(snapshot.queue, queue, canonicalQueue, snapshot.currentIndex)
-        } else {
-            canonicalQueue = queue
-        }
         persist(queue, snapshot.currentIndex, snapshot.origin)
         _state.update { it.mapContent { value -> value.copy(queue = queue) } }
         withController { player ->
@@ -266,11 +244,6 @@ private class AndroidPlaybackController(
         val snapshot = _state.value.content ?: return
         val queue = removeFutureQueueItems(snapshot.queue, snapshot.currentIndex, indices)
         if (queue == snapshot.queue) return
-        canonicalQueue = if (isShuffleEnabled) {
-            updateCanonicalQueue(snapshot.queue, queue, canonicalQueue, snapshot.currentIndex)
-        } else {
-            queue
-        }
         persist(queue, snapshot.currentIndex, snapshot.origin)
         _state.update { it.mapContent { value -> value.copy(queue = queue) } }
         withController { player ->
@@ -282,7 +255,6 @@ private class AndroidPlaybackController(
 
     override fun stopAndClear() {
         playbackStore.clear()
-        canonicalQueue = emptyList()
         isShuffleEnabled = false
         repeatMode = RepeatMode.Off
         queuedAction = null
@@ -290,6 +262,7 @@ private class AndroidPlaybackController(
             player.stop()
             player.clearMediaItems()
             player.repeatMode = Player.REPEAT_MODE_OFF
+            player.shuffleModeEnabled = false
         }
         _state.update { LoadableState.Content(PlaybackSnapshot()) }
     }
@@ -297,26 +270,34 @@ private class AndroidPlaybackController(
     override fun toggleShuffle() {
         val snapshot = _state.value.content ?: return
         if (snapshot.currentIndex !in snapshot.queue.indices) return
-        val order = if (isShuffleEnabled) {
-            disableShuffle(snapshot.queue, canonicalQueue, snapshot.currentIndex)
-        } else {
-            enableShuffle(snapshot.queue, snapshot.currentIndex)
-        }
         isShuffleEnabled = !isShuffleEnabled
-        canonicalQueue = order.canonicalQueue
-        persist(order.queue, snapshot.currentIndex, snapshot.origin)
+        persist(snapshot.queue, snapshot.currentIndex, snapshot.origin)
+        withController { it.shuffleModeEnabled = isShuffleEnabled }
         _state.update { current ->
-            current.mapContent { it.copy(queue = order.queue, isShuffleEnabled = isShuffleEnabled) }
+            current.mapContent {
+                it.copy(
+                    isShuffleEnabled = isShuffleEnabled,
+                    canSkipPrevious = controller?.hasPreviousMediaItem(),
+                    canSkipNext = controller?.hasNextMediaItem(),
+                )
+            }
         }
-        reorderFutureMediaItems(snapshot.queue, order.queue, snapshot.currentIndex)
     }
 
     override fun cycleRepeatMode() {
         repeatMode = repeatMode.next()
         val snapshot = _state.value.content ?: return
         persist(snapshot.queue, snapshot.currentIndex, snapshot.origin)
-        _state.update { current -> current.mapContent { it.copy(repeatMode = repeatMode) } }
         withController { it.repeatMode = repeatMode.toPlayerRepeatMode() }
+        _state.update { current ->
+            current.mapContent {
+                it.copy(
+                    repeatMode = repeatMode,
+                    canSkipPrevious = controller?.hasPreviousMediaItem(),
+                    canSkipNext = controller?.hasNextMediaItem(),
+                )
+            }
+        }
     }
 
     private fun withController(action: (MediaController) -> Unit) {
@@ -343,6 +324,8 @@ private class AndroidPlaybackController(
                     origin = saved.origin,
                     isShuffleEnabled = saved.isShuffleEnabled,
                     repeatMode = saved.repeatMode,
+                    canSkipPrevious = player.hasPreviousMediaItem(),
+                    canSkipNext = player.hasNextMediaItem(),
                 ),
             )
         }
@@ -386,6 +369,8 @@ private class AndroidPlaybackController(
                     durationMs = player.duration.validDuration() ?: saved.queue[index].durationMs,
                     isShuffleEnabled = isShuffleEnabled,
                     repeatMode = repeatMode,
+                    canSkipPrevious = player.hasPreviousMediaItem(),
+                    canSkipNext = player.hasNextMediaItem(),
                 )
             }
         }
@@ -401,24 +386,10 @@ private class AndroidPlaybackController(
                 queue = queue,
                 currentIndex = currentIndex,
                 origin = origin,
-                canonicalQueue = canonicalQueue,
                 isShuffleEnabled = isShuffleEnabled,
                 repeatMode = repeatMode,
             ),
         )
-    }
-
-    private fun reorderFutureMediaItems(oldQueue: List<Track>, newQueue: List<Track>, currentIndex: Int) {
-        withController { player ->
-            val working = oldQueue.toMutableList()
-            for (targetIndex in currentIndex + 1..newQueue.lastIndex) {
-                val fromIndex = working.indexOfFirstFrom(targetIndex) { it == newQueue[targetIndex] }
-                if (fromIndex >= 0 && fromIndex != targetIndex) {
-                    player.moveMediaItem(fromIndex, targetIndex)
-                    working.add(targetIndex, working.removeAt(fromIndex))
-                }
-            }
-        }
     }
 
     private inner class PlayerListener : Player.Listener {

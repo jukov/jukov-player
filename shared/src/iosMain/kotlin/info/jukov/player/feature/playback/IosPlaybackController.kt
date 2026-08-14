@@ -11,9 +11,6 @@ import info.jukov.player.feature.playback.domain.PlaybackControllerFactory
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
 import info.jukov.player.feature.playback.domain.RepeatMode
-import info.jukov.player.feature.playback.domain.disableShuffle
-import info.jukov.player.feature.playback.domain.enableShuffle
-import info.jukov.player.feature.playback.domain.updateCanonicalQueue
 import info.jukov.player.feature.playback.domain.appendQueueItems
 import info.jukov.player.feature.playback.domain.moveFutureQueueItem
 import info.jukov.player.feature.playback.domain.moveFutureQueueItemsToTop
@@ -61,6 +58,7 @@ import jukovplayer.shared.generated.resources.add_to_favorites
 import jukovplayer.shared.generated.resources.remove_from_favorites
 import org.jetbrains.compose.resources.getString
 import kotlin.math.roundToLong
+import kotlin.random.Random
 
 object IosPlaybackControllerFactory : PlaybackControllerFactory {
     override fun create(
@@ -84,9 +82,11 @@ internal class IosPlaybackController(
     private var queue = emptyList<Track>()
     private var currentIndex = -1
     private var origin: PlaybackOrigin = PlaybackOrigin.TrackList
-    private var canonicalQueue = emptyList<Track>()
     private var isShuffleEnabled = false
     private var repeatMode = RepeatMode.Off
+    private val shuffleHistory = mutableListOf<Int>()
+    private val shuffleRemainingIndices = mutableListOf<Int>()
+    private var shuffleTraversalInitialized = false
     private var playWhenReady = false
     private var interruptionActive = false
     private var playbackError: AppError? = null
@@ -122,9 +122,9 @@ internal class IosPlaybackController(
             queue = saved.queue
             currentIndex = saved.currentIndex
             origin = saved.origin
-            canonicalQueue = saved.canonicalQueue ?: saved.queue
             isShuffleEnabled = saved.isShuffleEnabled
             repeatMode = saved.repeatMode
+            resetShuffleTraversal()
             rebuildPlayer(autoplay = false, positionMs = 0)
         } else {
             _state.value = LoadableState.Content(PlaybackSnapshot())
@@ -139,13 +139,7 @@ internal class IosPlaybackController(
         if (tracks.isEmpty() || startIndex !in tracks.indices) {
             return
         }
-        val requestedQueue = tracks.drop(startIndex)
-        val order = if (isShuffleEnabled) {
-            enableShuffle(requestedQueue, currentIndex = 0)
-        } else {
-            enableShuffle(requestedQueue, currentIndex = -1)
-        }
-        val playable = order.queue
+        val playable = tracks.drop(startIndex)
         if (playable.any { it.streamUrl == null }) {
             fail(AppError.MissingTrackStreamUrl)
             return
@@ -153,8 +147,8 @@ internal class IosPlaybackController(
         invalidateNowPlayingArtwork()
         playbackError = null
         queue = playable
-        canonicalQueue = order.canonicalQueue
         currentIndex = 0
+        resetShuffleTraversal()
         this.origin = origin
         persist()
         publish(isLoading = true)
@@ -204,8 +198,9 @@ internal class IosPlaybackController(
         val previousQueueSize = queue.size
         val wasEmpty = queue.isEmpty()
         val playerWasExhausted = !wasEmpty && player.currentItem == null && playerItems.isEmpty()
+        val positionMs = currentPositionMs()
         queue = appendQueueItems(queue, tracks)
-        canonicalQueue = appendQueueItems(canonicalQueue, tracks)
+        resetShuffleTraversal()
         if (wasEmpty || playerWasExhausted) {
             currentIndex = indexAfterQueueAppend(
                 previousQueueSize = previousQueueSize,
@@ -213,6 +208,8 @@ internal class IosPlaybackController(
                 playerWasExhausted = playerWasExhausted,
             )
             rebuildPlayer(autoplay = false, positionMs = 0)
+        } else if (isShuffleEnabled) {
+            rebuildPlayer(autoplay = playWhenReady, positionMs = positionMs)
         } else {
             tracks.forEach { track ->
                 val item = track.toPlayerItem()
@@ -225,6 +222,14 @@ internal class IosPlaybackController(
     }
 
     override fun next() {
+        if (isShuffleEnabled) {
+            val nextIndex = takeNextShuffleIndex() ?: return
+            shuffleHistory += currentIndex
+            currentIndex = nextIndex
+            rebuildPlayer(autoplay = true, positionMs = 0)
+            persist()
+            return
+        }
         if (currentIndex == queue.lastIndex && repeatMode == RepeatMode.All) {
             currentIndex = 0
             rebuildPlayer(autoplay = true, positionMs = 0)
@@ -247,6 +252,17 @@ internal class IosPlaybackController(
             return
         }
         val positionMs = currentPositionMs()
+        if (isShuffleEnabled && positionMs <= PREVIOUS_RESTART_THRESHOLD_MS && shuffleHistory.isNotEmpty()) {
+            shuffleRemainingIndices += currentIndex
+            currentIndex = shuffleHistory.removeLast()
+            rebuildPlayer(autoplay = playWhenReady, positionMs = 0)
+            persist()
+            return
+        }
+        if (isShuffleEnabled) {
+            seekTo(0)
+            return
+        }
         if (positionMs > PREVIOUS_RESTART_THRESHOLD_MS || currentIndex == 0) {
             if (positionMs <= PREVIOUS_RESTART_THRESHOLD_MS && currentIndex == 0 && repeatMode == RepeatMode.All) {
                 currentIndex = queue.lastIndex
@@ -291,6 +307,7 @@ internal class IosPlaybackController(
             return
         }
         currentIndex = index
+        resetShuffleTraversal()
         rebuildPlayer(autoplay = true, positionMs = 0)
         persist()
     }
@@ -300,13 +317,8 @@ internal class IosPlaybackController(
         if (changed == queue) {
             return
         }
-        val previousQueue = queue
         queue = changed
-        canonicalQueue = if (isShuffleEnabled) {
-            updateCanonicalQueue(previousQueue, changed, canonicalQueue, currentIndex)
-        } else {
-            changed
-        }
+        resetShuffleTraversal()
         rebuildPlayer(autoplay = playWhenReady, positionMs = currentPositionMs())
         persist()
     }
@@ -316,13 +328,8 @@ internal class IosPlaybackController(
         if (changed == queue) {
             return
         }
-        val previousQueue = queue
         queue = changed
-        canonicalQueue = if (isShuffleEnabled) {
-            updateCanonicalQueue(previousQueue, changed, canonicalQueue, currentIndex)
-        } else {
-            changed
-        }
+        resetShuffleTraversal()
         rebuildPlayer(autoplay = playWhenReady, positionMs = currentPositionMs())
         persist()
     }
@@ -332,13 +339,8 @@ internal class IosPlaybackController(
         if (changed == queue) {
             return
         }
-        val previousQueue = queue
         queue = changed
-        canonicalQueue = if (isShuffleEnabled) {
-            updateCanonicalQueue(previousQueue, changed, canonicalQueue, currentIndex)
-        } else {
-            changed
-        }
+        resetShuffleTraversal()
         rebuildPlayer(autoplay = playWhenReady, positionMs = currentPositionMs())
         persist()
     }
@@ -352,9 +354,11 @@ internal class IosPlaybackController(
         queue = emptyList()
         currentIndex = -1
         origin = PlaybackOrigin.TrackList
-        canonicalQueue = emptyList()
         isShuffleEnabled = false
         repeatMode = RepeatMode.Off
+        shuffleHistory.clear()
+        shuffleRemainingIndices.clear()
+        shuffleTraversalInitialized = false
         interruptionActive = false
         playbackError = null
         invalidateNowPlayingArtwork()
@@ -369,17 +373,10 @@ internal class IosPlaybackController(
         if (currentIndex !in queue.indices) {
             return
         }
-        val positionMs = currentPositionMs()
-        val order = if (isShuffleEnabled) {
-            disableShuffle(queue, canonicalQueue, currentIndex)
-        } else {
-            enableShuffle(queue, currentIndex)
-        }
-        queue = order.queue
-        canonicalQueue = order.canonicalQueue
         isShuffleEnabled = !isShuffleEnabled
-        rebuildPlayer(autoplay = playWhenReady, positionMs = positionMs)
+        resetShuffleTraversal()
         persist()
+        publish()
     }
 
     override fun cycleRepeatMode() {
@@ -415,7 +412,12 @@ internal class IosPlaybackController(
             publish()
             return
         }
-        playerItems = queue.drop(currentIndex).map { track ->
+        val tracksToLoad = if (isShuffleEnabled) {
+            listOf(queue[currentIndex])
+        } else {
+            queue.drop(currentIndex)
+        }
+        playerItems = tracksToLoad.map { track ->
             track.toPlayerItem().also { player.insertItem(it, afterItem = null) }
         }
         if (positionMs > 0) {
@@ -482,6 +484,19 @@ internal class IosPlaybackController(
         if (repeatMode == RepeatMode.One) {
             rebuildPlayer(autoplay = true, positionMs = 0)
             persist()
+            return
+        }
+        if (isShuffleEnabled) {
+            val nextIndex = takeNextShuffleIndex()
+            if (nextIndex != null) {
+                shuffleHistory += currentIndex
+                currentIndex = nextIndex
+                rebuildPlayer(autoplay = true, positionMs = 0)
+                persist()
+            } else {
+                playWhenReady = false
+                updatePlaybackState(positionOverrideMs = completedPositionMs)
+            }
             return
         }
         playerItems = playerItems.drop(1)
@@ -644,7 +659,7 @@ internal class IosPlaybackController(
     }
 
     internal fun remoteNext(): Long {
-        if (currentIndex !in queue.indices || currentIndex == queue.lastIndex && repeatMode != RepeatMode.All) {
+        if (_state.value.content?.hasNext != true) {
             return MPRemoteCommandHandlerStatusNoSuchContent
         }
         next()
@@ -749,6 +764,18 @@ internal class IosPlaybackController(
             origin = origin,
             isShuffleEnabled = isShuffleEnabled,
             repeatMode = repeatMode,
+            canSkipPrevious = if (isShuffleEnabled) {
+                shuffleHistory.isNotEmpty() || positionMs > 0
+            } else {
+                null
+            },
+            canSkipNext = if (isShuffleEnabled) {
+                !shuffleTraversalInitialized && queue.size > 1 ||
+                    shuffleRemainingIndices.isNotEmpty() ||
+                    repeatMode == RepeatMode.All && queue.size > 1
+            } else {
+                null
+            },
         )
         _state.value = playbackLoadableState(snapshot, playbackError)
         updateNowPlaying(snapshot)
@@ -806,9 +833,6 @@ internal class IosPlaybackController(
             return
         }
         queue = updatedQueue
-        canonicalQueue = canonicalQueue.map { track ->
-            if (track.id == trackId) track.copy(isFavorite = isFavorite) else track
-        }
         persist()
         publish()
     }
@@ -886,12 +910,31 @@ internal class IosPlaybackController(
                     queue = queue,
                     currentIndex = currentIndex,
                     origin = origin,
-                    canonicalQueue = canonicalQueue,
                     isShuffleEnabled = isShuffleEnabled,
                     repeatMode = repeatMode,
                 ),
             )
         }
+    }
+
+    private fun resetShuffleTraversal() {
+        shuffleHistory.clear()
+        shuffleRemainingIndices.clear()
+        shuffleTraversalInitialized = false
+    }
+
+    private fun takeNextShuffleIndex(): Int? {
+        if (!shuffleTraversalInitialized) {
+            queue.indices.filterTo(shuffleRemainingIndices) { it != currentIndex }
+            shuffleTraversalInitialized = true
+        }
+        if (shuffleRemainingIndices.isEmpty() && repeatMode == RepeatMode.All && queue.size > 1) {
+            queue.indices.filterTo(shuffleRemainingIndices) { it != currentIndex }
+        }
+        if (shuffleRemainingIndices.isEmpty()) {
+            return null
+        }
+        return shuffleRemainingIndices.removeAt(Random.nextInt(shuffleRemainingIndices.size))
     }
 
     private fun fail(error: AppError) {

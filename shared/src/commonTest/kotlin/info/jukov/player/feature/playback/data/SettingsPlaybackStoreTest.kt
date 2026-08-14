@@ -43,12 +43,11 @@ class SettingsPlaybackStoreTest {
     }
 
     @Test
-    fun storesShuffleRepeatAndCanonicalQueue() {
+    fun storesShuffleAndRepeatModes() {
         val queue = listOf(track("two"), track("one"))
         val state = PersistedPlaybackState(
             queue = queue,
             currentIndex = 0,
-            canonicalQueue = queue.reversed(),
             isShuffleEnabled = true,
             repeatMode = RepeatMode.One,
         )

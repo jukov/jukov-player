@@ -12,7 +12,6 @@ data class PersistedPlaybackState(
     val queue: List<Track>,
     val currentIndex: Int,
     val origin: PlaybackOrigin = PlaybackOrigin.TrackList,
-    val canonicalQueue: List<Track>? = null,
     val isShuffleEnabled: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.Off,
 )

@@ -62,6 +62,20 @@ class IosPlaybackControllerIntegrationTest {
     }
 
     @Test
+    fun shuffleKeepsQueueOrderedAndSelectsAnotherTrackOnNext() {
+        val ordered = tracks(4)
+        val controller = controller(RecordingPlaybackStore(saved(queueSize = ordered.size)))
+
+        controller.toggleShuffle()
+        controller.next()
+
+        val snapshot = requireNotNull(controller.state.value.content)
+        assertEquals(ordered, snapshot.queue)
+        assertTrue(snapshot.isShuffleEnabled)
+        assertTrue(snapshot.currentIndex in 1..ordered.lastIndex)
+    }
+
+    @Test
     fun periodicUpdateSynchronizesAnAutomaticallyAdvancedQueueItem() {
         val store = RecordingPlaybackStore(saved(queueSize = 3))
         val player = AVQueuePlayer()

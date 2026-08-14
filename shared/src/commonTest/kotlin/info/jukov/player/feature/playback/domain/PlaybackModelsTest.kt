@@ -41,4 +41,16 @@ class PlaybackModelsTest {
         assertEquals(RepeatMode.One, RepeatMode.All.next())
         assertEquals(RepeatMode.Off, RepeatMode.One.next())
     }
+
+    @Test
+    fun platformNavigationAvailabilityOverridesLinearQueueOrder() {
+        val snapshot = PlaybackSnapshot(
+            currentIndex = 5,
+            canSkipPrevious = false,
+            canSkipNext = true,
+        )
+
+        assertFalse(snapshot.hasPrevious)
+        assertTrue(snapshot.hasNext)
+    }
 }
