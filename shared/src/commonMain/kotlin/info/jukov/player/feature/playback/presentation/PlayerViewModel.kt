@@ -8,6 +8,7 @@ import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
 import info.jukov.player.feature.playback.domain.PlaybackController
 import info.jukov.player.feature.playback.domain.PlaybackSnapshot
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
+import info.jukov.player.feature.playback.domain.RepeatMode
 import info.jukov.player.feature.track.domain.Track
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +35,8 @@ data class PlayerUiState(
     val hasPrevious: Boolean = false,
     val hasNext: Boolean = false,
     val origin: PlaybackOrigin = PlaybackOrigin.TrackList,
+    val isShuffleEnabled: Boolean = false,
+    val repeatMode: RepeatMode = RepeatMode.Off,
 )
 
 data class PlayerQueueItem(
@@ -122,6 +125,8 @@ class PlayerViewModel(
     fun next() = controller.next()
     fun previous() = controller.previous()
     fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
+    fun toggleShuffle() = controller.toggleShuffle()
+    fun cycleRepeatMode() = controller.cycleRepeatMode()
     fun playAt(index: Int) = controller.playAt(index)
     fun moveQueueItem(fromIndex: Int, toIndex: Int) {
         val currentIndex = state.value.content?.currentIndex ?: return
@@ -201,6 +206,8 @@ class PlayerViewModel(
         hasPrevious = hasPrevious,
         hasNext = hasNext,
         origin = origin,
+        isShuffleEnabled = isShuffleEnabled,
+        repeatMode = repeatMode,
     )
 
     private fun PlayerUiState.withPendingPlayback(pending: PendingPlayback?): PlayerUiState {

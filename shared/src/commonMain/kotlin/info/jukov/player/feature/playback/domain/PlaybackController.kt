@@ -24,6 +24,8 @@ interface PlaybackController {
     fun moveQueueItem(fromIndex: Int, toIndex: Int) = Unit
     fun moveQueueItemsToTop(indices: Set<Int>) = Unit
     fun removeQueueItems(indices: Set<Int>) = Unit
+    fun toggleShuffle() = Unit
+    fun cycleRepeatMode() = Unit
     fun stopAndClear()
 }
 

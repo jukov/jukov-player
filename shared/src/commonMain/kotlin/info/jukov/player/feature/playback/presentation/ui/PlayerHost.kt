@@ -79,6 +79,7 @@ import info.jukov.player.core.presentation.ui.rememberArtworkPalette
 import info.jukov.player.core.presentation.ui.SMALL_ARTWORK_SIZE
 import info.jukov.player.feature.playback.presentation.PlayerUiState
 import info.jukov.player.feature.playback.presentation.PlayerViewModel
+import info.jukov.player.feature.playback.domain.RepeatMode
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.download.domain.DownloadState
 import info.jukov.player.feature.download.domain.DownloadStatus
@@ -495,8 +496,8 @@ private fun FullPlayer(
             PlayerIconButton(
                 Res.drawable.shuffle,
                 stringResource(Res.string.shuffle),
-                enabled = false,
-                onClick = {},
+                active = snapshot.isShuffleEnabled,
+                onClick = viewModel::toggleShuffle,
             )
             FavoriteToggleButton(
                 isFavorite = track.isFavorite,
@@ -516,9 +517,14 @@ private fun FullPlayer(
             )
             PlayerIconButton(
                 Res.drawable.repeat,
-                stringResource(Res.string.repeat),
-                enabled = false,
-                onClick = {},
+                when (snapshot.repeatMode) {
+                    RepeatMode.Off -> stringResource(Res.string.repeat_off)
+                    RepeatMode.All -> stringResource(Res.string.repeat_all)
+                    RepeatMode.One -> stringResource(Res.string.repeat_one)
+                },
+                active = snapshot.repeatMode != RepeatMode.Off,
+                badge = "1".takeIf { snapshot.repeatMode == RepeatMode.One },
+                onClick = viewModel::cycleRepeatMode,
             )
         }
         Spacer(Modifier.height(16.dp))
@@ -641,9 +647,26 @@ private fun PlayerIconButton(
     enabled: Boolean = true,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    active: Boolean = false,
+    badge: String? = null,
 ) {
     IconButton(onClick = onClick, enabled = enabled, modifier = modifier) {
-        Icon(painterResource(resource), contentDescription = description, modifier = Modifier.fillMaxSize(0.7f))
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                painterResource(resource),
+                contentDescription = description,
+                tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxSize(0.7f),
+            )
+            badge?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+        }
     }
 }
 

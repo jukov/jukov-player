@@ -3,6 +3,7 @@ package info.jukov.player.feature.playback.data
 import com.russhwolf.settings.MapSettings
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
+import info.jukov.player.feature.playback.domain.RepeatMode
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,6 +40,22 @@ class SettingsPlaybackStoreTest {
         store.write(queue, 0, origin)
 
         assertEquals(PersistedPlaybackState(queue, 0, origin), store.read())
+    }
+
+    @Test
+    fun storesShuffleRepeatAndCanonicalQueue() {
+        val queue = listOf(track("two"), track("one"))
+        val state = PersistedPlaybackState(
+            queue = queue,
+            currentIndex = 0,
+            canonicalQueue = queue.reversed(),
+            isShuffleEnabled = true,
+            repeatMode = RepeatMode.One,
+        )
+
+        store.writePlaybackState(state)
+
+        assertEquals(state, store.read())
     }
 
     @Test
