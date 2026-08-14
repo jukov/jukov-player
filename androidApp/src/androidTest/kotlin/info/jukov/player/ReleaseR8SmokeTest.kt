@@ -4,8 +4,11 @@ import android.Manifest
 import android.os.Build
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.rule.GrantPermissionRule
+import kotlinx.coroutines.runBlocking
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
@@ -18,6 +21,17 @@ class ReleaseR8SmokeTest {
     val rules: TestRule = RuleChain
         .outerRule(notificationPermissionRule())
         .around(composeRule)
+
+    @Before
+    fun resetSession() {
+        val graph = (composeRule.activity.application as JukovApplication).graph
+        TestBackend.reset()
+        runBlocking { graph.authRepository.logout() }
+        graph.playbackController.stopAndClear()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Sign in").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
 
     @Test
     fun minifiedAppStartsAndRendersLogin() {

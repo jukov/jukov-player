@@ -57,8 +57,8 @@ class AndroidAppSmokeTest {
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()
+        waitForTrackList()
         composeRule.onNodeWithTag("track.track-1")
-            .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()
         val graph = (composeRule.activity.application as JukovApplication).graph
@@ -74,7 +74,7 @@ class AndroidAppSmokeTest {
     fun backAfterLoginDoesNotReturnToLogin() {
         login()
         composeRule.onNodeWithTag("library.tracks").performClick()
-        composeRule.onNodeWithTag("track.track-1").assertIsDisplayed()
+        waitForTrackList()
 
         composeRule.activityRule.scenario.onActivity {
             it.onBackPressedDispatcher.onBackPressed()
