@@ -13,8 +13,8 @@ import androidx.compose.runtime.setValue
 import info.jukov.player.core.domain.SortDirection
 import info.jukov.player.core.domain.SortOption
 import jukovplayer.shared.generated.resources.Res
-import jukovplayer.shared.generated.resources.format_vertical_align_top
 import jukovplayer.shared.generated.resources.sort
+import jukovplayer.shared.generated.resources.sort_variant
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -30,7 +30,7 @@ fun <C> SortAction(
 ) {
     var expanded by remember { mutableStateOf(false) }
     IconButton(onClick = { expanded = true }) {
-        Icon(painterResource(Res.drawable.format_vertical_align_top), stringResource(Res.string.sort))
+        Icon(painterResource(Res.drawable.sort_variant), stringResource(Res.string.sort))
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
         items.forEach { item ->
