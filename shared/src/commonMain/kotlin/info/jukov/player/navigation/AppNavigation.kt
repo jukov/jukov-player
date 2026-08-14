@@ -123,6 +123,8 @@ fun AppNavigation(
                         },
                         onAlbumClick = { album -> backStack.add(album.tracksRoute()) },
                         onTrackClick = { track -> playerViewModel.play(listOf(track), 0) },
+                        onAddToQueue = playerViewModel::addToQueue,
+                        onAddToPlaylist = playlistPickerViewModel::open,
                     )
                 }
                 entry<Routes.Downloads> {
@@ -211,6 +213,8 @@ fun AppNavigation(
                             onArtistClick = { artist ->
                                 backStack.add(Routes.Albums(artist.id, artist.name))
                             },
+                            onAddToQueue = playerViewModel::addToQueue,
+                            onAddToPlaylist = playlistPickerViewModel::open,
                         )
                     }
                 }

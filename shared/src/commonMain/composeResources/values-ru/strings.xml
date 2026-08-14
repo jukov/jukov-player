@@ -74,6 +74,12 @@
     <string name="download_selected_albums">Скачать выбранные альбомы</string>
     <string name="favorite_selected_albums">Добавить выбранные альбомы в избранное</string>
     <string name="add_selected_albums_to_queue">Добавить выбранные альбомы в очередь</string>
+    <string name="selected_artists">Выбрано: %1$d</string>
+    <string name="favorite_selected_artists">Добавить выбранных исполнителей в избранное</string>
+    <string name="download_selected_artists">Скачать выбранных исполнителей</string>
+    <string name="download_track">Скачать трек</string>
+    <string name="selected_items">Выбрано: %1$d</string>
+    <string name="add_selected_artists_to_queue">Добавить выбранных исполнителей в очередь</string>
     <string name="add_album_to_queue">Добавить альбом в очередь</string>
     <string name="move_track">Переместить %1$s</string>
     <string name="move_selected_to_top">Переместить выбранные треки наверх</string>
