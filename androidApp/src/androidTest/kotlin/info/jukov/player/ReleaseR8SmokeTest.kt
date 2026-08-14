@@ -1,6 +1,7 @@
 package info.jukov.player
 
 import android.Manifest
+import android.os.Build
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -15,7 +16,7 @@ class ReleaseR8SmokeTest {
 
     @get:Rule
     val rules: TestRule = RuleChain
-        .outerRule(GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS))
+        .outerRule(notificationPermissionRule())
         .around(composeRule)
 
     @Test
@@ -23,4 +24,11 @@ class ReleaseR8SmokeTest {
         composeRule.onNodeWithText("Connect to your Subsonic server").assertIsDisplayed()
         composeRule.onNodeWithText("Sign in").assertIsDisplayed()
     }
+
+    private fun notificationPermissionRule(): TestRule =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            TestRule { statement, _ -> statement }
+        }
 }

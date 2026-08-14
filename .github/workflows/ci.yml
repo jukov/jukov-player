@@ -277,7 +277,7 @@ jobs:
 
       - name: Capture connected-device logcat
         if: failure()
-        run: adb logcat -d > androidApp/build/device-logcat-api-${{ matrix.api }}.txt || true
+        run: timeout 30s adb logcat -d > androidApp/build/device-logcat-api-${{ matrix.api }}.txt || true
 
       - name: Upload device test reports
         if: always()
