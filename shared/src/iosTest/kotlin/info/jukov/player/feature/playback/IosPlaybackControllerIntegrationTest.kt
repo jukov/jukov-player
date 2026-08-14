@@ -73,6 +73,26 @@ class IosPlaybackControllerIntegrationTest {
         assertEquals(ordered, snapshot.queue)
         assertTrue(snapshot.isShuffleEnabled)
         assertTrue(snapshot.currentIndex in 1..ordered.lastIndex)
+        assertFalse(snapshot.isPlaying)
+    }
+
+    @Test
+    fun disablingShuffleDefersOrderedQueueRestoreUntilTrackTransition() {
+        val player = AVQueuePlayer()
+        val controller = controller(
+            RecordingPlaybackStore(saved(queueSize = 2, repeatMode = RepeatMode.All)),
+            player,
+        )
+        controller.toggleShuffle()
+        controller.next()
+
+        controller.toggleShuffle()
+        controller.handleCurrentItemEnded()
+
+        val snapshot = requireNotNull(controller.state.value.content)
+        assertFalse(snapshot.isShuffleEnabled)
+        assertEquals(0, snapshot.currentIndex)
+        assertTrue(snapshot.isPlaying)
     }
 
     @Test

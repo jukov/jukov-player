@@ -87,6 +87,7 @@ internal class IosPlaybackController(
     private val shuffleHistory = mutableListOf<Int>()
     private val shuffleRemainingIndices = mutableListOf<Int>()
     private var shuffleTraversalInitialized = false
+    private var playerContainsOnlyCurrentTrack = false
     private var playWhenReady = false
     private var interruptionActive = false
     private var playbackError: AppError? = null
@@ -226,13 +227,13 @@ internal class IosPlaybackController(
             val nextIndex = takeNextShuffleIndex() ?: return
             shuffleHistory += currentIndex
             currentIndex = nextIndex
-            rebuildPlayer(autoplay = true, positionMs = 0)
+            rebuildPlayer(autoplay = playWhenReady, positionMs = 0)
             persist()
             return
         }
         if (currentIndex == queue.lastIndex && repeatMode == RepeatMode.All) {
             currentIndex = 0
-            rebuildPlayer(autoplay = true, positionMs = 0)
+            rebuildPlayer(autoplay = playWhenReady, positionMs = 0)
             persist()
             return
         }
@@ -241,8 +242,12 @@ internal class IosPlaybackController(
         }
         cancelPendingSeek()
         currentIndex++
-        player.advanceToNextItem()
-        playerItems = playerItems.drop(1)
+        if (playerContainsOnlyCurrentTrack) {
+            rebuildPlayer(autoplay = playWhenReady, positionMs = 0)
+        } else {
+            player.advanceToNextItem()
+            playerItems = playerItems.drop(1)
+        }
         persist()
         updatePlaybackState(positionOverrideMs = 0)
     }
@@ -420,6 +425,7 @@ internal class IosPlaybackController(
         playerItems = tracksToLoad.map { track ->
             track.toPlayerItem().also { player.insertItem(it, afterItem = null) }
         }
+        playerContainsOnlyCurrentTrack = isShuffleEnabled
         if (positionMs > 0) {
             player.seekToTime(CMTimeMakeWithSeconds(positionMs / 1_000.0, preferredTimescale = 600))
         }
@@ -503,7 +509,11 @@ internal class IosPlaybackController(
         if (currentIndex < queue.lastIndex) {
             currentIndex++
             persist()
-            updatePlaybackState(positionOverrideMs = 0)
+            if (playerContainsOnlyCurrentTrack) {
+                rebuildPlayer(autoplay = true, positionMs = 0)
+            } else {
+                updatePlaybackState(positionOverrideMs = 0)
+            }
         } else if (repeatMode == RepeatMode.All) {
             currentIndex = 0
             rebuildPlayer(autoplay = true, positionMs = 0)
