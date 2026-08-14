@@ -76,6 +76,9 @@ fun ArtistsScreen(
             searchListState.scrollToItem(0)
         }
     }
+    LaunchedEffect(sort) {
+        browseListState.scrollToItem(0)
+    }
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }

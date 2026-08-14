@@ -167,6 +167,11 @@ fun TracksScreen(
             searchListState.scrollToItem(0)
         }
     }
+    LaunchedEffect(sort) {
+        if (filter is TracksFilter.ByArtist) {
+            browseListState.scrollToItem(0)
+        }
+    }
     val selectionState = rememberTrackSelectionState(tracks, key = filter)
     PlayerBackHandler(
         enabled = selectionState.isActive,

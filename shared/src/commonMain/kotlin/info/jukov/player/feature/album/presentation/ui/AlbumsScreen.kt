@@ -94,6 +94,9 @@ fun AlbumsScreen(
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
     val sort by viewModel.sort.collectAsStateWithLifecycle()
+    LaunchedEffect(sort) {
+        browseGridState.scrollToItem(0)
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }

@@ -94,6 +94,12 @@ fun DownloadsScreen(
             searchAlbumsListState.scrollToItem(0)
         }
     }
+    LaunchedEffect(trackSort) {
+        browseTracksListState.scrollToItem(0)
+    }
+    LaunchedEffect(albumSort) {
+        browseAlbumsListState.scrollToItem(0)
+    }
     val trackSelectionState = rememberTrackSelectionState(
         tracks = tracks,
         active = tab == DownloadsTab.Tracks,
