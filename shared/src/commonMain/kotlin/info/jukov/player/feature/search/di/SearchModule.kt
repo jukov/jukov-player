@@ -10,6 +10,9 @@ import info.jukov.player.feature.search.domain.SearchRepository
 import info.jukov.player.feature.search.domain.SearchUseCase
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.feature.library.presentation.LibraryViewModel
+import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
+import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.track.domain.GetTracksUseCase
 
 @BindingContainer
 object SearchModule {
@@ -21,5 +24,10 @@ object SearchModule {
         DefaultSearchRepository(api, authRepository)
 
     @Provides fun useCase(repository: SearchRepository): SearchUseCase = SearchUseCase(repository)
-    @Provides fun libraryViewModel(search: SearchUseCase): LibraryViewModel = LibraryViewModel(search)
+    @Provides fun libraryViewModel(
+        search: SearchUseCase,
+        favoriteDelegate: FavoriteDelegate,
+        downloadDelegate: DownloadDelegate,
+        getTracksUseCase: GetTracksUseCase,
+    ): LibraryViewModel = LibraryViewModel(search, favoriteDelegate, downloadDelegate, getTracksUseCase)
 }

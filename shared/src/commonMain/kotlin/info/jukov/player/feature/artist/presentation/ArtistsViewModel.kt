@@ -25,6 +25,13 @@ import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
 import info.jukov.player.feature.search.domain.SearchUseCase
 import info.jukov.player.feature.search.presentation.PagedSearchDelegate
+import info.jukov.player.feature.download.presentation.DownloadDelegate
+import info.jukov.player.feature.track.domain.GetTracksUseCase
+import info.jukov.player.feature.track.domain.Track
+import info.jukov.player.feature.track.domain.TracksFilter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.merge
 
 class ArtistsViewModel(
     private val getArtistsUseCase: GetArtistsUseCase,
@@ -32,6 +39,8 @@ class ArtistsViewModel(
     private val favoriteDelegate: FavoriteDelegate,
     search: SearchUseCase,
     private val sortPreferences: SortPreferences,
+    private val getTracksUseCase: GetTracksUseCase,
+    private val downloadDelegate: DownloadDelegate,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Artist>>>(
         LoadableState.Loading(content = null),
@@ -42,7 +51,8 @@ class ArtistsViewModel(
     private val _loadingOrigin = MutableStateFlow<LoadingOrigin?>(LoadingOrigin.Initial)
     val loadingOrigin: StateFlow<LoadingOrigin?> = _loadingOrigin.asStateFlow()
     val pending = favoriteDelegate.pending
-    val messages = favoriteDelegate.messages
+    private val actionMessages = MutableSharedFlow<AppError>(extraBufferCapacity = 1)
+    val messages = merge(favoriteDelegate.messages, actionMessages)
     private val searchDelegate = PagedSearchDelegate(viewModelScope, search::artists)
     val searchActive = searchDelegate.active
     val searchQuery = searchDelegate.query
@@ -93,6 +103,44 @@ class ArtistsViewModel(
             }
         }
     }
+
+    fun toggleFavorites(artists: List<Artist>) = viewModelScope.launch {
+        val desired = artists.any { !it.isFavorite }
+        favoriteDelegate.setArtists(artists, desired) { artist, isFavorite ->
+            updateFavorite(artist.id, isFavorite)
+        }
+    }
+
+    fun downloadArtists(artists: List<Artist>, onComplete: () -> Unit = {}) =
+        resolveArtistTracks(artists) { tracks ->
+            tracks.forEach { downloadDelegate.download(it) }
+            onComplete()
+        }
+
+    fun addArtistsToQueue(
+        artists: List<Artist>,
+        onTracksReady: (List<Track>) -> Unit,
+    ) = resolveArtistTracks(artists) { tracks ->
+        onTracksReady(tracks)
+    }
+
+    private fun resolveArtistTracks(artists: List<Artist>, action: suspend (List<Track>) -> Unit) =
+        viewModelScope.launch {
+            val tracks = buildList {
+                for (artist in artists) {
+                    when (val state = getTracksUseCase(TracksFilter.ByArtist(artist.id))
+                        .first { it !is LoadableState.Loading }) {
+                        is LoadableState.Content -> addAll(state.content)
+                        is LoadableState.Failure -> {
+                            actionMessages.emit(state.error)
+                            return@launch
+                        }
+                        is LoadableState.Loading -> Unit
+                    }
+                }
+            }
+            action(tracks)
+        }
 
     private fun updateFavorite(id: String, isFavorite: Boolean) {
         _state.updateItem({ it.id == id }) { it.copy(isFavorite = isFavorite) }

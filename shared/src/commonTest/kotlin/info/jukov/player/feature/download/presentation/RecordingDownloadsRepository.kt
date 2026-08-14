@@ -20,6 +20,7 @@ internal class RecordingDownloadsRepository(
     val downloadedAlbums = mutableListOf<Album>()
     val downloadedTracks = mutableListOf<Track>()
     val cancelledAlbumIds = mutableListOf<String>()
+    val cancelledTrackIds = mutableListOf<String>()
 
     override fun observeLibrary(): Flow<OfflineLibrary> = libraryFlow
     override fun searchLibrary(query: String): Flow<OfflineLibrary> = libraryFlow
@@ -33,7 +34,9 @@ internal class RecordingDownloadsRepository(
         downloadedAlbums += album
         onDownloadAlbum(album)
     }
-    override suspend fun cancelTrack(trackId: String) = Unit
+    override suspend fun cancelTrack(trackId: String) {
+        cancelledTrackIds += trackId
+    }
     override suspend fun removeTracks(trackIds: List<String>) = Unit
     override suspend fun cancelAlbum(albumId: String) {
         cancelledAlbumIds += albumId
