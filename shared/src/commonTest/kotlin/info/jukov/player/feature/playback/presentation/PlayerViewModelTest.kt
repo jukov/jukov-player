@@ -130,6 +130,19 @@ class PlayerViewModelTest {
         assertEquals(0, controller.playPauseCalls)
     }
 
+    @Test
+    fun forwardsPlaybackModeCommands() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val controller = FakePlaybackController()
+        val viewModel = playerViewModel(controller, DeferredResolver())
+
+        viewModel.toggleShuffle()
+        viewModel.cycleRepeatMode()
+
+        assertEquals(1, controller.shuffleCalls)
+        assertEquals(1, controller.repeatCalls)
+    }
+
     private fun playerViewModel(
         controller: PlaybackController,
         resolver: PlaybackQueueResolver,
@@ -154,6 +167,8 @@ class PlayerViewModelTest {
         )
         var playedTracks = emptyList<Track>()
         var playPauseCalls = 0
+        var shuffleCalls = 0
+        var repeatCalls = 0
 
         override fun play(tracks: List<Track>, startIndex: Int) {
             playedTracks = tracks
@@ -170,6 +185,12 @@ class PlayerViewModelTest {
         override fun next() = Unit
         override fun previous() = Unit
         override fun seekTo(positionMs: Long) = Unit
+        override fun toggleShuffle() {
+            shuffleCalls++
+        }
+        override fun cycleRepeatMode() {
+            repeatCalls++
+        }
         override fun stopAndClear() = Unit
     }
 
