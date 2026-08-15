@@ -138,7 +138,13 @@ fun PlaylistScreen(
                     selected = if (value) selected + key else selected - key
                 },
                 selectionKey = { index, _ -> index.toString() },
+                itemKey = { index, track ->
+                    val occurrence = tracks.take(index + 1).count { it.id == track.id }
+                    "${track.id}:$occurrence"
+                },
                 modifier = Modifier.padding(padding),
+                reorderEnabled = true,
+                onMove = viewModel::moveTrack,
             )
         }
     }

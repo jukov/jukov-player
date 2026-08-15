@@ -91,6 +91,7 @@ class DefaultDownloadsRepository(
                         ),
                         albumTracks,
                         offlineAlbum.trackCount,
+                        offlineAlbum.requestedAtMs,
                     )
                 },
             )
@@ -345,6 +346,7 @@ private fun OfflineTrackEntity.toOfflineTrack(
         isFavorite = metadata.isFavorite,
     ),
     status = toStatus(),
+    requestedAtMs = requestedAtMs,
 )
 
 private fun AlbumEntity.toDomain(
@@ -357,5 +359,5 @@ private fun AlbumEntity.toDomain(
     id = id, name = name, artist = artist, artistId = artistId, coverArtId = coverArtId,
     coverArtUrl = artworkPath?.let { platform.fileUri(key, it) }
         ?: coverArtId?.let { client.buildUrl("getCoverArt", session, mapOf("id" to it)) },
-    isFavorite = isFavorite,
+    isFavorite = isFavorite, year = year,
 )

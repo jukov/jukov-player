@@ -8,7 +8,7 @@ fun <T> MutableStateFlow<LoadableState<List<T>>>.updateItem(
     transform: (T) -> T,
 ) = update { state -> state.mapContent { items -> items.map { if (predicate(it)) transform(it) else it } } }
 
-private fun <T> LoadableState<T>.mapContent(transform: (T) -> T): LoadableState<T> = when (this) {
+fun <T> LoadableState<T>.mapContent(transform: (T) -> T): LoadableState<T> = when (this) {
     is LoadableState.Content -> LoadableState.Content(transform(content))
     is LoadableState.Loading -> LoadableState.Loading(content?.let(transform))
     is LoadableState.Failure -> LoadableState.Failure(error, content?.let(transform))

@@ -286,6 +286,8 @@ fun FavoritesScreen(
                             selectedIds = trackSelectionState.selectedIds,
                             onSelectionChange = trackSelectionState::setSelected,
                             modifier = Modifier,
+                            reorderEnabled = true,
+                            onMove = viewModel::moveTrack,
                         )
                         FavoritesTab.Albums -> if (content.albums.isEmpty()) {
                             Empty(stringResource(Res.string.no_favorite_albums))

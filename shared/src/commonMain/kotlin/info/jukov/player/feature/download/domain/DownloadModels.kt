@@ -21,12 +21,13 @@ sealed interface DownloadTarget {
     data class Album(override val id: String) : DownloadTarget
 }
 
-data class OfflineTrack(val track: Track, val status: DownloadStatus)
+data class OfflineTrack(val track: Track, val status: DownloadStatus, val requestedAtMs: Long = 0)
 
 data class OfflineAlbum(
     val album: Album,
     val tracks: List<OfflineTrack>,
     val expectedTrackCount: Int,
+    val requestedAtMs: Long = 0,
 ) {
     val status: DownloadStatus
         get() {

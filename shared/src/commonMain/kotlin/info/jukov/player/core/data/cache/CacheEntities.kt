@@ -69,6 +69,7 @@ object CacheKeys {
     const val FAVORITES = "favorites"
     const val SCAN = "scan"
     fun artistAlbums(id: String) = "artist:$id:albums"
+    fun albums(sort: String) = "albums:$sort"
     fun tracksAll() = "tracks:all"
     fun artistTracks(id: String) = "artist:$id:tracks"
     fun albumTracks(id: String) = "album:$id:tracks"
