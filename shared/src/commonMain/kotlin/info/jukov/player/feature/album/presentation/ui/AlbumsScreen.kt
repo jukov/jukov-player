@@ -94,9 +94,6 @@ fun AlbumsScreen(
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
     val sort by viewModel.sort.collectAsStateWithLifecycle()
-    LaunchedEffect(sort) {
-        browseGridState.scrollToItem(0)
-    }
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
     LaunchedEffect(viewModel) { viewModel.messages.collect { snackbarError = it } }
@@ -159,7 +156,10 @@ fun AlbumsScreen(
                                     SortMenuItem(AlbumSortCriterion.Title, stringResource(Res.string.sort_title), alphaDirections),
                                     SortMenuItem(AlbumSortCriterion.Artist, stringResource(Res.string.sort_artist), alphaDirections),
                                     SortMenuItem(AlbumSortCriterion.Year, stringResource(Res.string.sort_year)),
-                                ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending), viewModel::updateSort)
+                                ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending)) { option ->
+                                    browseGridState.requestScrollToItem(0)
+                                    viewModel.updateSort(option)
+                                }
                             }
                             SearchAction(viewModel::openSearch)
                         },

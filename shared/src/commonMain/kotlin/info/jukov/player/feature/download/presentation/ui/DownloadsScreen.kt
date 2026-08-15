@@ -94,12 +94,6 @@ fun DownloadsScreen(
             searchAlbumsListState.scrollToItem(0)
         }
     }
-    LaunchedEffect(trackSort) {
-        browseTracksListState.scrollToItem(0)
-    }
-    LaunchedEffect(albumSort) {
-        browseAlbumsListState.scrollToItem(0)
-    }
     val trackSelectionState = rememberTrackSelectionState(
         tracks = tracks,
         active = tab == DownloadsTab.Tracks,
@@ -161,14 +155,20 @@ fun DownloadsScreen(
                                         SortMenuItem(DownloadTrackSortCriterion.Title, stringResource(Res.string.sort_title)),
                                         SortMenuItem(DownloadTrackSortCriterion.Artist, stringResource(Res.string.sort_artist)),
                                         SortMenuItem(DownloadTrackSortCriterion.Added, stringResource(Res.string.sort_added)),
-                                    ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending), viewModel::updateTrackSort)
+                                    ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending)) { option ->
+                                        browseTracksListState.requestScrollToItem(0)
+                                        viewModel.updateTrackSort(option)
+                                    }
                                 } else {
                                     SortAction(albumSort, listOf(
                                         SortMenuItem(DownloadAlbumSortCriterion.Title, stringResource(Res.string.sort_title)),
                                         SortMenuItem(DownloadAlbumSortCriterion.Artist, stringResource(Res.string.sort_artist)),
                                         SortMenuItem(DownloadAlbumSortCriterion.Year, stringResource(Res.string.sort_year)),
                                         SortMenuItem(DownloadAlbumSortCriterion.Added, stringResource(Res.string.sort_added)),
-                                    ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending), viewModel::updateAlbumSort)
+                                    ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending)) { option ->
+                                        browseAlbumsListState.requestScrollToItem(0)
+                                        viewModel.updateAlbumSort(option)
+                                    }
                                 }
                             }
                             SearchAction(viewModel::openSearch)

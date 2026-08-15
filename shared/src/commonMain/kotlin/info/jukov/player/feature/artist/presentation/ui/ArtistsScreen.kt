@@ -76,9 +76,6 @@ fun ArtistsScreen(
             searchListState.scrollToItem(0)
         }
     }
-    LaunchedEffect(sort) {
-        browseListState.scrollToItem(0)
-    }
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var snackbarError by remember { mutableStateOf<AppError?>(null) }
@@ -136,7 +133,10 @@ fun ArtistsScreen(
                         onSearchClose = viewModel::closeSearch,
                         scrollBehavior = topAppBarScrollBehavior,
                         sort = sort,
-                        onSort = viewModel::updateSort,
+                        onSort = { option ->
+                            browseListState.requestScrollToItem(0)
+                            viewModel.updateSort(option)
+                        },
                     )
                 }
                 if (loadingOrigin == LoadingOrigin.Automatic && artists.isNotEmpty()) {

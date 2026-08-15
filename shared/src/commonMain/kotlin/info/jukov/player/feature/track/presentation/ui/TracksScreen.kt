@@ -167,11 +167,6 @@ fun TracksScreen(
             searchListState.scrollToItem(0)
         }
     }
-    LaunchedEffect(sort) {
-        if (filter is TracksFilter.ByArtist) {
-            browseListState.scrollToItem(0)
-        }
-    }
     val selectionState = rememberTrackSelectionState(tracks, key = filter)
     PlayerBackHandler(
         enabled = selectionState.isActive,
@@ -253,7 +248,10 @@ fun TracksScreen(
                                 SortAction(sort, listOf(
                                     SortMenuItem(TrackSortCriterion.Title, stringResource(Res.string.sort_title)),
                                     SortMenuItem(TrackSortCriterion.Artist, stringResource(Res.string.sort_artist)),
-                                ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending), viewModel::updateSort)
+                                ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending)) { option ->
+                                    browseListState.requestScrollToItem(0)
+                                    viewModel.updateSort(option)
+                                }
                             }
                             if (filter !is TracksFilter.ByAlbum) {
                                 SearchAction(viewModel::openSearch)
