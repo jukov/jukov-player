@@ -67,7 +67,9 @@ fun LibraryScreen(
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val resultItems = results.content.orEmpty()
     var selectedIds by remember(query) { mutableStateOf<Set<String>>(emptySet()) }
-    val selectedItems = resultItems.filter { it.id in selectedIds }
+    val selectedItems = remember(resultItems, selectedIds) {
+        resultItems.filter { it.id in selectedIds }
+    }
     val allSelectedFavorite = selectedItems.all { item ->
         when (item) {
             is LibrarySearchItem.ArtistItem -> item.artist.isFavorite

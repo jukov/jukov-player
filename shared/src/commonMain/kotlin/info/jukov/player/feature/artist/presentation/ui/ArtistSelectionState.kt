@@ -43,7 +43,7 @@ class ArtistSelectionState internal constructor() {
 @Composable
 fun rememberArtistSelectionState(artists: List<Artist>, key: Any? = Unit): ArtistSelectionState {
     val state = remember(key) { ArtistSelectionState() }
-    val validIds = artists.mapTo(mutableSetOf(), Artist::id)
+    val validIds = remember(artists) { artists.mapTo(mutableSetOf(), Artist::id) }
     LaunchedEffect(state, validIds) { state.retain(validIds) }
     return state
 }

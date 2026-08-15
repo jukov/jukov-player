@@ -62,9 +62,12 @@ fun DownloadsScreen(
     val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     var confirmRemoveAll by remember { mutableStateOf(false) }
-    val library = state.content ?: OfflineLibrary()
-    val tracks = library.tracks.map { it.track }
-    val albums = library.albums.map { it.album }
+    val library = state.content ?: remember { OfflineLibrary() }
+    val tracks = remember(library.tracks) { library.tracks.map { it.track } }
+    val albums = remember(library.albums) { library.albums.map { it.album } }
+    val downloadStatuses = remember(library.tracks) {
+        library.tracks.associate { it.track.id to it.status }
+    }
     val browseTracksListState = rememberLazyListState()
     val searchTracksListState = rememberLazyListState()
     val browseAlbumsListState = rememberLazyListState()
@@ -190,7 +193,7 @@ fun DownloadsScreen(
                                     activeTrackId = activeTrackId,
                                     isPlaying = isPlaying,
                                     loadingTrackId = loadingTrackId,
-                                    downloadStatuses = library.tracks.associate { it.track.id to it.status },
+                                    downloadStatuses = downloadStatuses,
                                     onCancelDownload = viewModel::removeTrack,
                                     onRetryDownload = viewModel::retryTrack,
                                     selectionMode = trackSelectionState.isActive,
@@ -274,7 +277,10 @@ fun OfflineAlbumTracksScreen(
     onAddToQueue: (List<Track>) -> Unit,
 ) {
     val offlineTracks by viewModel.albumTracks(albumId).collectAsStateWithLifecycle(emptyList())
-    val tracks = offlineTracks.map { it.track }
+    val tracks = remember(offlineTracks) { offlineTracks.map { it.track } }
+    val downloadStatuses = remember(offlineTracks) {
+        offlineTracks.associate { it.track.id to it.status }
+    }
     val selectionState = rememberTrackSelectionState(tracks, key = albumId)
     PlayerBackHandler(
         enabled = selectionState.isActive,
@@ -310,7 +316,7 @@ fun OfflineAlbumTracksScreen(
             activeTrackId = activeTrackId,
             isPlaying = isPlaying,
             loadingTrackId = loadingTrackId,
-            downloadStatuses = offlineTracks.associate { it.track.id to it.status },
+            downloadStatuses = downloadStatuses,
             onCancelDownload = viewModel::removeTrack,
             onRetryDownload = viewModel::retryTrack,
             selectionMode = selectionState.isActive,

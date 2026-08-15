@@ -90,6 +90,12 @@ fun FavoritesScreen(
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
+    val pendingTrackIds = remember(pending) {
+        pending.filterIsInstance<FavoriteTarget.Track>().mapTo(mutableSetOf()) { it.id }
+    }
+    val pendingAlbumIds = remember(pending) {
+        pending.filterIsInstance<FavoriteTarget.Album>().mapTo(mutableSetOf()) { it.id }
+    }
     val downloadStatuses by viewModel.downloadStatuses.collectAsStateWithLifecycle()
     val artworkUris by viewModel.artworkUris.collectAsStateWithLifecycle()
     val visibleTracks = state.content?.tracks.orEmpty()
@@ -269,8 +275,7 @@ fun FavoritesScreen(
                             activeTrackId = activeTrackId,
                             isPlaying = isPlaying,
                             loadingTrackId = loadingTrackId,
-                            pendingIds = pending.filterIsInstance<FavoriteTarget.Track>()
-                                .mapTo(mutableSetOf()) { it.id },
+                            pendingIds = pendingTrackIds,
                             onFavoriteClick = {
                                 viewModel.toggleFavorite(
                                     FavoriteTarget.Track(it.id),
@@ -294,8 +299,7 @@ fun FavoritesScreen(
                             error = (state as? LoadableState.Failure)?.error,
                             onRetry = viewModel::refresh,
                             onAlbumClick = onAlbumClick,
-                            pendingIds = pending.filterIsInstance<FavoriteTarget.Album>()
-                                .mapTo(mutableSetOf()) { it.id },
+                            pendingIds = pendingAlbumIds,
                             onFavoriteClick = {
                                 viewModel.toggleFavorite(
                                     FavoriteTarget.Album(it.id),
