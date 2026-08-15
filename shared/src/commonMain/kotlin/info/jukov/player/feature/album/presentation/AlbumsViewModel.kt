@@ -126,7 +126,7 @@ class AlbumsViewModel(
         _sort.value = value
         if (artistId == null) {
             _hasMore.value = false
-            loadPage(forceRefresh = false)
+            loadPage(forceRefresh = false, requestedOrigin = LoadingOrigin.Sorting)
         } else {
             _state.update { it.mapContent { albums -> albums.sortedAlbums(value) } }
         }

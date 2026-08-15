@@ -168,7 +168,10 @@ fun AlbumsScreen(
                         onSearchClose = viewModel::closeSearch,
                     )
                 }
-                if (loadingOrigin == LoadingOrigin.Automatic && albums.isNotEmpty()) {
+                if (
+                    (loadingOrigin == LoadingOrigin.Automatic || loadingOrigin == LoadingOrigin.Sorting) &&
+                    albums.isNotEmpty()
+                ) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
             }
