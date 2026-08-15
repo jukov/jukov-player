@@ -7,6 +7,7 @@ import info.jukov.player.feature.favorite.domain.FavoriteMutator
 import info.jukov.player.feature.playback.data.PersistedPlaybackState
 import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
+import info.jukov.player.feature.playback.domain.RepeatMode
 import info.jukov.player.feature.track.domain.Track
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,6 +37,62 @@ class IosPlaybackControllerIntegrationTest {
 
         assertEquals(1, controller.state.value.content?.currentIndex)
         assertEquals(1, store.current?.currentIndex)
+    }
+
+    @Test
+    fun repeatOneRestartsCurrentItem() {
+        val store = RecordingPlaybackStore(saved(queueSize = 2, repeatMode = RepeatMode.One))
+        val controller = controller(store)
+
+        controller.handleCurrentItemEnded()
+
+        assertEquals(0, controller.state.value.content?.currentIndex)
+        assertTrue(controller.state.value.content?.isPlaying == true)
+    }
+
+    @Test
+    fun repeatAllWrapsAtEndOfQueue() {
+        val store = RecordingPlaybackStore(saved(queueSize = 2, repeatMode = RepeatMode.All).copy(currentIndex = 1))
+        val controller = controller(store)
+
+        controller.handleCurrentItemEnded()
+
+        assertEquals(0, controller.state.value.content?.currentIndex)
+        assertTrue(controller.state.value.content?.isPlaying == true)
+    }
+
+    @Test
+    fun shuffleKeepsQueueOrderedAndSelectsAnotherTrackOnNext() {
+        val ordered = tracks(4)
+        val controller = controller(RecordingPlaybackStore(saved(queueSize = ordered.size)))
+
+        controller.toggleShuffle()
+        controller.next()
+
+        val snapshot = requireNotNull(controller.state.value.content)
+        assertEquals(ordered, snapshot.queue)
+        assertTrue(snapshot.isShuffleEnabled)
+        assertTrue(snapshot.currentIndex in 1..ordered.lastIndex)
+        assertFalse(snapshot.isPlaying)
+    }
+
+    @Test
+    fun disablingShuffleDefersOrderedQueueRestoreUntilTrackTransition() {
+        val player = AVQueuePlayer()
+        val controller = controller(
+            RecordingPlaybackStore(saved(queueSize = 2, repeatMode = RepeatMode.All)),
+            player,
+        )
+        controller.toggleShuffle()
+        controller.next()
+
+        controller.toggleShuffle()
+        controller.handleCurrentItemEnded()
+
+        val snapshot = requireNotNull(controller.state.value.content)
+        assertFalse(snapshot.isShuffleEnabled)
+        assertEquals(0, snapshot.currentIndex)
+        assertTrue(snapshot.isPlaying)
     }
 
     @Test
@@ -130,10 +187,14 @@ class IosPlaybackControllerIntegrationTest {
         audioSessionActivation = { true },
     )
 
-    private fun saved(queueSize: Int) = PersistedPlaybackState(
+    private fun saved(
+        queueSize: Int,
+        repeatMode: RepeatMode = RepeatMode.Off,
+    ) = PersistedPlaybackState(
         queue = tracks(queueSize),
         currentIndex = 0,
         origin = PlaybackOrigin.TrackList,
+        repeatMode = repeatMode,
     )
 
     private fun tracks(count: Int): List<Track> = List(count) { index ->
@@ -175,6 +236,10 @@ private class RecordingPlaybackStore(
 
     override fun write(queue: List<Track>, currentIndex: Int, origin: PlaybackOrigin) {
         current = PersistedPlaybackState(queue, currentIndex, origin)
+    }
+
+    override fun writePlaybackState(state: PersistedPlaybackState) {
+        current = state
     }
 
     override fun updateCurrentIndex(currentIndex: Int) {

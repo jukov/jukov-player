@@ -59,6 +59,9 @@
     <string name="next_track">Next track</string>
     <string name="shuffle">Shuffle</string>
     <string name="repeat">Repeat</string>
+    <string name="repeat_off">Repeat off</string>
+    <string name="repeat_all">Repeat queue</string>
+    <string name="repeat_one">Repeat current track</string>
     <string name="queue">Queue</string>
     <string name="open_queue">Open queue</string>
     <string name="queue_empty">There are no tracks after the current track</string>
