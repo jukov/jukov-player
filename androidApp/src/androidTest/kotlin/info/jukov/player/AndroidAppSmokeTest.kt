@@ -57,8 +57,8 @@ class AndroidAppSmokeTest {
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()
+        waitForTrackList()
         composeRule.onNodeWithTag("track.track-1")
-            .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()
         val graph = (composeRule.activity.application as JukovApplication).graph
@@ -74,7 +74,7 @@ class AndroidAppSmokeTest {
     fun backAfterLoginDoesNotReturnToLogin() {
         login()
         composeRule.onNodeWithTag("library.tracks").performClick()
-        composeRule.onNodeWithTag("track.track-1").assertIsDisplayed()
+        waitForTrackList()
 
         composeRule.activityRule.scenario.onActivity {
             it.onBackPressedDispatcher.onBackPressed()
@@ -87,7 +87,7 @@ class AndroidAppSmokeTest {
     fun activityRecreationKeepsAuthorizedDestination() {
         login()
         composeRule.onNodeWithTag("library.tracks").performClick()
-        composeRule.onNodeWithTag("track.track-1").assertIsDisplayed()
+        waitForTrackList()
 
         composeRule.activityRule.scenario.recreate()
 
@@ -138,6 +138,13 @@ class AndroidAppSmokeTest {
             composeRule.onAllNodesWithTag("library.tracks").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithTag("library.tracks").assertIsDisplayed()
+    }
+
+    private fun waitForTrackList() {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("track.track-1").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("track.track-1").assertIsDisplayed()
     }
 
     private fun enterCredentials() {
