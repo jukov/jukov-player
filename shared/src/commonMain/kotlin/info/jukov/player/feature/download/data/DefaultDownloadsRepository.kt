@@ -107,6 +107,27 @@ class DefaultDownloadsRepository(
             }
         }
 
+    override fun observeAlbumStatuses(): Flow<Map<String, DownloadStatus>> =
+        authRepository.authState.flatMapLatest { state ->
+            val accountKey = (state as? AuthState.LoggedIn)?.session?.accountKey
+                ?: return@flatMapLatest flowOf(emptyMap())
+            combine(
+                dao.observeOfflineAlbums(accountKey),
+                dao.observeDownloadOwnerships(accountKey),
+                dao.observeOfflineTracks(accountKey),
+            ) { albums, ownerships, tracks ->
+                val statusesByTrackId = tracks.associate { it.trackId to it.toStatus() }
+                val trackIdsByAlbumId = ownerships.asSequence()
+                    .filter { it.ownerType == OWNER_ALBUM }
+                    .groupBy(DownloadOwnershipEntity::ownerId, DownloadOwnershipEntity::trackId)
+                albums.associate { album ->
+                    val statuses = trackIdsByAlbumId[album.albumId].orEmpty()
+                        .mapNotNull(statusesByTrackId::get)
+                    album.albumId to aggregateDownloadStatus(album.trackCount, statuses)
+                }
+            }
+        }
+
     override fun observeAlbumTracks(albumId: String): Flow<List<OfflineTrack>> {
         return observeLibrary().map { library ->
             library.albums.firstOrNull { it.album.id == albumId }?.tracks.orEmpty()
@@ -140,6 +161,41 @@ class DefaultDownloadsRepository(
             }
             platform.enqueue(session.accountKey)
         }
+    }
+
+    override suspend fun ensureDownloaded(tracks: List<Track>): Boolean = mutations.run {
+        val key = accountKey() ?: return@run false
+        if (tracks.isEmpty()) {
+            return@run false
+        }
+        var allDownloaded = true
+        tracks.forEach { track ->
+            val download = dao.offlineTrack(key, track.id)
+            val path = download?.relativePath
+            if (download != null && path != null && platform.exists(key, path)) {
+                if (download.state != DownloadState.Completed.name) {
+                    dao.updateOfflineTrackState(
+                        key, track.id, DownloadState.Completed.name,
+                        download.downloadedBytes, download.expectedSize, path, null,
+                        download.completedAtMs ?: Clock.System.now().toEpochMilliseconds(),
+                    )
+                }
+            } else {
+                allDownloaded = false
+                if (download == null) {
+                    storeTrack(key, track, OWNER_TRACK, track.id, position = 0)
+                }
+                val stored = download ?: dao.offlineTrack(key, track.id) ?: return@forEach
+                dao.updateOfflineTrackState(
+                    key, track.id, DownloadState.Queued.name, 0, stored.expectedSize,
+                    null, null, null,
+                )
+            }
+        }
+        if (!allDownloaded) {
+            platform.enqueue(key)
+        }
+        allDownloaded
     }
 
     override suspend fun cancelTrack(trackId: String) {

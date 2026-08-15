@@ -29,9 +29,9 @@ class DownloadDelegate(
     val library = repository.observeLibrary().stateIn(
         appScope, SharingStarted.Eagerly, info.jukov.player.feature.download.domain.OfflineLibrary(),
     )
-    val trackStatuses = library.map { value -> value.tracks.associate { it.track.id to it.status } }
+    val trackStatuses = repository.observeTrackStatuses()
         .stateIn(appScope, SharingStarted.Eagerly, emptyMap())
-    val albumStatuses = library.map { value -> value.albums.associate { it.album.id to it.status } }
+    val albumStatuses = repository.observeAlbumStatuses()
         .stateIn(appScope, SharingStarted.Eagerly, emptyMap())
     val artworkUris = library.map { value ->
         buildMap {

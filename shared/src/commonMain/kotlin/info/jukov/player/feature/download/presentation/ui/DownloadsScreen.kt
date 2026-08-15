@@ -212,7 +212,9 @@ fun DownloadsScreen(
                                 TracksList(
                                     tracks = tracks,
                                     error = null,
-                                    onPlayClick = onPlayClick,
+                                    onPlayClick = { queue, index ->
+                                        viewModel.playWhenDownloaded(queue, index, onPlayClick)
+                                    },
                                     onActiveTrackClick = onActiveTrackClick,
                                     activeTrackId = activeTrackId,
                                     isPlaying = isPlaying,
@@ -243,7 +245,10 @@ fun DownloadsScreen(
                                             if (album.tracks.any { it.track.id == activeTrackId }) {
                                                 onActiveTrackClick()
                                             } else if (album.tracks.isNotEmpty()) {
-                                                onPlayClick(album.tracks.map { it.track }, 0)
+                                                viewModel.playAlbumWhenDownloaded(
+                                                    album.tracks.map { it.track },
+                                                    onPlayClick,
+                                                )
                                             }
                                         },
                                         isPlaying = isPlaying &&
@@ -332,7 +337,9 @@ fun OfflineAlbumTracksScreen(
         TracksList(
             tracks = tracks,
             error = null,
-            onPlayClick = onPlayClick,
+            onPlayClick = { queue, index ->
+                viewModel.playWhenDownloaded(queue, index, onPlayClick)
+            },
             onActiveTrackClick = onActiveTrackClick,
             activeTrackId = activeTrackId,
             isPlaying = isPlaying,

@@ -30,19 +30,24 @@ data class OfflineAlbum(
     val requestedAtMs: Long = 0,
 ) {
     val status: DownloadStatus
-        get() {
-            val total = tracks.mapNotNull { it.status.totalBytes }.takeIf { it.size == tracks.size }
-                ?.sum()
-            val downloaded = tracks.sumOf { it.status.downloadedBytes }
-            val state = when {
-                tracks.size == expectedTrackCount && tracks.isNotEmpty() &&
-                    tracks.all { it.status.state == DownloadState.Completed } -> DownloadState.Completed
-                tracks.any { it.status.state == DownloadState.Downloading } -> DownloadState.Downloading
-                tracks.any { it.status.state == DownloadState.Queued } -> DownloadState.Queued
-                else -> DownloadState.Failed
-            }
-            return DownloadStatus(state, downloaded, total)
-        }
+        get() = aggregateDownloadStatus(expectedTrackCount, tracks.map(OfflineTrack::status))
+}
+
+fun aggregateDownloadStatus(
+    expectedTrackCount: Int,
+    tracks: List<DownloadStatus>,
+): DownloadStatus {
+    val total = tracks.mapNotNull(DownloadStatus::totalBytes).takeIf { it.size == tracks.size }
+        ?.sum()
+    val downloaded = tracks.sumOf(DownloadStatus::downloadedBytes)
+    val state = when {
+        tracks.size == expectedTrackCount && tracks.isNotEmpty() &&
+            tracks.all { it.state == DownloadState.Completed } -> DownloadState.Completed
+        tracks.any { it.state == DownloadState.Downloading } -> DownloadState.Downloading
+        tracks.any { it.state == DownloadState.Queued } -> DownloadState.Queued
+        else -> DownloadState.Failed
+    }
+    return DownloadStatus(state, downloaded, total)
 }
 
 data class OfflineLibrary(

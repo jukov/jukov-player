@@ -1,6 +1,8 @@
 package info.jukov.player.feature.download.presentation
 
 import info.jukov.player.feature.album.domain.Album
+import info.jukov.player.feature.download.domain.DownloadState
+import info.jukov.player.feature.download.domain.DownloadStatus
 import info.jukov.player.feature.track.domain.Track
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -8,11 +10,28 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DownloadDelegateTest {
+    @Test
+    fun statusesComeFromDownloadRecordsEvenWhenLibraryIsMissingItems() = runTest {
+        val trackStatus = DownloadStatus(DownloadState.Completed, 100, 100)
+        val albumStatus = DownloadStatus(DownloadState.Downloading, 50, 100)
+        val repository = RecordingDownloadsRepository(
+            trackStatuses = mapOf("track" to trackStatus),
+            albumStatuses = mapOf("album" to albumStatus),
+        )
+
+        val delegate = DownloadDelegate(repository, backgroundScope)
+        runCurrent()
+
+        assertEquals(mapOf("track" to trackStatus), delegate.trackStatuses.value)
+        assertEquals(mapOf("album" to albumStatus), delegate.albumStatuses.value)
+    }
+
     @Test
     fun repeatedAlbumDownloadWhileRequestIsRunningIsIgnored() = runTest {
         val requestStarted = CompletableDeferred<Unit>()

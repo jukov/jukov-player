@@ -7,6 +7,15 @@ import kotlin.test.assertEquals
 
 class DownloadModelsTest {
     @Test
+    fun albumWithMissingDownloadRecordIsFailedInsteadOfCompleted() {
+        val completed = DownloadStatus(DownloadState.Completed, 100, 100)
+
+        val status = aggregateDownloadStatus(expectedTrackCount = 2, tracks = listOf(completed))
+
+        assertEquals(DownloadState.Failed, status.state)
+    }
+
+    @Test
     fun progressIsCalculatedFromBytes() {
         assertEquals(0.25f, DownloadStatus(DownloadState.Downloading, 25, 100).progress)
         assertEquals(null, DownloadStatus(DownloadState.Downloading, 25, null).progress)

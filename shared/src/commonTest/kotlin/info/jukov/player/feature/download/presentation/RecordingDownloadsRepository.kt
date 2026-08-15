@@ -13,10 +13,19 @@ import kotlinx.coroutines.flow.flowOf
 
 internal class RecordingDownloadsRepository(
     library: OfflineLibrary = OfflineLibrary(),
+    trackStatuses: Map<String, DownloadStatus>? = null,
+    albumStatuses: Map<String, DownloadStatus>? = null,
     private val onDownloadTrack: suspend (Track) -> Unit = {},
     private val onDownloadAlbum: suspend (Album) -> Unit = {},
+    private val onEnsureDownloaded: suspend (List<Track>) -> Boolean = { true },
 ) : DownloadsRepository {
     private val libraryFlow = MutableStateFlow(library)
+    private val trackStatusesFlow = MutableStateFlow(
+        trackStatuses ?: library.tracks.associate { it.track.id to it.status },
+    )
+    private val albumStatusesFlow = MutableStateFlow(
+        albumStatuses ?: library.albums.associate { it.album.id to it.status },
+    )
     val downloadedAlbums = mutableListOf<Album>()
     val downloadedTracks = mutableListOf<Track>()
     val cancelledAlbumIds = mutableListOf<String>()
@@ -24,7 +33,8 @@ internal class RecordingDownloadsRepository(
 
     override fun observeLibrary(): Flow<OfflineLibrary> = libraryFlow
     override fun searchLibrary(query: String): Flow<OfflineLibrary> = libraryFlow
-    override fun observeTrackStatuses(): Flow<Map<String, DownloadStatus>> = flowOf(emptyMap())
+    override fun observeTrackStatuses(): Flow<Map<String, DownloadStatus>> = trackStatusesFlow
+    override fun observeAlbumStatuses(): Flow<Map<String, DownloadStatus>> = albumStatusesFlow
     override fun observeAlbumTracks(albumId: String): Flow<List<OfflineTrack>> = emptyFlow()
     override suspend fun downloadTrack(track: Track) {
         downloadedTracks += track
@@ -34,6 +44,7 @@ internal class RecordingDownloadsRepository(
         downloadedAlbums += album
         onDownloadAlbum(album)
     }
+    override suspend fun ensureDownloaded(tracks: List<Track>): Boolean = onEnsureDownloaded(tracks)
     override suspend fun cancelTrack(trackId: String) {
         cancelledTrackIds += trackId
     }

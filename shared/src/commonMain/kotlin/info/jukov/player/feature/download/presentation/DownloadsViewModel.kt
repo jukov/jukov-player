@@ -76,6 +76,18 @@ class DownloadsViewModel(
     }
     fun removeAll() = viewModelScope.launch { repository.clearCurrentAccount() }
     fun retryTrack(id: String) = viewModelScope.launch { repository.retryTrack(id) }
+    fun playWhenDownloaded(tracks: List<Track>, index: Int, onPlay: (List<Track>, Int) -> Unit) =
+        viewModelScope.launch {
+            if (index in tracks.indices && repository.ensureDownloaded(listOf(tracks[index]))) {
+                onPlay(tracks, index)
+            }
+        }
+    fun playAlbumWhenDownloaded(tracks: List<Track>, onPlay: (List<Track>, Int) -> Unit) =
+        viewModelScope.launch {
+            if (repository.ensureDownloaded(tracks)) {
+                onPlay(tracks, 0)
+            }
+        }
     fun albumTracks(id: String): Flow<List<OfflineTrack>> = repository.observeAlbumTracks(id)
 
     private fun info.jukov.player.feature.download.domain.OfflineLibrary.sorted() = copy(
