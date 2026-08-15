@@ -3,6 +3,7 @@ package info.jukov.player.feature.playback.data
 import com.russhwolf.settings.Settings
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
+import info.jukov.player.feature.playback.domain.RepeatMode
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -11,6 +12,8 @@ data class PersistedPlaybackState(
     val queue: List<Track>,
     val currentIndex: Int,
     val origin: PlaybackOrigin = PlaybackOrigin.TrackList,
+    val isShuffleEnabled: Boolean = false,
+    val repeatMode: RepeatMode = RepeatMode.Off,
 )
 
 interface PlaybackStore {
@@ -20,6 +23,9 @@ interface PlaybackStore {
         currentIndex: Int,
         origin: PlaybackOrigin = PlaybackOrigin.TrackList,
     )
+    fun writePlaybackState(state: PersistedPlaybackState) {
+        write(state.queue, state.currentIndex, state.origin)
+    }
     fun updateCurrentIndex(currentIndex: Int)
     fun clear()
 }
@@ -45,9 +51,20 @@ class SettingsPlaybackStore(
         settings.putString(STATE_KEY, json.encodeToString(state))
     }
 
+    override fun writePlaybackState(state: PersistedPlaybackState) {
+        if (state.queue.isEmpty()) {
+            clear()
+            return
+        }
+        settings.putString(
+            STATE_KEY,
+            json.encodeToString(state.copy(currentIndex = state.currentIndex.coerceIn(state.queue.indices))),
+        )
+    }
+
     override fun updateCurrentIndex(currentIndex: Int) {
         val state = read() ?: return
-        write(state.queue, currentIndex, state.origin)
+        writePlaybackState(state.copy(currentIndex = currentIndex))
     }
 
     override fun clear() = settings.remove(STATE_KEY)

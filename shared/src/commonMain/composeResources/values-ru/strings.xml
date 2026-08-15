@@ -59,6 +59,9 @@
     <string name="next_track">Следующий трек</string>
     <string name="shuffle">Перемешать</string>
     <string name="repeat">Повтор</string>
+    <string name="repeat_off">Повтор выключен</string>
+    <string name="repeat_all">Повтор очереди</string>
+    <string name="repeat_one">Повтор текущего трека</string>
     <string name="queue">Очередь</string>
     <string name="open_queue">Открыть очередь</string>
     <string name="queue_empty">После текущего трека очередь пуста</string>
