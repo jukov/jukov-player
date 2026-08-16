@@ -259,6 +259,38 @@ class DefaultDownloadsRepository(
     override suspend fun reconcile() {
         mutations.run {
             val key = accountKey() ?: return@run
+            val repairs = missingAlbumDownloadRecords(
+                albums = dao.allOfflineAlbums(key),
+                metadataTracks = dao.offlineAlbumMetadataTracks(key),
+                downloads = dao.allOfflineTracks(key),
+                ownerships = dao.downloadOwnerships(key),
+            )
+            repairs.forEach { repair ->
+                if (repair.createDownload) {
+                    dao.upsertOfflineTrack(
+                        OfflineTrackEntity(
+                            accountKey = key,
+                            trackId = repair.trackId,
+                            relativePath = null,
+                            expectedSize = null,
+                            downloadedBytes = 0,
+                            state = DownloadState.Queued.name,
+                            error = null,
+                            requestedAtMs = repair.requestedAtMs,
+                            completedAtMs = null,
+                        ),
+                    )
+                }
+                if (repair.createOwnership) {
+                    dao.upsertDownloadOwnership(
+                        listOf(
+                            DownloadOwnershipEntity(
+                                key, OWNER_ALBUM, repair.albumId, repair.trackId, repair.position,
+                            ),
+                        ),
+                    )
+                }
+            }
             val tracks = dao.allOfflineTracks(key)
             var hasPending = false
             platform.cleanupStaleParts(key, tracks.mapTo(mutableSetOf()) { it.trackId })
@@ -275,8 +307,8 @@ class DefaultDownloadsRepository(
                     }
                 }
             }
-            if (hasPending) {
-                platform.recover(key)
+            if (hasPending || repairs.isNotEmpty()) {
+                platform.enqueue(key)
             }
         }
     }
@@ -344,6 +376,51 @@ class DefaultDownloadsRepository(
     private companion object {
         const val OWNER_TRACK = "track"
         const val OWNER_ALBUM = "album"
+    }
+}
+
+internal data class AlbumDownloadRepair(
+    val albumId: String,
+    val trackId: String,
+    val position: Int,
+    val requestedAtMs: Long,
+    val createDownload: Boolean,
+    val createOwnership: Boolean,
+)
+
+internal fun missingAlbumDownloadRecords(
+    albums: List<OfflineAlbumEntity>,
+    metadataTracks: List<TrackEntity>,
+    downloads: List<OfflineTrackEntity>,
+    ownerships: List<DownloadOwnershipEntity>,
+): List<AlbumDownloadRepair> {
+    val downloadsByTrackId = downloads.associateBy(OfflineTrackEntity::trackId)
+    val albumOwnerships = ownerships.asSequence()
+        .filter { it.ownerType == "album" }
+        .mapTo(hashSetOf()) { it.ownerId to it.trackId }
+    val tracksByAlbumId = metadataTracks.groupBy(TrackEntity::albumId)
+    return albums.flatMap { album ->
+        val tracks = tracksByAlbumId[album.albumId].orEmpty()
+            .sortedWith(compareBy<TrackEntity> { it.trackNumber ?: Int.MAX_VALUE }.thenBy { it.id })
+        if (tracks.size != album.trackCount) {
+            return@flatMap emptyList()
+        }
+        tracks.mapIndexedNotNull { position, track ->
+            val createDownload = track.id !in downloadsByTrackId
+            val createOwnership = (album.albumId to track.id) !in albumOwnerships
+            if (!createDownload && !createOwnership) {
+                null
+            } else {
+                AlbumDownloadRepair(
+                    albumId = album.albumId,
+                    trackId = track.id,
+                    position = position,
+                    requestedAtMs = album.requestedAtMs,
+                    createDownload = createDownload,
+                    createOwnership = createOwnership,
+                )
+            }
+        }
     }
 }
 

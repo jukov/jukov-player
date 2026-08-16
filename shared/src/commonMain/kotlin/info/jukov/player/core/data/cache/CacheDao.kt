@@ -40,6 +40,12 @@ interface CacheDao {
     @Query("SELECT * FROM OfflineAlbumEntity WHERE accountKey=:accountKey ORDER BY requestedAtMs DESC")
     fun observeOfflineAlbums(accountKey: String): Flow<List<OfflineAlbumEntity>>
 
+    @Query("SELECT * FROM OfflineAlbumEntity WHERE accountKey=:accountKey ORDER BY requestedAtMs DESC")
+    suspend fun allOfflineAlbums(accountKey: String): List<OfflineAlbumEntity>
+
+    @Query("SELECT t.* FROM TrackEntity t JOIN OfflineAlbumEntity a ON a.accountKey=t.accountKey AND a.albumId=t.albumId WHERE t.accountKey=:accountKey")
+    suspend fun offlineAlbumMetadataTracks(accountKey: String): List<TrackEntity>
+
     @Query("""
         SELECT d.* FROM OfflineAlbumEntity d
         JOIN AlbumEntity a ON a.accountKey=d.accountKey AND a.id=d.albumId
@@ -54,6 +60,9 @@ interface CacheDao {
 
     @Query("SELECT * FROM DownloadOwnershipEntity WHERE accountKey=:accountKey")
     fun observeDownloadOwnerships(accountKey: String): Flow<List<DownloadOwnershipEntity>>
+
+    @Query("SELECT * FROM DownloadOwnershipEntity WHERE accountKey=:accountKey")
+    suspend fun downloadOwnerships(accountKey: String): List<DownloadOwnershipEntity>
 
     @Query("SELECT * FROM OfflineArtworkEntity WHERE accountKey=:accountKey")
     fun observeOfflineArtworks(accountKey: String): Flow<List<OfflineArtworkEntity>>
