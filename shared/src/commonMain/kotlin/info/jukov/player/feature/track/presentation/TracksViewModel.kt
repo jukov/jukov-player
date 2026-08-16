@@ -25,12 +25,18 @@ import info.jukov.player.feature.download.presentation.DownloadDelegate
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.search.domain.SearchUseCase
 import info.jukov.player.feature.search.presentation.PagedSearchDelegate
+import info.jukov.player.core.domain.SortOption
+import info.jukov.player.core.domain.SortPreferences
+import info.jukov.player.core.domain.TrackSortCriterion
+import info.jukov.player.core.domain.sortedTracks
+import info.jukov.player.core.domain.mapContent
 
 class TracksViewModel(
     private val getTracksUseCase: GetTracksUseCase,
     private val favoriteDelegate: FavoriteDelegate,
     private val downloadDelegate: DownloadDelegate,
     search: SearchUseCase,
+    private val sortPreferences: SortPreferences,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Track>>>(
         LoadableState.Loading(content = null),
@@ -55,6 +61,8 @@ class TracksViewModel(
     val searchQuery = searchDelegate.query
     val searchState = searchDelegate.state
     val searchHasMore = searchDelegate.hasMore
+    private val _sort = MutableStateFlow(sortPreferences.artistTracks)
+    val sort = _sort.asStateFlow()
 
     private var filter: TracksFilter? = null
     private var loadJob: Job? = null
@@ -109,6 +117,13 @@ class TracksViewModel(
     fun loadMoreSearch() = searchDelegate.loadMore()
     fun retrySearch() = searchDelegate.retry()
     fun closeSearch() = searchDelegate.close()
+    fun updateSort(value: SortOption<TrackSortCriterion>) {
+        sortPreferences.artistTracks = value
+        _sort.value = value
+        if (filter is TracksFilter.ByArtist) {
+            _state.update { it.mapContent { tracks -> tracks.sortedTracks(value) } }
+        }
+    }
 
     fun toggleFavorite(track: Track) {
         viewModelScope.launch {
@@ -170,7 +185,11 @@ class TracksViewModel(
         if (loadJob?.isActive == true) return
         loadJob = viewModelScope.launch {
             getTracksUseCase(currentFilter, forceRefresh).collect { state ->
-                _state.value = state
+                _state.value = if (currentFilter is TracksFilter.ByArtist) {
+                    state.mapContent { it.sortedTracks(_sort.value) }
+                } else {
+                    state
+                }
                 _loadingOrigin.value = when (state) {
                     is LoadableState.Loading -> requestedOrigin
                         ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic

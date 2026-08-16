@@ -26,6 +26,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.merge
 import info.jukov.player.feature.search.domain.SearchUseCase
 import info.jukov.player.feature.search.presentation.PagedSearchDelegate
+import info.jukov.player.core.domain.AlbumSortCriterion
+import info.jukov.player.core.domain.SortDirection
+import info.jukov.player.core.domain.SortOption
+import info.jukov.player.core.domain.SortPreferences
+import info.jukov.player.core.domain.sortedAlbums
+import info.jukov.player.core.domain.mapContent
+import info.jukov.player.core.domain.supportedForGlobalAlbums
 
 class AlbumsViewModel(
     private val getAlbumsUseCase: GetAlbumsUseCase,
@@ -33,6 +40,7 @@ class AlbumsViewModel(
     private val downloadDelegate: DownloadDelegate,
     private val getTracksUseCase: GetTracksUseCase,
     search: SearchUseCase,
+    private val sortPreferences: SortPreferences,
 ) : ViewModel() {
     private val _state = MutableStateFlow<LoadableState<List<Album>>>(
         LoadableState.Loading(content = null),
@@ -54,6 +62,8 @@ class AlbumsViewModel(
     val searchQuery = searchDelegate.query
     val searchState = searchDelegate.state
     val searchHasMore = searchDelegate.hasMore
+    private val _sort = MutableStateFlow(sortPreferences.albums)
+    val sort = _sort.asStateFlow()
 
     private var artistId: String? = null
     private var initialized = false
@@ -72,6 +82,13 @@ class AlbumsViewModel(
         if (initialized && this.artistId == artistId) return
         closeSearch()
         this.artistId = artistId
+        if (artistId == null) {
+            val supportedSort = _sort.value.supportedForGlobalAlbums()
+            if (supportedSort != _sort.value) {
+                sortPreferences.albums = supportedSort
+                _sort.value = supportedSort
+            }
+        }
         initialized = true
         _hasMore.value = false
         _state.value = LoadableState.Loading(content = null)
@@ -101,6 +118,19 @@ class AlbumsViewModel(
     fun loadMoreSearch() = searchDelegate.loadMore()
     fun retrySearch() = searchDelegate.retry()
     fun closeSearch() = searchDelegate.close()
+    fun updateSort(value: SortOption<AlbumSortCriterion>) {
+        if (artistId == null && value.criterion != AlbumSortCriterion.Year && value.direction == SortDirection.Descending) {
+            return
+        }
+        sortPreferences.albums = value
+        _sort.value = value
+        if (artistId == null) {
+            _hasMore.value = false
+            loadPage(forceRefresh = false, requestedOrigin = LoadingOrigin.Sorting)
+        } else {
+            _state.update { it.mapContent { albums -> albums.sortedAlbums(value) } }
+        }
+    }
 
     fun toggleFavorite(album: Album) {
         viewModelScope.launch {
@@ -144,7 +174,7 @@ class AlbumsViewModel(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             getAlbumsUseCase(artistId, forceRefresh).collect { state ->
-                _state.value = state
+                _state.value = state.mapContent { it.sortedAlbums(_sort.value) }
                 _loadingOrigin.value = when (state) {
                     is LoadableState.Loading -> requestedOrigin
                         ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic
@@ -166,7 +196,7 @@ class AlbumsViewModel(
             _state.value = LoadableState.Loading(displayed.ifEmpty { null })
             _loadingOrigin.value = requestedOrigin ?: LoadingOrigin.Initial
             try {
-                val page = getAlbumsUseCase.page(previous.size, PAGE_SIZE, forceRefresh)
+                val page = getAlbumsUseCase.page(previous.size, PAGE_SIZE, _sort.value, forceRefresh)
                 _hasMore.value = page.hasMore
                 _state.value = LoadableState.Content(previous + page.items)
             } catch (error: Throwable) {

@@ -22,7 +22,7 @@ class DownloadsViewModelTest {
     fun removeAlbumsCancelsEverySelectedAlbumInOrder() = runTest {
         kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val downloadsRepository = RecordingDownloadsRepository()
-        val viewModel = DownloadsViewModel(downloadsRepository)
+        val viewModel = DownloadsViewModel(downloadsRepository, info.jukov.player.core.domain.SettingsSortPreferences(com.russhwolf.settings.MapSettings()))
         val albums = listOf(album("first"), album("second"))
 
         viewModel.removeAlbums(albums)

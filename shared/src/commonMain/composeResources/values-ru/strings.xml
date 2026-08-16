@@ -114,4 +114,5 @@
     <string name="error_player_connection_failed">Не удалось подключиться к плееру</string>
     <string name="error_missing_track_stream_url">У трека отсутствует URL воспроизведения</string>
     <string name="error_playback_failed">Не удалось воспроизвести трек</string>
+    <string name="sort">Сортировка</string><string name="sort_title">Название</string><string name="sort_artist">Исполнитель</string><string name="sort_year">Год выпуска</string><string name="sort_added">Дата добавления</string><string name="sort_name">Имя</string><string name="sort_ascending">По возрастанию</string><string name="sort_descending">По убыванию</string>
 </resources>

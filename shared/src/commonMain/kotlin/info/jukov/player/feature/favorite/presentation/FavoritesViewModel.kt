@@ -10,6 +10,7 @@ import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.GetTracksUseCase
 import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.core.domain.LoadableState
+import info.jukov.player.core.domain.mapContent
 import info.jukov.player.feature.favorite.domain.FavoriteTarget
 import info.jukov.player.feature.favorite.domain.favoriteStateForSelection
 import info.jukov.player.feature.favorite.domain.Favorites
@@ -47,6 +48,7 @@ class FavoritesViewModel(
     val artworkUris = downloadDelegate.artworkUris
     private var initialized = false
     private var loadJob: Job? = null
+    private var manualTrackOrder: List<String>? = null
 
     fun load() {
         if (initialized) return
@@ -66,7 +68,15 @@ class FavoritesViewModel(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             repository.getFavorites(forceRefresh).collect { state ->
-                _state.value = state
+                _state.value = state.mapContent { favorites ->
+                    val order = manualTrackOrder
+                    if (order == null) {
+                        favorites
+                    } else {
+                        val rank = order.withIndex().associate { it.value to it.index }
+                        favorites.copy(tracks = favorites.tracks.sortedBy { rank[it.id] ?: Int.MAX_VALUE })
+                    }
+                }
                 _loadingOrigin.value = when (state) {
                     is LoadableState.Loading -> requestedOrigin
                         ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic
@@ -98,6 +108,17 @@ class FavoritesViewModel(
     }
 
     fun downloadTrack(track: Track) = viewModelScope.launch { download(track) }
+    fun moveTrack(from: Int, to: Int) {
+        _state.update { current ->
+            val favorites = current.content ?: return@update current
+            if (from !in favorites.tracks.indices || to !in favorites.tracks.indices) {
+                return@update current
+            }
+            val tracks = favorites.tracks.toMutableList().apply { add(to, removeAt(from)) }
+            manualTrackOrder = tracks.map(Track::id)
+            current.mapContent { it.copy(tracks = tracks) }
+        }
+    }
     fun cancelTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.cancelTrack(id) }
     fun retryTrackDownload(id: String) = viewModelScope.launch { downloadDelegate.retry(id) }
     fun toggleFavorites(tracks: List<Track>) = viewModelScope.launch {

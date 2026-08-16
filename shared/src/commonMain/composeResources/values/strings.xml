@@ -114,4 +114,5 @@
     <string name="error_player_connection_failed">Could not connect to the player</string>
     <string name="error_missing_track_stream_url">The track has no playback URL</string>
     <string name="error_playback_failed">Could not play the track</string>
+    <string name="sort">Sort</string><string name="sort_title">Title</string><string name="sort_artist">Artist</string><string name="sort_year">Release year</string><string name="sort_added">Date added</string><string name="sort_name">Name</string><string name="sort_ascending">Ascending</string><string name="sort_descending">Descending</string>
 </resources>

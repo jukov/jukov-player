@@ -4,10 +4,13 @@ import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.auth.domain.AuthSession
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.core.domain.Page
+import info.jukov.player.core.domain.AlbumSortCriterion
+import info.jukov.player.core.domain.SortDirection
+import info.jukov.player.core.domain.SortOption
 
 class SubsonicAlbumsApi(private val client: SubsonicApiClient) : AlbumsApi {
-    override suspend fun getAlbumsPage(session: AuthSession, offset: Int, size: Int): Page<Album> {
-        val albums = requestAlbumsPage(session, offset, size)
+    override suspend fun getAlbumsPage(session: AuthSession, offset: Int, size: Int, sort: SortOption<AlbumSortCriterion>): Page<Album> {
+        val albums = requestAlbumsPage(session, offset, size, sort)
         return Page(albums.map { it.toDomain(session) }, hasMore = albums.size == size)
     }
 
@@ -16,7 +19,12 @@ class SubsonicAlbumsApi(private val client: SubsonicApiClient) : AlbumsApi {
             val albums = buildList {
                 var offset = 0
                 do {
-                    val page = requestAlbumsPage(session, offset, PAGE_SIZE)
+                    val page = requestAlbumsPage(
+                        session,
+                        offset,
+                        PAGE_SIZE,
+                        SortOption(AlbumSortCriterion.Title, SortDirection.Ascending),
+                    )
                     addAll(page)
                     offset += page.size
                 } while (page.size == PAGE_SIZE)
@@ -35,16 +43,24 @@ class SubsonicAlbumsApi(private val client: SubsonicApiClient) : AlbumsApi {
         return response.map { it.toDomain(session, artistName) }.sortedBy { it.name.lowercase() }
     }
 
-    private suspend fun requestAlbumsPage(session: AuthSession, offset: Int, size: Int) =
+    private suspend fun requestAlbumsPage(session: AuthSession, offset: Int, size: Int, sort: SortOption<AlbumSortCriterion>) =
         client.get(
             endpoint = "getAlbumList2",
             session = session,
             deserializer = AlbumsResponseDto.serializer(),
-            parameters = mapOf(
-                "type" to "alphabeticalByName",
-                "size" to size.toString(),
-                "offset" to offset.toString(),
-            ),
+            parameters = buildMap {
+                put("type", when (sort.criterion) {
+                    AlbumSortCriterion.Title -> "alphabeticalByName"
+                    AlbumSortCriterion.Artist -> "alphabeticalByArtist"
+                    AlbumSortCriterion.Year -> "byYear"
+                })
+                put("size", size.toString())
+                put("offset", offset.toString())
+                if (sort.criterion == AlbumSortCriterion.Year) {
+                    put("fromYear", if (sort.direction == SortDirection.Ascending) "0" else "9999")
+                    put("toYear", if (sort.direction == SortDirection.Ascending) "9999" else "0")
+                }
+            },
         ).response.albumList2?.album.orEmpty()
 
     private fun AlbumDto.toDomain(session: AuthSession, fallbackArtist: String = "") = Album(
