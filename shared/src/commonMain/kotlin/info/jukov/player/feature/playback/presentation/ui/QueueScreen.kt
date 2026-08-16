@@ -88,12 +88,26 @@ fun QueueScreen(
         onBack = { selectedIds = emptySet() },
     )
     var draggedItemId by remember { mutableStateOf<String?>(null) }
-    val visibleItems = state.queue.drop(state.currentIndex.coerceAtLeast(0))
-    val validFutureIds = state.queue.drop(state.currentIndex + 1).mapTo(mutableSetOf()) { it.uiId }
+    val visibleItems = remember(state.queue, state.currentIndex) {
+        state.queue.drop(state.currentIndex.coerceAtLeast(0))
+    }
+    val validFutureIds = remember(state.queue, state.currentIndex) {
+        buildSet {
+            for (index in state.currentIndex + 1 until state.queue.size) {
+                add(state.queue[index].uiId)
+            }
+        }
+    }
     LaunchedEffect(validFutureIds) { selectedIds = selectedIds intersect validFutureIds }
-    val selectedIndices = state.queue.mapIndexedNotNull { index, item ->
-        index.takeIf { index > state.currentIndex && item.uiId in selectedIds }
-    }.toSet()
+    val selectedIndices = remember(state.queue, state.currentIndex, selectedIds) {
+        buildSet {
+            state.queue.forEachIndexed { index, item ->
+                if (index > state.currentIndex && item.uiId in selectedIds) {
+                    add(index)
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {

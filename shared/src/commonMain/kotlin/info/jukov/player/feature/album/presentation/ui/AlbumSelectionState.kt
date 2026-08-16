@@ -48,7 +48,7 @@ fun rememberAlbumSelectionState(
     key: Any? = Unit,
 ): AlbumSelectionState {
     val state = remember(key) { AlbumSelectionState() }
-    val validIds = albums.mapTo(mutableSetOf(), Album::id)
+    val validIds = remember(albums) { albums.mapTo(mutableSetOf(), Album::id) }
     LaunchedEffect(state, active, validIds) {
         if (active) {
             state.retain(validIds)
