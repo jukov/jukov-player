@@ -255,11 +255,13 @@ class DefaultDownloadsRepository(
             ownerships = dao.allDownloadOwnerships(key)
             val offlineAlbums = dao.allOfflineAlbums(key).associateBy(OfflineAlbumEntity::albumId)
             val albums = dao.allAccountAlbums(key).associateBy(AlbumEntity::id)
+            val invalidAlbumTrackIds = mutableSetOf<String>()
             ownerships.filter { it.ownerType == OWNER_ALBUM }.groupBy { it.ownerId }
                 .forEach { (albumId, albumOwnerships) ->
                     val album = albums[albumId]
                     if (album == null) {
                         albumOwnerships.forEach { ownership ->
+                            invalidAlbumTrackIds += ownership.trackId
                             dao.deleteDownloadOwnership(
                                 key, ownership.ownerType, ownership.ownerId, ownership.trackId,
                             )
@@ -277,6 +279,16 @@ class DefaultDownloadsRepository(
                     }
                 }
             ownerships = dao.allDownloadOwnerships(key)
+            invalidAlbumTrackIds.filter { trackId ->
+                ownerships.none { it.trackId == trackId }
+            }.forEach { trackId ->
+                tracks.firstOrNull { it.trackId == trackId }?.let { track ->
+                    dao.deleteOfflineTrack(key, trackId)
+                    platform.deleteTrack(key, track.relativePath)
+                }
+            }
+            tracks = dao.allOfflineTracks(key)
+            ownerships = dao.allDownloadOwnerships(key)
             tracks.filter { track -> ownerships.none { it.trackId == track.trackId } }
                 .forEach { track ->
                     dao.upsertDownloadOwnership(
@@ -287,6 +299,7 @@ class DefaultDownloadsRepository(
                         ),
                     )
                 }
+            tracks = dao.allOfflineTracks(key)
             var hasPending = false
             platform.cleanupStaleParts(key, tracks.mapTo(mutableSetOf()) { it.trackId })
             tracks.forEach { track ->
