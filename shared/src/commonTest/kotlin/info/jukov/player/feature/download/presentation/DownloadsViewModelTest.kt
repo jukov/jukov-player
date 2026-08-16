@@ -25,7 +25,7 @@ class DownloadsViewModelTest {
         kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val selected = track("track")
         val repository = RecordingDownloadsRepository(onEnsureDownloaded = { true })
-        val viewModel = DownloadsViewModel(repository)
+        val viewModel = viewModel(repository)
         var played = false
 
         viewModel.playWhenDownloaded(listOf(selected), 0) { tracks, index ->
@@ -40,7 +40,7 @@ class DownloadsViewModelTest {
     fun missingTrackIsQueuedWithoutStartingPlayback() = runTest {
         kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val repository = RecordingDownloadsRepository(onEnsureDownloaded = { false })
-        val viewModel = DownloadsViewModel(repository)
+        val viewModel = viewModel(repository)
         var played = false
 
         viewModel.playWhenDownloaded(listOf(track("track")), 0) { _, _ -> played = true }
@@ -53,7 +53,7 @@ class DownloadsViewModelTest {
     fun albumWithMissingDownloadJobIsDownloadedInsteadOfPartiallyPlayed() = runTest {
         kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val repository = RecordingDownloadsRepository()
-        val viewModel = DownloadsViewModel(repository)
+        val viewModel = viewModel(repository)
         val album = OfflineAlbum(
             album = album("album"),
             tracks = listOf(
@@ -74,7 +74,7 @@ class DownloadsViewModelTest {
     fun albumWithNoDownloadJobsIsDownloaded() = runTest {
         kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val repository = RecordingDownloadsRepository()
-        val viewModel = DownloadsViewModel(repository)
+        val viewModel = viewModel(repository)
         val album = OfflineAlbum(
             album = album("album"),
             tracks = emptyList(),
@@ -93,7 +93,7 @@ class DownloadsViewModelTest {
         val repository = RecordingDownloadsRepository(
             onDownloadAlbum = { throw IllegalStateException("network failed") },
         )
-        val viewModel = DownloadsViewModel(repository)
+        val viewModel = viewModel(repository)
         val album = OfflineAlbum(
             album = album("album"),
             tracks = emptyList(),
@@ -131,6 +131,11 @@ class DownloadsViewModelTest {
         artistId = null,
         coverArtUrl = null,
         isFavorite = false,
+    )
+
+    private fun viewModel(repository: RecordingDownloadsRepository) = DownloadsViewModel(
+        repository,
+        info.jukov.player.core.domain.SettingsSortPreferences(com.russhwolf.settings.MapSettings()),
     )
 
     private fun track(id: String) = info.jukov.player.feature.track.domain.Track(
