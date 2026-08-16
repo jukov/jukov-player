@@ -16,6 +16,7 @@ import info.jukov.player.subsonic.data.SubsonicApiClient
 import info.jukov.player.core.data.cache.CacheDao
 import info.jukov.player.core.data.cache.LibraryCachePolicy
 import info.jukov.player.feature.search.domain.SearchUseCase
+import info.jukov.player.core.domain.SortPreferences
 import info.jukov.player.feature.download.presentation.DownloadDelegate
 import info.jukov.player.feature.track.domain.GetTracksUseCase
 
@@ -44,9 +45,16 @@ object ArtistsModule {
         authRepository: AuthRepository,
         favoriteDelegate: FavoriteDelegate,
         search: SearchUseCase,
+        sortPreferences: SortPreferences,
         getTracksUseCase: GetTracksUseCase,
         downloadDelegate: DownloadDelegate,
     ): ArtistsViewModel = ArtistsViewModel(
-        getArtistsUseCase, authRepository, favoriteDelegate, search, getTracksUseCase, downloadDelegate,
+        getArtistsUseCase,
+        authRepository,
+        favoriteDelegate,
+        search,
+        sortPreferences,
+        getTracksUseCase,
+        downloadDelegate,
     )
 }

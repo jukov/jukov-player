@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import info.jukov.player.subsonic.data.SubsonicApiClient
+import info.jukov.player.core.domain.SortPreferences
 
 @BindingContainer
 object DownloadsModule {
@@ -49,5 +50,6 @@ object DownloadsModule {
     @Provides
     fun provideDownloadsViewModel(
         repository: DownloadsRepository,
-    ): DownloadsViewModel = DownloadsViewModel(repository)
+        sortPreferences: SortPreferences,
+    ): DownloadsViewModel = DownloadsViewModel(repository, sortPreferences)
 }

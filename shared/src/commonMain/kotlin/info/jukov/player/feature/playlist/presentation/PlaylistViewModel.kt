@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import info.jukov.player.core.domain.AppError
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.core.domain.toAppError
+import info.jukov.player.core.domain.mapContent
 import info.jukov.player.feature.download.presentation.DownloadDelegate
 import info.jukov.player.feature.favorite.domain.favoriteStateForSelection
 import info.jukov.player.feature.favorite.presentation.FavoriteDelegate
@@ -34,14 +35,26 @@ class PlaylistViewModel(
     val artworkUris = downloadDelegate.artworkUris
     private var id: String? = null
     private var observeJob: Job? = null
+    private var manualTrackOrder: List<String>? = null
 
     fun load(id: String, forceRefresh: Boolean = false) {
         if (this.id == id && !forceRefresh) return
         if (this.id != id) {
+            manualTrackOrder = null
             this.id = id
             observeJob?.cancel()
             observeJob = viewModelScope.launch {
-                repository.playlist(id).collect { _state.value = it }
+                repository.playlist(id).collect { state ->
+                    _state.value = state.mapContent { playlist ->
+                        val order = manualTrackOrder ?: return@mapContent playlist
+                        val remaining = playlist.tracks.toMutableList()
+                        val ordered = order.mapNotNull { id ->
+                            remaining.indexOfFirst { it.id == id }.takeIf { it >= 0 }
+                                ?.let(remaining::removeAt)
+                        } + remaining
+                        playlist.copy(tracks = ordered)
+                    }
+                }
             }
         }
         viewModelScope.launch {
@@ -50,6 +63,17 @@ class PlaylistViewModel(
     }
 
     fun isEditable(playlist: Playlist) = repository.isEditable(playlist)
+    fun moveTrack(from: Int, to: Int) {
+        _state.update { current ->
+            val playlist = current.content ?: return@update current
+            if (from !in playlist.tracks.indices || to !in playlist.tracks.indices) {
+                return@update current
+            }
+            val tracks = playlist.tracks.toMutableList().apply { add(to, removeAt(from)) }
+            manualTrackOrder = tracks.map(Track::id)
+            current.mapContent { it.copy(tracks = tracks) }
+        }
+    }
 
     fun download(tracks: List<Track>) = viewModelScope.launch {
         tracks.forEach { track -> requestDownload(track) }

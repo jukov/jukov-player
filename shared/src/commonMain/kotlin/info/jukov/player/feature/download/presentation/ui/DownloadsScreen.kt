@@ -43,6 +43,9 @@ import info.jukov.player.feature.playback.presentation.ui.PlayerBackHandler
 import jukovplayer.shared.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import info.jukov.player.core.domain.*
+import info.jukov.player.core.presentation.ui.SortAction
+import info.jukov.player.core.presentation.ui.SortMenuItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,10 +64,15 @@ fun DownloadsScreen(
     val tab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val searchActive by viewModel.searchActive.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val trackSort by viewModel.trackSort.collectAsStateWithLifecycle()
+    val albumSort by viewModel.albumSort.collectAsStateWithLifecycle()
     var confirmRemoveAll by remember { mutableStateOf(false) }
-    val library = state.content ?: OfflineLibrary()
-    val tracks = library.tracks.map { it.track }
-    val albums = library.albums.map { it.album }
+    val library = state.content ?: remember { OfflineLibrary() }
+    val tracks = remember(library.tracks) { library.tracks.map { it.track } }
+    val albums = remember(library.albums) { library.albums.map { it.album } }
+    val downloadStatuses = remember(library.tracks) {
+        library.tracks.associate { it.track.id to it.status }
+    }
     val browseTracksListState = rememberLazyListState()
     val searchTracksListState = rememberLazyListState()
     val browseAlbumsListState = rememberLazyListState()
@@ -144,6 +152,28 @@ fun DownloadsScreen(
                             }
                         },
                         actions = {
+                            if (!searchActive) {
+                                if (tab == DownloadsTab.Tracks) {
+                                    SortAction(trackSort, listOf(
+                                        SortMenuItem(DownloadTrackSortCriterion.Title, stringResource(Res.string.sort_title)),
+                                        SortMenuItem(DownloadTrackSortCriterion.Artist, stringResource(Res.string.sort_artist)),
+                                        SortMenuItem(DownloadTrackSortCriterion.Added, stringResource(Res.string.sort_added)),
+                                    ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending)) { option ->
+                                        browseTracksListState.requestScrollToItem(0)
+                                        viewModel.updateTrackSort(option)
+                                    }
+                                } else {
+                                    SortAction(albumSort, listOf(
+                                        SortMenuItem(DownloadAlbumSortCriterion.Title, stringResource(Res.string.sort_title)),
+                                        SortMenuItem(DownloadAlbumSortCriterion.Artist, stringResource(Res.string.sort_artist)),
+                                        SortMenuItem(DownloadAlbumSortCriterion.Year, stringResource(Res.string.sort_year)),
+                                        SortMenuItem(DownloadAlbumSortCriterion.Added, stringResource(Res.string.sort_added)),
+                                    ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending)) { option ->
+                                        browseAlbumsListState.requestScrollToItem(0)
+                                        viewModel.updateAlbumSort(option)
+                                    }
+                                }
+                            }
                             SearchAction(viewModel::openSearch)
                             IconButton(onClick = { confirmRemoveAll = true }) {
                                 Icon(
@@ -190,7 +220,7 @@ fun DownloadsScreen(
                                     activeTrackId = activeTrackId,
                                     isPlaying = isPlaying,
                                     loadingTrackId = loadingTrackId,
-                                    downloadStatuses = library.tracks.associate { it.track.id to it.status },
+                                    downloadStatuses = downloadStatuses,
                                     onCancelDownload = viewModel::removeTrack,
                                     onRetryDownload = viewModel::retryTrack,
                                     selectionMode = trackSelectionState.isActive,
@@ -274,7 +304,10 @@ fun OfflineAlbumTracksScreen(
     onAddToQueue: (List<Track>) -> Unit,
 ) {
     val offlineTracks by viewModel.albumTracks(albumId).collectAsStateWithLifecycle(emptyList())
-    val tracks = offlineTracks.map { it.track }
+    val tracks = remember(offlineTracks) { offlineTracks.map { it.track } }
+    val downloadStatuses = remember(offlineTracks) {
+        offlineTracks.associate { it.track.id to it.status }
+    }
     val selectionState = rememberTrackSelectionState(tracks, key = albumId)
     PlayerBackHandler(
         enabled = selectionState.isActive,
@@ -310,7 +343,7 @@ fun OfflineAlbumTracksScreen(
             activeTrackId = activeTrackId,
             isPlaying = isPlaying,
             loadingTrackId = loadingTrackId,
-            downloadStatuses = offlineTracks.associate { it.track.id to it.status },
+            downloadStatuses = downloadStatuses,
             onCancelDownload = viewModel::removeTrack,
             onRetryDownload = viewModel::retryTrack,
             selectionMode = selectionState.isActive,

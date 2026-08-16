@@ -15,6 +15,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import info.jukov.player.core.domain.ArtistSortCriterion
+import info.jukov.player.core.domain.SortOption
+import info.jukov.player.core.domain.SortPreferences
+import info.jukov.player.core.domain.sortedArtists
+import info.jukov.player.core.domain.mapContent
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import info.jukov.player.core.presentation.LoadingOrigin
@@ -33,6 +38,7 @@ class ArtistsViewModel(
     authRepository: AuthRepository,
     private val favoriteDelegate: FavoriteDelegate,
     search: SearchUseCase,
+    private val sortPreferences: SortPreferences,
     private val getTracksUseCase: GetTracksUseCase,
     private val downloadDelegate: DownloadDelegate,
 ) : ViewModel() {
@@ -40,6 +46,8 @@ class ArtistsViewModel(
         LoadableState.Loading(content = null),
     )
     val state: StateFlow<LoadableState<List<Artist>>> = _state.asStateFlow()
+    private val _sort = MutableStateFlow(sortPreferences.artists)
+    val sort = _sort.asStateFlow()
     private val _loadingOrigin = MutableStateFlow<LoadingOrigin?>(LoadingOrigin.Initial)
     val loadingOrigin: StateFlow<LoadingOrigin?> = _loadingOrigin.asStateFlow()
     val pending = favoriteDelegate.pending
@@ -79,6 +87,11 @@ class ArtistsViewModel(
 
     fun openSearch() = searchDelegate.open()
     fun updateSearchQuery(value: String) = searchDelegate.updateQuery(value)
+    fun updateSort(value: SortOption<ArtistSortCriterion>) {
+        sortPreferences.artists = value
+        _sort.value = value
+        _state.update { it.mapContent { artists -> artists.sortedArtists(value) } }
+    }
     fun loadMoreSearch() = searchDelegate.loadMore()
     fun retrySearch() = searchDelegate.retry()
     fun closeSearch() = searchDelegate.close()
@@ -138,7 +151,7 @@ class ArtistsViewModel(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             getArtistsUseCase(forceRefresh).collect { state ->
-                _state.value = state
+                _state.value = state.mapContent { it.sortedArtists(_sort.value) }
                 _loadingOrigin.value = when (state) {
                     is LoadableState.Loading -> requestedOrigin
                         ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic

@@ -17,6 +17,7 @@ import info.jukov.player.core.data.cache.CacheDao
 import info.jukov.player.core.data.cache.LibraryCachePolicy
 import info.jukov.player.feature.download.presentation.DownloadDelegate
 import info.jukov.player.feature.search.domain.SearchUseCase
+import info.jukov.player.core.domain.SortPreferences
 
 @BindingContainer
 object TracksModule {
@@ -44,5 +45,6 @@ object TracksModule {
         favoriteDelegate: FavoriteDelegate,
         downloadDelegate: DownloadDelegate,
         search: SearchUseCase,
-    ): TracksViewModel = TracksViewModel(getTracksUseCase, favoriteDelegate, downloadDelegate, search)
+        sortPreferences: SortPreferences,
+    ): TracksViewModel = TracksViewModel(getTracksUseCase, favoriteDelegate, downloadDelegate, search, sortPreferences)
 }

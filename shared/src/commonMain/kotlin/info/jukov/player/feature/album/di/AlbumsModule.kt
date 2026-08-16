@@ -18,6 +18,7 @@ import info.jukov.player.core.data.cache.LibraryCachePolicy
 import info.jukov.player.feature.download.presentation.DownloadDelegate
 import info.jukov.player.feature.track.domain.GetTracksUseCase
 import info.jukov.player.feature.search.domain.SearchUseCase
+import info.jukov.player.core.domain.SortPreferences
 
 @BindingContainer
 object AlbumsModule {
@@ -46,11 +47,13 @@ object AlbumsModule {
         downloadDelegate: DownloadDelegate,
         getTracksUseCase: GetTracksUseCase,
         search: SearchUseCase,
+        sortPreferences: SortPreferences,
     ): AlbumsViewModel = AlbumsViewModel(
         getAlbumsUseCase,
         favoriteDelegate,
         downloadDelegate,
         getTracksUseCase,
         search,
+        sortPreferences,
     )
 }

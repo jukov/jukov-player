@@ -49,7 +49,7 @@ fun rememberTrackSelectionState(
     key: Any? = Unit,
 ): TrackSelectionState {
     val state = remember(key) { TrackSelectionState() }
-    val validIds = tracks.mapTo(mutableSetOf(), Track::id)
+    val validIds = remember(tracks) { tracks.mapTo(mutableSetOf(), Track::id) }
     LaunchedEffect(state, active, validIds) {
         if (active) {
             state.retain(validIds)

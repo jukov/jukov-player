@@ -52,13 +52,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.CornerRadius
@@ -71,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
@@ -83,6 +90,9 @@ import info.jukov.player.core.presentation.ui.AppFlexibleTopAppBar
 import info.jukov.player.core.presentation.ui.SearchAction
 import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBar
 import info.jukov.player.core.presentation.ui.AppCollapsingTopAppBarState
+import info.jukov.player.core.domain.TrackSortCriterion
+import info.jukov.player.core.presentation.ui.SortAction
+import info.jukov.player.core.presentation.ui.SortMenuItem
 import info.jukov.player.core.presentation.ui.rememberAppCollapsingTopAppBarState
 import info.jukov.player.core.presentation.ui.Padding
 import info.jukov.player.core.presentation.ui.PlayPauseButton
@@ -137,6 +147,7 @@ fun TracksScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchState by viewModel.searchState.collectAsStateWithLifecycle()
     val searchHasMore by viewModel.searchHasMore.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
     val loadingOrigin by viewModel.loadingOrigin.collectAsStateWithLifecycle()
     val hasMore by viewModel.hasMore.collectAsStateWithLifecycle()
     val currentAlbumIsFavorite by viewModel.albumIsFavorite.collectAsStateWithLifecycle()
@@ -238,6 +249,15 @@ fun TracksScreen(
                         scrollBehavior = scrollBehavior,
                         navigationIcon = { BackButton(onBack) },
                         actions = {
+                            if (filter is TracksFilter.ByArtist && !searchActive) {
+                                SortAction(sort, listOf(
+                                    SortMenuItem(TrackSortCriterion.Title, stringResource(Res.string.sort_title)),
+                                    SortMenuItem(TrackSortCriterion.Artist, stringResource(Res.string.sort_artist)),
+                                ), stringResource(Res.string.sort_ascending), stringResource(Res.string.sort_descending)) { option ->
+                                    browseListState.requestScrollToItem(0)
+                                    viewModel.updateSort(option)
+                                }
+                            }
                             if (filter !is TracksFilter.ByAlbum) {
                                 SearchAction(viewModel::openSearch)
                             }
@@ -664,10 +684,14 @@ fun TracksList(
     selectedIds: Set<String> = emptySet(),
     onSelectionChange: (String, Boolean) -> Unit = { _, _ -> },
     selectionKey: (Int, Track) -> String = { _, track -> track.id },
+    itemKey: (Int, Track) -> Any = selectionKey,
     trailingAction: TrackTrailingAction = TrackTrailingAction.Favorite,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
+    reorderEnabled: Boolean = false,
+    onMove: (Int, Int) -> Unit = { _, _ -> },
 ) {
+    var draggedItemKey by remember { mutableStateOf<Any?>(null) }
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
@@ -678,7 +702,17 @@ fun TracksList(
         error?.let { message ->
             item { Text(message.localizedMessage(), color = MaterialTheme.colorScheme.error) }
         }
-        itemsIndexed(tracks, key = selectionKey) { index, track ->
+        itemsIndexed(tracks, key = itemKey) { index, track ->
+            val key = itemKey(index, track)
+            var dragOffset by remember(key) { mutableFloatStateOf(0f) }
+            var dragIndex by remember(key) { mutableIntStateOf(index) }
+            var measuredRowHeightPx by remember(key) { mutableIntStateOf(0) }
+            val isDragging = draggedItemKey == key
+            LaunchedEffect(index, isDragging) {
+                if (!isDragging) {
+                    dragIndex = index
+                }
+            }
             if (hasMore && index >= tracks.lastIndex - LOAD_MORE_THRESHOLD) {
                 LaunchedEffect(tracks.size) { onLoadMore() }
             }
@@ -703,6 +737,59 @@ fun TracksList(
                 selected = selectionKey(index, track) in selectedIds,
                 onSelectedChange = { onSelectionChange(selectionKey(index, track), it) },
                 trailingAction = trailingAction,
+                modifier = if (!reorderEnabled) {
+                    Modifier
+                } else if (isDragging) {
+                    Modifier.animateItem(placementSpec = null)
+                        .graphicsLayer { translationY = dragOffset }
+                        .onSizeChanged { measuredRowHeightPx = it.height }
+                        .zIndex(1f)
+                } else {
+                    Modifier.animateItem()
+                        .onSizeChanged { measuredRowHeightPx = it.height }
+                },
+                dragHandle = if (reorderEnabled && !selectionMode) {
+                    {
+                        Icon(
+                            painterResource(Res.drawable.drag_handle),
+                            stringResource(Res.string.move_track, track.title),
+                            Modifier.size(48.dp).padding(12.dp).pointerInput(key) {
+                                detectVerticalDragGestures(
+                                    onDragStart = {
+                                        draggedItemKey = key
+                                        dragIndex = index
+                                    },
+                                    onVerticalDrag = { change, amount ->
+                                        change.consume()
+                                        dragOffset += amount
+                                        val itemStridePx = measuredRowHeightPx + Padding.small.toPx()
+                                        if (itemStridePx > 0f) {
+                                            val moveThreshold = itemStridePx / 2f
+                                            while (dragOffset > moveThreshold && dragIndex < tracks.lastIndex) {
+                                                onMove(dragIndex, dragIndex + 1)
+                                                dragIndex += 1
+                                                dragOffset -= itemStridePx
+                                            }
+                                            while (dragOffset < -moveThreshold && dragIndex > 0) {
+                                                onMove(dragIndex, dragIndex - 1)
+                                                dragIndex -= 1
+                                                dragOffset += itemStridePx
+                                            }
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        dragOffset = 0f
+                                        draggedItemKey = null
+                                    },
+                                    onDragCancel = {
+                                        dragOffset = 0f
+                                        draggedItemKey = null
+                                    },
+                                )
+                            },
+                        )
+                    }
+                } else null,
             )
         }
         if (isLoadingMore) {
@@ -740,9 +827,11 @@ fun TrackRow(
     selected: Boolean = false,
     onSelectedChange: (Boolean) -> Unit = {},
     trailingAction: TrackTrailingAction = TrackTrailingAction.Favorite,
+    modifier: Modifier = Modifier,
+    dragHandle: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .testTag("track.${track.id}")
             .clip(RoundedCornerShape(16.dp))
@@ -857,6 +946,7 @@ fun TrackRow(
             status = downloadStatus,
             modifier = Modifier.padding(end = Padding.small),
         )
+        dragHandle?.invoke()
     }
 }
 

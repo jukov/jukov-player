@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
 import info.jukov.player.core.domain.AppException
 import info.jukov.player.core.domain.Page
+import info.jukov.player.core.domain.AlbumSortCriterion
+import info.jukov.player.core.domain.SortOption
 
 class DefaultAlbumsRepository(
     private val api: AlbumsApi,
@@ -24,21 +26,22 @@ class DefaultAlbumsRepository(
     private val policy: LibraryCachePolicy,
     private val client: SubsonicApiClient,
 ) : AlbumsRepository {
-    override suspend fun getAlbumsPage(offset: Int, size: Int, forceRefresh: Boolean): Page<Album> {
+    override suspend fun getAlbumsPage(offset: Int, size: Int, sort: SortOption<AlbumSortCriterion>, forceRefresh: Boolean): Page<Album> {
         val session = (authRepository.authState.value as? AuthState.LoggedIn)?.session
             ?: throw AppException(AppError.AuthenticationRequired)
-        val cacheIsFresh = !forceRefresh && policy.isFresh(session, CacheKeys.ALBUMS)
+        val queryKey = CacheKeys.albums("${sort.criterion.name}:${sort.direction.name}")
+        val cacheIsFresh = !forceRefresh && policy.isFresh(session, queryKey)
         if (cacheIsFresh) {
-            val cached = dao.albumPage(session.accountKey, CacheKeys.ALBUMS, offset, size + 1)
+            val cached = dao.albumPage(session.accountKey, queryKey, offset, size + 1)
             return Page(
                 items = cached.take(size).map { it.toDomain(session, client) },
                 hasMore = cached.size > size,
             )
         }
-        val page = api.getAlbumsPage(session, offset, size)
+        val page = api.getAlbumsPage(session, offset, size, sort)
         dao.storeAlbumPage(
             accountKey = session.accountKey,
-            queryKey = CacheKeys.ALBUMS,
+            queryKey = queryKey,
             items = page.items.map { it.toEntity(session.accountKey) },
             offset = offset,
             isLastPage = !page.hasMore,
