@@ -738,7 +738,7 @@ class DownloadForegroundService : Service() {
 
     private enum class TrackResult { Completed, Skipped }
     private class TrackRemovedException : Exception()
-    private class NetworkDownloadException(message: String) : Exception(message)
+    private class NetworkDownloadException(message: String) : IOException(message)
     private class PermanentDownloadException(
         message: String,
         val kind: DownloadErrorKind = DownloadErrorKind.Local,
