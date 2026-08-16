@@ -43,9 +43,6 @@ interface CacheDao {
     @Query("SELECT * FROM OfflineAlbumEntity WHERE accountKey=:accountKey ORDER BY requestedAtMs DESC")
     suspend fun allOfflineAlbums(accountKey: String): List<OfflineAlbumEntity>
 
-    @Query("SELECT t.* FROM TrackEntity t JOIN OfflineAlbumEntity a ON a.accountKey=t.accountKey AND a.albumId=t.albumId WHERE t.accountKey=:accountKey")
-    suspend fun offlineAlbumMetadataTracks(accountKey: String): List<TrackEntity>
-
     @Query("""
         SELECT d.* FROM OfflineAlbumEntity d
         JOIN AlbumEntity a ON a.accountKey=d.accountKey AND a.id=d.albumId

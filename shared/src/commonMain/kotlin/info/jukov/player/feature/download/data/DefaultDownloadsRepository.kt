@@ -12,6 +12,7 @@ import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.track.domain.TracksFilter
 import info.jukov.player.subsonic.data.SubsonicApiClient
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -259,12 +260,32 @@ class DefaultDownloadsRepository(
     override suspend fun reconcile() {
         mutations.run {
             val key = accountKey() ?: return@run
-            val repairs = missingAlbumDownloadRecords(
-                albums = dao.allOfflineAlbums(key),
-                metadataTracks = dao.offlineAlbumMetadataTracks(key),
-                downloads = dao.allOfflineTracks(key),
-                ownerships = dao.downloadOwnerships(key),
-            )
+            val session = session() ?: return@run
+            val albums = dao.allOfflineAlbums(key)
+            val initialDownloads = dao.allOfflineTracks(key)
+            val ownerships = dao.downloadOwnerships(key)
+            val repairs = albums.filter { album ->
+                albumNeedsDownloadRepair(album, initialDownloads, ownerships)
+            }.flatMap { album ->
+                val metadataTracks = try {
+                    tracksApi.getTracks(session, TracksFilter.ByAlbum(album.albumId))
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Throwable) {
+                    emptyList()
+                }
+                if (metadataTracks.size != album.trackCount) {
+                    emptyList()
+                } else {
+                    dao.upsertTracks(metadataTracks.map { it.toEntity(key) })
+                    missingAlbumDownloadRecords(
+                        album = album,
+                        orderedTrackIds = metadataTracks.map(Track::id),
+                        downloads = initialDownloads,
+                        ownerships = ownerships,
+                    )
+                }
+            }
             repairs.forEach { repair ->
                 if (repair.createDownload) {
                     dao.upsertOfflineTrack(
@@ -307,8 +328,10 @@ class DefaultDownloadsRepository(
                     }
                 }
             }
-            if (hasPending || repairs.isNotEmpty()) {
+            if (repairs.isNotEmpty()) {
                 platform.enqueue(key)
+            } else if (hasPending) {
+                platform.recover(key)
             }
         }
     }
@@ -389,39 +412,46 @@ internal data class AlbumDownloadRepair(
 )
 
 internal fun missingAlbumDownloadRecords(
-    albums: List<OfflineAlbumEntity>,
-    metadataTracks: List<TrackEntity>,
+    album: OfflineAlbumEntity,
+    orderedTrackIds: List<String>,
     downloads: List<OfflineTrackEntity>,
     ownerships: List<DownloadOwnershipEntity>,
 ): List<AlbumDownloadRepair> {
     val downloadsByTrackId = downloads.associateBy(OfflineTrackEntity::trackId)
-    val albumOwnerships = ownerships.asSequence()
-        .filter { it.ownerType == "album" }
-        .mapTo(hashSetOf()) { it.ownerId to it.trackId }
-    val tracksByAlbumId = metadataTracks.groupBy(TrackEntity::albumId)
-    return albums.flatMap { album ->
-        val tracks = tracksByAlbumId[album.albumId].orEmpty()
-            .sortedWith(compareBy<TrackEntity> { it.trackNumber ?: Int.MAX_VALUE }.thenBy { it.id })
-        if (tracks.size != album.trackCount) {
-            return@flatMap emptyList()
-        }
-        tracks.mapIndexedNotNull { position, track ->
-            val createDownload = track.id !in downloadsByTrackId
-            val createOwnership = (album.albumId to track.id) !in albumOwnerships
-            if (!createDownload && !createOwnership) {
-                null
-            } else {
-                AlbumDownloadRepair(
-                    albumId = album.albumId,
-                    trackId = track.id,
-                    position = position,
-                    requestedAtMs = album.requestedAtMs,
-                    createDownload = createDownload,
-                    createOwnership = createOwnership,
-                )
-            }
+    val albumOwnerships = ownerships.asSequence().filter {
+        it.ownerType == "album" && it.ownerId == album.albumId
+    }.associateBy(DownloadOwnershipEntity::trackId)
+    if (orderedTrackIds.size != album.trackCount) {
+        return emptyList()
+    }
+    return orderedTrackIds.mapIndexedNotNull { position, trackId ->
+        val createDownload = trackId !in downloadsByTrackId
+        val createOwnership = albumOwnerships[trackId]?.position != position
+        if (!createDownload && !createOwnership) {
+            null
+        } else {
+            AlbumDownloadRepair(
+                albumId = album.albumId,
+                trackId = trackId,
+                position = position,
+                requestedAtMs = album.requestedAtMs,
+                createDownload = createDownload,
+                createOwnership = createOwnership,
+            )
         }
     }
+}
+
+internal fun albumNeedsDownloadRepair(
+    album: OfflineAlbumEntity,
+    downloads: List<OfflineTrackEntity>,
+    ownerships: List<DownloadOwnershipEntity>,
+): Boolean {
+    val downloadIds = downloads.mapTo(hashSetOf(), OfflineTrackEntity::trackId)
+    val ownedTrackIds = ownerships.asSequence()
+        .filter { it.ownerType == "album" && it.ownerId == album.albumId }
+        .mapTo(hashSetOf(), DownloadOwnershipEntity::trackId)
+    return ownedTrackIds.size != album.trackCount || ownedTrackIds.any { it !in downloadIds }
 }
 
 internal class DownloadMutationCoordinator {

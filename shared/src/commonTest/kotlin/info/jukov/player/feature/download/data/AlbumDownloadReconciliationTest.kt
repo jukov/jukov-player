@@ -3,7 +3,6 @@ package info.jukov.player.feature.download.data
 import info.jukov.player.core.data.cache.DownloadOwnershipEntity
 import info.jukov.player.core.data.cache.OfflineAlbumEntity
 import info.jukov.player.core.data.cache.OfflineTrackEntity
-import info.jukov.player.core.data.cache.TrackEntity
 import info.jukov.player.feature.download.domain.DownloadState
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,8 +11,8 @@ class AlbumDownloadReconciliationTest {
     @Test
     fun createsMissingJobsAndOwnershipsForCompleteAlbumMetadata() {
         val repairs = missingAlbumDownloadRecords(
-            albums = listOf(OfflineAlbumEntity(ACCOUNT, ALBUM, 2, 123)),
-            metadataTracks = listOf(track("second", 2), track("first", 1)),
+            album = OfflineAlbumEntity(ACCOUNT, ALBUM, 2, 123),
+            orderedTrackIds = listOf("first", "second"),
             downloads = listOf(download("first")),
             ownerships = listOf(ownership("first", position = 0)),
         )
@@ -36,8 +35,8 @@ class AlbumDownloadReconciliationTest {
     @Test
     fun doesNotGuessMissingTracksFromPartialMetadata() {
         val repairs = missingAlbumDownloadRecords(
-            albums = listOf(OfflineAlbumEntity(ACCOUNT, ALBUM, 2, 123)),
-            metadataTracks = listOf(track("first", 1)),
+            album = OfflineAlbumEntity(ACCOUNT, ALBUM, 2, 123),
+            orderedTrackIds = listOf("first"),
             downloads = emptyList(),
             ownerships = emptyList(),
         )
@@ -45,21 +44,21 @@ class AlbumDownloadReconciliationTest {
         assertEquals(emptyList(), repairs)
     }
 
-    private fun track(id: String, number: Int) = TrackEntity(
-        accountKey = ACCOUNT,
-        id = id,
-        title = id,
-        artist = "Artist",
-        album = "Album",
-        albumId = ALBUM,
-        artistId = null,
-        trackNumber = number,
-        year = null,
-        coverArtId = null,
-        durationMs = 1,
-        contentType = null,
-        isFavorite = false,
-    )
+    @Test
+    fun repairsSurvivingOwnershipPositionFromServerOrder() {
+        val repairs = missingAlbumDownloadRecords(
+            album = OfflineAlbumEntity(ACCOUNT, ALBUM, 2, 123),
+            orderedTrackIds = listOf("disc-two", "disc-one"),
+            downloads = listOf(download("disc-two"), download("disc-one")),
+            ownerships = listOf(
+                ownership("disc-two", position = 1),
+                ownership("disc-one", position = 0),
+            ),
+        )
+
+        assertEquals(listOf(0, 1), repairs.map(AlbumDownloadRepair::position))
+        assertEquals(listOf("disc-two", "disc-one"), repairs.map(AlbumDownloadRepair::trackId))
+    }
 
     private fun download(id: String) = OfflineTrackEntity(
         accountKey = ACCOUNT,
