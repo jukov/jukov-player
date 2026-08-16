@@ -1,5 +1,6 @@
 package info.jukov.player.feature.download.presentation
 
+import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.download.domain.DownloadState
 import info.jukov.player.feature.download.domain.DownloadStatus
@@ -15,6 +16,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertIs
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DownloadsViewModelTest {
@@ -66,6 +68,42 @@ class DownloadsViewModelTest {
 
         assertEquals(listOf(album.album), repository.downloadedAlbums)
         assertEquals(false, played)
+    }
+
+    @Test
+    fun albumWithNoDownloadJobsIsDownloaded() = runTest {
+        kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val repository = RecordingDownloadsRepository()
+        val viewModel = DownloadsViewModel(repository)
+        val album = OfflineAlbum(
+            album = album("album"),
+            tracks = emptyList(),
+            expectedTrackCount = 2,
+        )
+
+        viewModel.playAlbumWhenDownloaded(album) { _, _ -> }
+        advanceUntilIdle()
+
+        assertEquals(listOf(album.album), repository.downloadedAlbums)
+    }
+
+    @Test
+    fun albumRepairFailureIsPublishedWithoutEscapingCoroutine() = runTest {
+        kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val repository = RecordingDownloadsRepository(
+            onDownloadAlbum = { throw IllegalStateException("network failed") },
+        )
+        val viewModel = DownloadsViewModel(repository)
+        val album = OfflineAlbum(
+            album = album("album"),
+            tracks = emptyList(),
+            expectedTrackCount = 2,
+        )
+
+        viewModel.playAlbumWhenDownloaded(album) { _, _ -> }
+        advanceUntilIdle()
+
+        assertIs<LoadableState.Failure<*>>(viewModel.state.value)
     }
 
     @AfterTest

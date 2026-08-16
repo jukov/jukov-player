@@ -3,6 +3,8 @@ package info.jukov.player.feature.download.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import info.jukov.player.core.domain.LoadableState
+import info.jukov.player.core.domain.AppError
+import info.jukov.player.core.domain.toAppError
 import info.jukov.player.feature.download.domain.DownloadState
 import info.jukov.player.feature.download.domain.DownloadsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,6 +13,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CancellationException
 import info.jukov.player.feature.download.domain.OfflineTrack
 import info.jukov.player.feature.download.domain.OfflineAlbum
 import info.jukov.player.feature.track.domain.Track
@@ -90,7 +94,18 @@ class DownloadsViewModel(
         viewModelScope.launch {
             val tracks = album.tracks.map { it.track }
             if (tracks.size != album.expectedTrackCount) {
-                repository.downloadAlbum(album.album)
+                try {
+                    repository.downloadAlbum(album.album)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    _state.update { current ->
+                        LoadableState.Failure(
+                            error.toAppError(AppError.DownloadFailed),
+                            current.content,
+                        )
+                    }
+                }
             } else if (repository.ensureDownloaded(tracks)) {
                 onPlay(tracks, 0)
             }
