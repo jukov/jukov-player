@@ -268,7 +268,7 @@ class DefaultDownloadsRepository(
                         }
                     } else {
                         val current = offlineAlbums[albumId]
-                        if (current == null || current.trackCount == 0) {
+                        if (current == null || current.trackCount != albumOwnerships.size) {
                             dao.upsertOfflineAlbum(
                                 OfflineAlbumEntity(
                                     key, albumId, albumOwnerships.size,
@@ -279,6 +279,13 @@ class DefaultDownloadsRepository(
                     }
                 }
             ownerships = dao.allDownloadOwnerships(key)
+            val albumIdsWithOwnership = ownerships.asSequence()
+                .filter { it.ownerType == OWNER_ALBUM }
+                .map { it.ownerId }
+                .toSet()
+            offlineAlbums.keys.filter { it !in albumIdsWithOwnership }.forEach { albumId ->
+                dao.deleteOfflineAlbum(key, albumId)
+            }
             invalidAlbumTrackIds.filter { trackId ->
                 ownerships.none { it.trackId == trackId }
             }.forEach { trackId ->

@@ -28,6 +28,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.utils.io.readAvailable
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import jukovplayer.shared.generated.resources.Res
 import jukovplayer.shared.generated.resources.cancel_all_downloads
 import jukovplayer.shared.generated.resources.download_notification_channel
@@ -189,7 +190,7 @@ class DownloadForegroundService : Service() {
                     ?: return TrackResult.Skipped
                 markFailure(accountKey, current, error.message.orEmpty(), error.kind)
                 return TrackResult.Completed
-            } catch (error: Throwable) {
+            } catch (error: IOException) {
                 val message = error.message ?: error::class.simpleName.orEmpty()
                 val current = dao.offlineTrack(accountKey, item.trackId)
                     ?: return TrackResult.Skipped
@@ -203,6 +204,15 @@ class DownloadForegroundService : Service() {
                     return TrackResult.Skipped
                 }
                 trace(item.trackId, trackStartedAtMs, "queued for network-constrained retry")
+                return TrackResult.Completed
+            } catch (error: Throwable) {
+                val current = dao.offlineTrack(accountKey, item.trackId)
+                    ?: return TrackResult.Skipped
+                markFailure(
+                    accountKey, current,
+                    error.message ?: error::class.simpleName.orEmpty(),
+                    DownloadErrorKind.Unknown,
+                )
                 return TrackResult.Completed
             }
         }
@@ -334,12 +344,25 @@ class DownloadForegroundService : Service() {
         val channel = response.bodyAsChannel()
         var downloadedBytes = plan.initialBytes
         var lastProgressAtMs = 0L
-        FileOutputStream(part, plan.append).use { output ->
+        val output = try {
+            FileOutputStream(part, plan.append)
+        } catch (error: IOException) {
+            throw PermanentDownloadException(
+                error.message ?: "Cannot open local file", DownloadErrorKind.Local,
+            )
+        }
+        output.use {
             while (!channel.isClosedForRead) {
                 ensureTrackStillRequested(accountKey, item.trackId)
                 val read = channel.readAvailable(transferBuffer)
                 if (read <= 0) continue
-                output.write(transferBuffer, 0, read)
+                try {
+                    output.write(transferBuffer, 0, read)
+                } catch (error: IOException) {
+                    throw PermanentDownloadException(
+                        error.message ?: "Cannot write local file", DownloadErrorKind.Local,
+                    )
+                }
                 downloadedBytes += read
                 val nowMs = SystemClock.elapsedRealtime()
                 if (nowMs - lastProgressAtMs >= PROGRESS_UPDATE_INTERVAL_MS ||
