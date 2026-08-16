@@ -6,6 +6,9 @@ import info.jukov.player.feature.auth.domain.AuthRepository
 import info.jukov.player.feature.auth.domain.AuthState
 import info.jukov.player.feature.auth.domain.accountKey
 import info.jukov.player.feature.download.domain.DownloadState
+import info.jukov.player.feature.download.domain.DownloadErrorKind
+import info.jukov.player.feature.download.domain.MAX_AUTOMATIC_DOWNLOAD_RETRIES
+import info.jukov.player.feature.download.domain.downloadRetryDelayMs
 import info.jukov.player.feature.download.domain.OfflinePlatform
 import info.jukov.player.feature.download.domain.OfflinePlatformFactory
 import info.jukov.player.subsonic.data.SubsonicApiClient
@@ -18,6 +21,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -280,7 +284,10 @@ class IosOfflinePlatform internal constructor(
         beginCallbackProcessing()
         submitOperation {
             try {
-                markTaskFailed(metadata, error.localizedDescription, task.taskIdentifier)
+                markTaskFailed(
+                    metadata, error.localizedDescription, task.taskIdentifier,
+                    DownloadErrorKind.Network,
+                )
             } finally {
                 endCallbackProcessing()
             }
@@ -308,7 +315,9 @@ class IosOfflinePlatform internal constructor(
             return
         }
         if (!sessionState.session.serverUrl.startsWith("https://", ignoreCase = true)) {
-            dao.failPendingOfflineTracks(accountKey, "HTTPS is required on iOS")
+            dao.failPendingOfflineTracks(
+                accountKey, "HTTPS is required on iOS", DownloadErrorKind.Local.name,
+            )
             return
         }
         val tasks = currentTasks()
@@ -327,6 +336,17 @@ class IosOfflinePlatform internal constructor(
                 it.state != NSURLSessionTaskStateCompleted
         }.mapNotNullTo(hashSetOf()) { it.taskDescription }
         dao.pendingOfflineTracks(accountKey).forEach { item ->
+            val now = Clock.System.now().toEpochMilliseconds()
+            val retryAt = item.nextRetryAtMs
+            if (retryAt != null && retryAt > now) {
+                scope.launch {
+                    delay(retryAt - now)
+                    submitOperation {
+                        schedulePending(accountKey, generation, allowCancelledRetry)
+                    }
+                }
+                return@forEach
+            }
             val description = iosTaskDescription(TASK_TRACK, accountKey, item.trackId)
             if (description !in active) {
                 if (description in cancelledTaskDescriptions.value && !allowCancelledRetry) {
@@ -355,6 +375,7 @@ class IosOfflinePlatform internal constructor(
                 dao.updateOfflineTrackState(
                     accountKey, item.trackId, DownloadState.Downloading.name,
                     0, item.expectedSize, item.relativePath, null, null,
+                    null, item.retryCount, null,
                 )
                 if (currentAccountKey() != accountKey ||
                     !isCurrentDownloadGeneration(generation, currentCancellationGeneration()) ||
@@ -387,7 +408,9 @@ class IosOfflinePlatform internal constructor(
             ?.firstOrNull { it.key.toString().equals("Content-Type", ignoreCase = true) }
             ?.value?.toString()
         if (statusCode !in 200..299 || isApiErrorContentType(contentType)) {
-            markTaskFailed(metadata, "HTTP $statusCode", task.taskIdentifier)
+            markTaskFailed(
+                metadata, "HTTP $statusCode", task.taskIdentifier, DownloadErrorKind.Http,
+            )
             return
         }
         when (metadata.kind) {
@@ -556,6 +579,7 @@ class IosOfflinePlatform internal constructor(
         metadata: IosDownloadTaskMetadata,
         message: String,
         taskIdentifier: ULong,
+        kind: DownloadErrorKind = DownloadErrorKind.Local,
     ) {
         if (!isTaskActive(metadata, taskIdentifier)) {
             return
@@ -564,10 +588,33 @@ class IosOfflinePlatform internal constructor(
         when (metadata.kind) {
             TASK_TRACK -> {
                 val item = dao.offlineTrack(accountKey, metadata.id) ?: return
+                val retryCount = if (kind == DownloadErrorKind.Network) {
+                    item.retryCount + 1
+                } else {
+                    item.retryCount
+                }
+                val retryable = kind == DownloadErrorKind.Network &&
+                    retryCount <= MAX_AUTOMATIC_DOWNLOAD_RETRIES
+                val retryAt = if (retryable) {
+                    Clock.System.now().toEpochMilliseconds() + downloadRetryDelayMs(retryCount)
+                } else {
+                    null
+                }
                 dao.updateOfflineTrackState(
-                    accountKey, metadata.id, DownloadState.Failed.name, item.downloadedBytes,
-                    item.expectedSize, item.relativePath, message, null,
+                    accountKey, metadata.id,
+                    if (retryable) DownloadState.Queued.name else DownloadState.Failed.name,
+                    item.downloadedBytes, item.expectedSize, item.relativePath, message, null,
+                    kind.name, retryCount, retryAt,
                 )
+                if (retryable) {
+                    val generation = currentCancellationGeneration()
+                    scope.launch {
+                        delay(downloadRetryDelayMs(retryCount))
+                        submitOperation {
+                            schedulePending(accountKey, generation, allowCancelledRetry = true)
+                        }
+                    }
+                }
             }
             TASK_ARTWORK -> {
                 val artwork = dao.offlineArtwork(accountKey, metadata.id) ?: return

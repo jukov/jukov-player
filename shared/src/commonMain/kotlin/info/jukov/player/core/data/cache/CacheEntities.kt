@@ -1,6 +1,7 @@
 package info.jukov.player.core.data.cache
 
 import androidx.room3.Entity
+import androidx.room3.ColumnInfo
 import androidx.room3.Index
 import androidx.room3.ForeignKey
 
@@ -104,6 +105,9 @@ data class OfflineTrackEntity(
     val error: String?,
     val requestedAtMs: Long,
     val completedAtMs: Long?,
+    val errorKind: String? = null,
+    @ColumnInfo(defaultValue = "0") val retryCount: Int = 0,
+    val nextRetryAtMs: Long? = null,
 )
 
 @Entity(

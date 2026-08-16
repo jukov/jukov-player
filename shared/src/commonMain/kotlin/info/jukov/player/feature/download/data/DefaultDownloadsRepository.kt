@@ -113,6 +113,25 @@ class DefaultDownloadsRepository(
         }
     }
 
+    override fun observeFailureSummary(): Flow<DownloadFailureSummary> =
+        authRepository.authState.flatMapLatest { state ->
+            val key = (state as? AuthState.LoggedIn)?.session?.accountKey
+                ?: return@flatMapLatest flowOf(DownloadFailureSummary())
+            dao.observeOfflineTracks(key).map { tracks ->
+                val failed = tracks.filter { it.state == DownloadState.Failed.name }
+                DownloadFailureSummary(
+                    count = failed.size,
+                    reasons = failed.groupBy {
+                        DownloadErrorKind.entries.firstOrNull { kind -> kind.name == it.errorKind }
+                            ?: DownloadErrorKind.Unknown
+                    }.flatMap { (kind, items) ->
+                        items.groupBy { it.error.takeIf { detail -> kind == DownloadErrorKind.Http } }
+                            .map { (detail, grouped) -> DownloadFailureReason(kind, detail, grouped.size) }
+                    },
+                )
+            }
+        }
+
     override suspend fun downloadTrack(track: Track) {
         mutations.run {
             val key = accountKey() ?: return@run
@@ -189,6 +208,15 @@ class DefaultDownloadsRepository(
         }
     }
 
+    override suspend fun retryAllFailed() {
+        mutations.run {
+            val key = accountKey() ?: return@run
+            if (dao.retryAllFailedTracks(key) > 0) {
+                platform.enqueue(key)
+            }
+        }
+    }
+
     override suspend fun clearCurrentAccount() {
         mutations.invalidateAndRun {
             val key = accountKey() ?: return@invalidateAndRun
@@ -203,16 +231,95 @@ class DefaultDownloadsRepository(
     override suspend fun reconcile() {
         mutations.run {
             val key = accountKey() ?: return@run
-            val tracks = dao.allOfflineTracks(key)
+            var tracks = dao.allOfflineTracks(key)
+            var ownerships = dao.allDownloadOwnerships(key)
+            val metadataById = dao.tracks(key, ownerships.map { it.trackId }.distinct())
+                .associateBy(TrackEntity::id)
+            val now = Clock.System.now().toEpochMilliseconds()
+            ownerships.forEach { ownership ->
+                if (tracks.none { it.trackId == ownership.trackId }) {
+                    if (metadataById[ownership.trackId] == null) {
+                        dao.deleteDownloadOwnership(
+                            key, ownership.ownerType, ownership.ownerId, ownership.trackId,
+                        )
+                    } else {
+                        dao.upsertOfflineTrack(
+                            OfflineTrackEntity(
+                                key, ownership.trackId, null, null, 0,
+                                DownloadState.Queued.name, null, now, null,
+                            ),
+                        )
+                    }
+                }
+            }
+            tracks = dao.allOfflineTracks(key)
+            ownerships = dao.allDownloadOwnerships(key)
+            tracks.filter { track -> ownerships.none { it.trackId == track.trackId } }
+                .forEach { track ->
+                    dao.upsertDownloadOwnership(
+                        listOf(DownloadOwnershipEntity(key, OWNER_TRACK, track.trackId, track.trackId, 0)),
+                    )
+                }
+            ownerships = dao.allDownloadOwnerships(key)
+            val offlineAlbums = dao.allOfflineAlbums(key).associateBy(OfflineAlbumEntity::albumId)
+            val albums = dao.allAccountAlbums(key).associateBy(AlbumEntity::id)
+            ownerships.filter { it.ownerType == OWNER_ALBUM }.groupBy { it.ownerId }
+                .forEach { (albumId, albumOwnerships) ->
+                    val album = albums[albumId]
+                    if (album == null) {
+                        albumOwnerships.forEach { ownership ->
+                            dao.deleteDownloadOwnership(
+                                key, ownership.ownerType, ownership.ownerId, ownership.trackId,
+                            )
+                        }
+                    } else {
+                        val current = offlineAlbums[albumId]
+                        if (current == null || current.trackCount == 0) {
+                            dao.upsertOfflineAlbum(
+                                OfflineAlbumEntity(
+                                    key, albumId, albumOwnerships.size,
+                                    current?.requestedAtMs ?: now,
+                                ),
+                            )
+                        }
+                    }
+                }
             var hasPending = false
             platform.cleanupStaleParts(key, tracks.mapTo(mutableSetOf()) { it.trackId })
             tracks.forEach { track ->
                 val path = track.relativePath
                 when {
+                    track.state == DownloadState.Failed.name && track.errorKind == null -> {
+                        val kind = when {
+                            track.error?.startsWith("HTTP ") == true -> DownloadErrorKind.Http
+                            track.error == "Authentication required" -> DownloadErrorKind.Authentication
+                            track.error?.contains("file", ignoreCase = true) == true ->
+                                DownloadErrorKind.Local
+                            else -> DownloadErrorKind.Network
+                        }
+                        val retryCount = if (kind == DownloadErrorKind.Network) 1 else track.retryCount
+                        val state = if (kind == DownloadErrorKind.Network) {
+                            hasPending = true
+                            DownloadState.Queued
+                        } else {
+                            DownloadState.Failed
+                        }
+                        dao.updateOfflineTrackState(
+                            key, track.trackId, state.name, track.downloadedBytes,
+                            track.expectedSize, track.relativePath, track.error, null, kind.name,
+                            retryCount,
+                            if (kind == DownloadErrorKind.Network) {
+                                now + downloadRetryDelayMs(retryCount)
+                            } else {
+                                null
+                            },
+                        )
+                    }
                     track.state == DownloadState.Completed.name &&
                         (path == null || !platform.exists(key, path)) -> dao.updateOfflineTrackState(
                             key, track.trackId, DownloadState.Failed.name, 0, track.expectedSize,
-                            null, "Local file is missing", null,
+                            null, "Local file is missing", null, DownloadErrorKind.Local.name,
+                            track.retryCount, null,
                         )
                     track.state == DownloadState.Queued.name || track.state == DownloadState.Downloading.name -> {
                         hasPending = true
@@ -321,6 +428,7 @@ internal class DownloadMutationCoordinator {
 
 private fun OfflineTrackEntity.toStatus() = DownloadStatus(
     DownloadState.valueOf(state), downloadedBytes, expectedSize, error,
+    DownloadErrorKind.entries.firstOrNull { it.name == errorKind }, retryCount,
 )
 
 private fun OfflineTrackEntity.toOfflineTrack(

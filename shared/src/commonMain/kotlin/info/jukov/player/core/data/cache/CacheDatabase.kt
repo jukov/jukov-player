@@ -2,6 +2,7 @@ package info.jukov.player.core.data.cache
 
 import androidx.room3.ConstructedBy
 import androidx.room3.Database
+import androidx.room3.AutoMigration
 import androidx.room3.RoomDatabase
 import androidx.room3.RoomDatabaseConstructor
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
@@ -12,7 +13,8 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
         CacheMetadata::class, OfflineTrackEntity::class, OfflineAlbumEntity::class,
         DownloadOwnershipEntity::class, OfflineArtworkEntity::class,
     ],
-    version = 1,
+    version = 2,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
     exportSchema = true,
 )
 @ConstructedBy(CacheDatabaseConstructor::class)

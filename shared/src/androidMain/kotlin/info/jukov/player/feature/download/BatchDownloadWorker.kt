@@ -18,6 +18,9 @@ import info.jukov.player.feature.auth.domain.AuthSession
 import info.jukov.player.feature.auth.domain.AuthState
 import info.jukov.player.feature.auth.domain.accountKey
 import info.jukov.player.feature.download.domain.DownloadState
+import info.jukov.player.feature.download.domain.DownloadErrorKind
+import info.jukov.player.feature.download.domain.MAX_AUTOMATIC_DOWNLOAD_RETRIES
+import info.jukov.player.feature.download.domain.downloadRetryDelayMs
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
@@ -32,7 +35,6 @@ import jukovplayer.shared.generated.resources.download_notification_progress
 import jukovplayer.shared.generated.resources.download_notification_track_progress
 import jukovplayer.shared.generated.resources.downloads_completed_notification_text
 import jukovplayer.shared.generated.resources.downloads_completed_notification_title
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -112,11 +114,22 @@ class DownloadForegroundService : Service() {
         var completedCount = 0
         val completedBefore = dao.completedOfflineTrackCount(accountKey)
         var batchSize = dao.pendingOfflineTrackCount(accountKey)
+        var scheduledFutureRetry = false
         updateForeground(completedCount, batchSize, null, null)
 
         while (currentCoroutineContext().isActive) {
             Log.d(LOG_TAG, "batch: looking for next track; completed=$completedCount total=$batchSize")
-            val item = dao.nextPendingOfflineTrack(accountKey) ?: break
+            var item = dao.nextPendingOfflineTrack(accountKey, Clock.System.now().toEpochMilliseconds())
+            if (item == null) {
+                val nextRetryAt = dao.nextRetryAt(accountKey, Clock.System.now().toEpochMilliseconds())
+                    ?: break
+                platform.scheduleRecovery(
+                    accountKey,
+                    (nextRetryAt - Clock.System.now().toEpochMilliseconds()).coerceAtLeast(1),
+                )
+                scheduledFutureRetry = true
+                break
+            }
             val trackStartedAtMs = SystemClock.elapsedRealtime()
             trace(item.trackId, trackStartedAtMs, "selected from queue")
             val metadata = dao.track(accountKey, item.trackId)
@@ -137,7 +150,9 @@ class DownloadForegroundService : Service() {
             trace(item.trackId, trackStartedAtMs, "downloadTrack returned; advancing queue")
             completedCount++
         }
-        platform.cancelRecovery(accountKey)
+        if (!scheduledFutureRetry) {
+            platform.cancelRecovery(accountKey)
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         val successfulCount = (dao.completedOfflineTrackCount(accountKey) - completedBefore)
             .coerceAtLeast(0)
@@ -156,11 +171,12 @@ class DownloadForegroundService : Service() {
         batchSize: Int,
         trackStartedAtMs: Long,
     ): TrackResult {
-        repeat(MAX_TRACK_ATTEMPTS) { attempt ->
+        while (true) {
             try {
-                trace(item.trackId, trackStartedAtMs, "attempt ${attempt + 1} started")
+                val current = dao.offlineTrack(accountKey, item.trackId) ?: return TrackResult.Skipped
+                trace(item.trackId, trackStartedAtMs, "attempt ${current.retryCount + 1} started")
                 return downloadTrackAttempt(
-                    accountKey, session, item, trackLabel, completedCount, batchSize,
+                    accountKey, session, current, trackLabel, completedCount, batchSize,
                     trackStartedAtMs,
                 )
             } catch (_: TrackRemovedException) {
@@ -169,21 +185,27 @@ class DownloadForegroundService : Service() {
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: PermanentDownloadException) {
-                markFailure(accountKey, item, error.message.orEmpty())
+                val current = dao.offlineTrack(accountKey, item.trackId)
+                    ?: return TrackResult.Skipped
+                markFailure(accountKey, current, error.message.orEmpty(), error.kind)
                 return TrackResult.Completed
             } catch (error: Throwable) {
                 val message = error.message ?: error::class.simpleName.orEmpty()
-                trace(item.trackId, trackStartedAtMs, "attempt ${attempt + 1} failed: $message")
-                if (attempt == MAX_TRACK_ATTEMPTS - 1) {
-                    markFailure(accountKey, item, message)
+                val current = dao.offlineTrack(accountKey, item.trackId)
+                    ?: return TrackResult.Skipped
+                val retryCount = current.retryCount + 1
+                trace(item.trackId, trackStartedAtMs, "network attempt $retryCount failed: $message")
+                if (retryCount > MAX_AUTOMATIC_DOWNLOAD_RETRIES) {
+                    markFailure(accountKey, current, message, DownloadErrorKind.Network)
                     return TrackResult.Completed
                 }
-                if (!queueForRetry(accountKey, item, message)) return TrackResult.Skipped
-                trace(item.trackId, trackStartedAtMs, "waiting before retry")
-                delay(RETRY_BASE_DELAY_MS * (1L shl attempt))
+                if (!queueForRetry(accountKey, current, message, retryCount)) {
+                    return TrackResult.Skipped
+                }
+                trace(item.trackId, trackStartedAtMs, "queued for network-constrained retry")
+                return TrackResult.Completed
             }
         }
-        return TrackResult.Completed
     }
 
     private suspend fun downloadTrackAttempt(
@@ -236,7 +258,7 @@ class DownloadForegroundService : Service() {
             }
             if (downloaded.bytes == total) break
             if (downloaded.bytes <= offset) {
-                throw RetryableDownloadException("Range response made no progress")
+                throw NetworkDownloadException("Range response made no progress")
             }
             // The server capped this 206 response before the end of the file. Request the next
             // range immediately; this is normal continuation and does not consume a retry attempt.
@@ -265,14 +287,15 @@ class DownloadForegroundService : Service() {
     )
 
     private fun validateTrackResponse(response: HttpResponse) {
-        if (response.status.value >= 500 || response.status == HttpStatusCode.TooManyRequests) {
-            throw RetryableDownloadException("HTTP ${response.status.value}")
-        }
         if (response.status.value !in 200..299) {
-            throw PermanentDownloadException("HTTP ${response.status.value}")
+            throw PermanentDownloadException(
+                "HTTP ${response.status.value}", DownloadErrorKind.Http,
+            )
         }
         if (response.headers[HttpHeaders.ContentType]?.contains("json", ignoreCase = true) == true) {
-            throw PermanentDownloadException("Server returned an API error")
+            throw PermanentDownloadException(
+                "Server returned an API error", DownloadErrorKind.InvalidResponse,
+            )
         }
     }
 
@@ -488,23 +511,30 @@ class DownloadForegroundService : Service() {
         accountKey: String,
         item: OfflineTrackEntity,
         message: String,
+        retryCount: Int,
     ): Boolean {
         val current = dao.offlineTrack(accountKey, item.trackId) ?: return false
         val bytes = platform.trackPartFile(accountKey, item.trackId)
             .takeIf(File::exists)?.length() ?: 0
         updateState(
             accountKey, current, DownloadState.Queued,
-            bytes, current.expectedSize, message, null,
+            bytes, current.expectedSize, message, null, DownloadErrorKind.Network,
+            retryCount, Clock.System.now().toEpochMilliseconds() + downloadRetryDelayMs(retryCount),
         )
         return true
     }
 
-    private suspend fun markFailure(accountKey: String, item: OfflineTrackEntity, message: String) {
+    private suspend fun markFailure(
+        accountKey: String,
+        item: OfflineTrackEntity,
+        message: String,
+        kind: DownloadErrorKind = DownloadErrorKind.Local,
+    ) {
         val downloadedBytes = platform.trackPartFile(accountKey, item.trackId)
             .takeIf(File::exists)?.length() ?: item.downloadedBytes
         updateState(
             accountKey, item, DownloadState.Failed,
-            downloadedBytes, item.expectedSize, message, null,
+            downloadedBytes, item.expectedSize, message, null, kind, item.retryCount, null,
         )
     }
 
@@ -516,10 +546,14 @@ class DownloadForegroundService : Service() {
         expectedSize: Long?,
         error: String?,
         completedAtMs: Long?,
+        errorKind: DownloadErrorKind? = null,
+        retryCount: Int = item.retryCount,
+        nextRetryAtMs: Long? = null,
     ) {
         dao.updateOfflineTrackState(
             accountKey, item.trackId, state.name, downloadedBytes, expectedSize,
             item.relativePath, error, completedAtMs,
+            errorKind?.name, retryCount, nextRetryAtMs,
         )
     }
 
@@ -681,8 +715,11 @@ class DownloadForegroundService : Service() {
 
     private enum class TrackResult { Completed, Skipped }
     private class TrackRemovedException : Exception()
-    private class RetryableDownloadException(message: String) : Exception(message)
-    private class PermanentDownloadException(message: String) : Exception(message)
+    private class NetworkDownloadException(message: String) : Exception(message)
+    private class PermanentDownloadException(
+        message: String,
+        val kind: DownloadErrorKind = DownloadErrorKind.Local,
+    ) : Exception(message)
 
     companion object {
         const val LOG_TAG = "OfflineDownloadTrace"
@@ -693,8 +730,6 @@ class DownloadForegroundService : Service() {
         const val EXTRA_OPEN_DOWNLOADS = "info.jukov.player.OPEN_DOWNLOADS"
         const val ACTION_QUEUE_CHANGED = "info.jukov.player.DOWNLOAD_QUEUE_CHANGED"
         const val ACTION_CANCEL_ALL = "info.jukov.player.CANCEL_ALL_DOWNLOADS"
-        const val MAX_TRACK_ATTEMPTS = 3
-        const val RETRY_BASE_DELAY_MS = 1_000L
         const val PROGRESS_UPDATE_INTERVAL_MS = 100L
         const val ARTWORK_SIZE = 1024
     }

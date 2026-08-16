@@ -28,11 +28,11 @@ class AndroidOfflinePlatform(context: Context) : OfflinePlatform {
         scheduleRecovery(accountKey)
     }
 
-    internal fun scheduleRecovery(accountKey: String) {
+    internal fun scheduleRecovery(accountKey: String, delayMs: Long = 0L) {
         val request = OneTimeWorkRequestBuilder<DownloadRecoveryWorker>()
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setInputData(Data.Builder().putString(KEY_ACCOUNT, accountKey).build())
-            .setInitialDelay(RECOVERY_DELAY_MINUTES, java.util.concurrent.TimeUnit.MINUTES)
+            .setInitialDelay(delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
             .addTag(accountTag(accountKey))
             .build()
         workManager.enqueueUniqueWork(workName(accountKey), ExistingWorkPolicy.REPLACE, request)
@@ -124,7 +124,6 @@ class AndroidOfflinePlatform(context: Context) : OfflinePlatform {
         fun workName(accountKey: String) = "downloads:$accountKey"
         fun accountTag(accountKey: String) = "downloads:$accountKey"
         private const val STALE_PART_AGE_MS = 24 * 60 * 60 * 1_000L
-        private const val RECOVERY_DELAY_MINUTES = 1L
 
         private fun safeComponent(value: String): String = Base64.encodeToString(
             value.encodeToByteArray(),
