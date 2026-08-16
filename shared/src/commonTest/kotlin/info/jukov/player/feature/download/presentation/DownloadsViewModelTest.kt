@@ -1,6 +1,10 @@
 package info.jukov.player.feature.download.presentation
 
 import info.jukov.player.feature.album.domain.Album
+import info.jukov.player.feature.download.domain.DownloadState
+import info.jukov.player.feature.download.domain.DownloadStatus
+import info.jukov.player.feature.download.domain.OfflineAlbum
+import info.jukov.player.feature.download.domain.OfflineTrack
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -40,6 +44,27 @@ class DownloadsViewModelTest {
         viewModel.playWhenDownloaded(listOf(track("track")), 0) { _, _ -> played = true }
         advanceUntilIdle()
 
+        assertEquals(false, played)
+    }
+
+    @Test
+    fun albumWithMissingDownloadJobIsDownloadedInsteadOfPartiallyPlayed() = runTest {
+        kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val repository = RecordingDownloadsRepository()
+        val viewModel = DownloadsViewModel(repository)
+        val album = OfflineAlbum(
+            album = album("album"),
+            tracks = listOf(
+                OfflineTrack(track("track"), DownloadStatus(DownloadState.Completed)),
+            ),
+            expectedTrackCount = 2,
+        )
+        var played = false
+
+        viewModel.playAlbumWhenDownloaded(album) { _, _ -> played = true }
+        advanceUntilIdle()
+
+        assertEquals(listOf(album.album), repository.downloadedAlbums)
         assertEquals(false, played)
     }
 

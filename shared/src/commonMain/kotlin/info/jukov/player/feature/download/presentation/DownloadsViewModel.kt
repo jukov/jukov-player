@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import info.jukov.player.feature.download.domain.OfflineTrack
+import info.jukov.player.feature.download.domain.OfflineAlbum
 import info.jukov.player.feature.track.domain.Track
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.core.domain.DownloadAlbumSortCriterion
@@ -82,9 +83,15 @@ class DownloadsViewModel(
                 onPlay(tracks, index)
             }
         }
-    fun playAlbumWhenDownloaded(tracks: List<Track>, onPlay: (List<Track>, Int) -> Unit) =
+    fun playAlbumWhenDownloaded(
+        album: OfflineAlbum,
+        onPlay: (List<Track>, Int) -> Unit,
+    ) =
         viewModelScope.launch {
-            if (repository.ensureDownloaded(tracks)) {
+            val tracks = album.tracks.map { it.track }
+            if (tracks.size != album.expectedTrackCount) {
+                repository.downloadAlbum(album.album)
+            } else if (repository.ensureDownloaded(tracks)) {
                 onPlay(tracks, 0)
             }
         }

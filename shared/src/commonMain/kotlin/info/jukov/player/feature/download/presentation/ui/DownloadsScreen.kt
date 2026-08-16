@@ -246,7 +246,7 @@ fun DownloadsScreen(
                                                 onActiveTrackClick()
                                             } else if (album.tracks.isNotEmpty()) {
                                                 viewModel.playAlbumWhenDownloaded(
-                                                    album.tracks.map { it.track },
+                                                    album,
                                                     onPlayClick,
                                                 )
                                             }
