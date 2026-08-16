@@ -12,7 +12,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,20 +21,13 @@ import info.jukov.player.core.presentation.ui.AndroidArtworkPaletteExtractor
 import info.jukov.player.core.presentation.ui.LocalArtworkPaletteExtractor
 import info.jukov.player.feature.download.DownloadForegroundService
 import info.jukov.player.feature.playback.PlaybackNotificationIntent
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var openDownloads by mutableStateOf(false)
     private var openPlayerRequest by mutableStateOf(0L)
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) {
-            lifecycleScope.launch {
-                (application as JukovApplication).graph.downloadsRepository.reconcile()
-            }
-        }
-    }
+    ) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

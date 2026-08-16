@@ -6,8 +6,20 @@ import info.jukov.player.core.data.cache.OfflineTrackEntity
 import info.jukov.player.feature.download.domain.DownloadState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class AlbumDownloadReconciliationTest {
+    @Test
+    fun zeroTrackLegacyAlbumNeedsServerRepair() {
+        assertTrue(
+            albumNeedsDownloadRepair(
+                album = OfflineAlbumEntity(ACCOUNT, ALBUM, 0, 123),
+                downloads = emptyList(),
+                ownerships = emptyList(),
+            ),
+        )
+    }
+
     @Test
     fun createsMissingJobsAndOwnershipsForCompleteAlbumMetadata() {
         val repairs = missingAlbumDownloadRecords(

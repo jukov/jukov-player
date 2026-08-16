@@ -3,6 +3,7 @@ package info.jukov.player.feature.download
 import android.content.Context
 import android.content.Intent
 import android.util.Base64
+import android.util.Log
 import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
@@ -18,10 +19,15 @@ class AndroidOfflinePlatform(context: Context) : OfflinePlatform {
     private val workManager = WorkManager.getInstance(appContext)
 
     override fun enqueue(accountKey: String) {
-        appContext.startForegroundService(
-            downloadServiceIntent(accountKey).setAction(DownloadForegroundService.ACTION_QUEUE_CHANGED),
-        )
         scheduleRecovery(accountKey)
+        try {
+            appContext.startForegroundService(
+                downloadServiceIntent(accountKey)
+                    .setAction(DownloadForegroundService.ACTION_QUEUE_CHANGED),
+            )
+        } catch (error: IllegalStateException) {
+            Log.w(LOG_TAG, "Foreground download start deferred to WorkManager", error)
+        }
     }
 
     override fun recover(accountKey: String) {
@@ -120,6 +126,7 @@ class AndroidOfflinePlatform(context: Context) : OfflinePlatform {
             .putExtra(KEY_ACCOUNT, accountKey)
 
     companion object {
+        private const val LOG_TAG = "AndroidOfflinePlatform"
         const val KEY_ACCOUNT = "accountKey"
         fun workName(accountKey: String) = "downloads:$accountKey"
         fun accountTag(accountKey: String) = "downloads:$accountKey"

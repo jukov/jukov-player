@@ -274,12 +274,19 @@ class DefaultDownloadsRepository(
                 } catch (_: Throwable) {
                     emptyList()
                 }
-                if (metadataTracks.size != album.trackCount) {
+                if (metadataTracks.isEmpty()) {
                     emptyList()
                 } else {
+                    val repairedAlbum = if (metadataTracks.size != album.trackCount) {
+                        album.copy(trackCount = metadataTracks.size).also {
+                            dao.upsertOfflineAlbum(it)
+                        }
+                    } else {
+                        album
+                    }
                     dao.upsertTracks(metadataTracks.map { it.toEntity(key) })
                     missingAlbumDownloadRecords(
-                        album = album,
+                        album = repairedAlbum,
                         orderedTrackIds = metadataTracks.map(Track::id),
                         downloads = initialDownloads,
                         ownerships = ownerships,
@@ -451,7 +458,8 @@ internal fun albumNeedsDownloadRepair(
     val ownedTrackIds = ownerships.asSequence()
         .filter { it.ownerType == "album" && it.ownerId == album.albumId }
         .mapTo(hashSetOf(), DownloadOwnershipEntity::trackId)
-    return ownedTrackIds.size != album.trackCount || ownedTrackIds.any { it !in downloadIds }
+    return album.trackCount <= 0 || ownedTrackIds.size != album.trackCount ||
+        ownedTrackIds.any { it !in downloadIds }
 }
 
 internal class DownloadMutationCoordinator {
