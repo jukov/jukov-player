@@ -1,5 +1,6 @@
 TEAM_ID=
 APP_BUNDLE_IDENTIFIER=info.jukov.player.Jukovplayer
+APP_DISPLAY_NAME=the only player
 // Define TEAM_ID in the gitignored Local.xcconfig for device signing. Developers
 // from another Apple team can also override APP_BUNDLE_IDENTIFIER there; Firebase
 // Crashlytics is enabled only for the registered default bundle identifier.

@@ -10,7 +10,7 @@
 		<string>ru</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>the only player</string>
+	<string>$(APP_DISPLAY_NAME)</string>
 	<key>CFBundleName</key>
 	<string>the only player</string>
 	<key>NSLocalNetworkUsageDescription</key>
