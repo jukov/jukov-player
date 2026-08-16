@@ -55,6 +55,15 @@ interface CacheDao {
     @Query("SELECT * FROM DownloadOwnershipEntity WHERE accountKey=:accountKey")
     fun observeDownloadOwnerships(accountKey: String): Flow<List<DownloadOwnershipEntity>>
 
+    @Query("SELECT * FROM DownloadOwnershipEntity WHERE accountKey=:accountKey")
+    suspend fun allDownloadOwnerships(accountKey: String): List<DownloadOwnershipEntity>
+
+    @Query("SELECT * FROM OfflineAlbumEntity WHERE accountKey=:accountKey")
+    suspend fun allOfflineAlbums(accountKey: String): List<OfflineAlbumEntity>
+
+    @Query("SELECT * FROM AlbumEntity WHERE accountKey=:accountKey")
+    suspend fun allAccountAlbums(accountKey: String): List<AlbumEntity>
+
     @Query("SELECT * FROM OfflineArtworkEntity WHERE accountKey=:accountKey")
     fun observeOfflineArtworks(accountKey: String): Flow<List<OfflineArtworkEntity>>
 
@@ -85,8 +94,12 @@ interface CacheDao {
     @Query("SELECT COUNT(*) FROM OfflineTrackEntity WHERE accountKey=:accountKey AND state='Completed'")
     suspend fun completedOfflineTrackCount(accountKey: String): Int
 
-    @Query("UPDATE OfflineTrackEntity SET state='Failed', error=:message WHERE accountKey=:accountKey AND state IN ('Queued','Downloading')")
-    suspend fun failPendingOfflineTracks(accountKey: String, message: String)
+    @Query("UPDATE OfflineTrackEntity SET state='Failed', error=:message, errorKind=:errorKind, nextRetryAtMs=NULL WHERE accountKey=:accountKey AND state IN ('Queued','Downloading')")
+    suspend fun failPendingOfflineTracks(
+        accountKey: String,
+        message: String,
+        errorKind: String = "Authentication",
+    )
 
     @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey")
     suspend fun allOfflineTracks(accountKey: String): List<OfflineTrackEntity>
@@ -94,8 +107,11 @@ interface CacheDao {
     @Query("SELECT t.* FROM OfflineTrackEntity t JOIN DownloadOwnershipEntity o ON t.accountKey=o.accountKey AND t.trackId=o.trackId WHERE o.accountKey=:accountKey AND o.ownerType='album' AND o.ownerId=:albumId ORDER BY o.position")
     suspend fun offlineAlbumTracks(accountKey: String, albumId: String): List<OfflineTrackEntity>
 
-    @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND state IN ('Queued','Downloading') ORDER BY requestedAtMs, trackId LIMIT 1")
-    suspend fun nextPendingOfflineTrack(accountKey: String): OfflineTrackEntity?
+    @Query("SELECT * FROM OfflineTrackEntity WHERE accountKey=:accountKey AND state IN ('Queued','Downloading') AND (nextRetryAtMs IS NULL OR nextRetryAtMs<=:nowMs) ORDER BY requestedAtMs, trackId LIMIT 1")
+    suspend fun nextPendingOfflineTrack(accountKey: String, nowMs: Long): OfflineTrackEntity?
+
+    @Query("SELECT MIN(nextRetryAtMs) FROM OfflineTrackEntity WHERE accountKey=:accountKey AND state='Queued' AND nextRetryAtMs>:nowMs")
+    suspend fun nextRetryAt(accountKey: String, nowMs: Long): Long?
 
     @Query("SELECT COUNT(*) FROM DownloadOwnershipEntity WHERE accountKey=:accountKey AND trackId=:trackId")
     suspend fun ownershipCount(accountKey: String, trackId: String): Int
@@ -117,8 +133,14 @@ interface CacheDao {
         return true
     }
 
-    @Query("UPDATE OfflineTrackEntity SET state=:state, downloadedBytes=:downloadedBytes, expectedSize=:expectedSize, relativePath=:relativePath, error=:error, completedAtMs=:completedAtMs WHERE accountKey=:accountKey AND trackId=:trackId")
-    suspend fun updateOfflineTrackState(accountKey: String, trackId: String, state: String, downloadedBytes: Long, expectedSize: Long?, relativePath: String?, error: String?, completedAtMs: Long?)
+    @Query("UPDATE OfflineTrackEntity SET state=:state, downloadedBytes=:downloadedBytes, expectedSize=:expectedSize, relativePath=:relativePath, error=:error, completedAtMs=:completedAtMs, errorKind=:errorKind, retryCount=:retryCount, nextRetryAtMs=:nextRetryAtMs WHERE accountKey=:accountKey AND trackId=:trackId")
+    suspend fun updateOfflineTrackState(accountKey: String, trackId: String, state: String, downloadedBytes: Long, expectedSize: Long?, relativePath: String?, error: String?, completedAtMs: Long?, errorKind: String? = null, retryCount: Int = 0, nextRetryAtMs: Long? = null)
+
+    @Query("UPDATE OfflineTrackEntity SET state='Queued', error=NULL, errorKind=NULL, retryCount=0, nextRetryAtMs=NULL, completedAtMs=NULL WHERE accountKey=:accountKey AND state='Failed'")
+    suspend fun retryAllFailedTracks(accountKey: String): Int
+
+    @Query("DELETE FROM DownloadOwnershipEntity WHERE accountKey=:accountKey AND ownerType=:ownerType AND ownerId=:ownerId AND trackId=:trackId")
+    suspend fun deleteDownloadOwnership(accountKey: String, ownerType: String, ownerId: String, trackId: String)
 
     @Query("UPDATE OfflineTrackEntity SET state='Downloading', downloadedBytes=MAX(downloadedBytes, :downloadedBytes), expectedSize=COALESCE(:expectedSize, expectedSize), error=NULL, completedAtMs=NULL WHERE accountKey=:accountKey AND trackId=:trackId AND state IN ('Queued','Downloading')")
     suspend fun updateOfflineTrackProgress(

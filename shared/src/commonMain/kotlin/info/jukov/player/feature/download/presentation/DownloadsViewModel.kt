@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import info.jukov.player.core.domain.LoadableState
 import info.jukov.player.feature.download.domain.DownloadState
 import info.jukov.player.feature.download.domain.DownloadsRepository
+import info.jukov.player.feature.download.domain.DownloadFailureSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -42,6 +43,8 @@ class DownloadsViewModel(
     val trackSort = _trackSort.asStateFlow()
     private val _albumSort = MutableStateFlow(sortPreferences.downloadAlbums)
     val albumSort = _albumSort.asStateFlow()
+    private val _failureSummary = MutableStateFlow(DownloadFailureSummary())
+    val failureSummary = _failureSummary.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -49,6 +52,11 @@ class DownloadsViewModel(
                 .flatMapLatest { (active, query) ->
                     if (active && query.isNotBlank()) repository.searchLibrary(query) else repository.observeLibrary()
                 }.collect { library -> _state.value = LoadableState.Content(library.sorted()) }
+        }
+        viewModelScope.launch {
+            repository.observeFailureSummary().collect { summary ->
+                _failureSummary.value = summary
+            }
         }
     }
 
@@ -76,6 +84,7 @@ class DownloadsViewModel(
     }
     fun removeAll() = viewModelScope.launch { repository.clearCurrentAccount() }
     fun retryTrack(id: String) = viewModelScope.launch { repository.retryTrack(id) }
+    fun retryAllFailed() = viewModelScope.launch { repository.retryAllFailed() }
     fun albumTracks(id: String): Flow<List<OfflineTrack>> = repository.observeAlbumTracks(id)
 
     private fun info.jukov.player.feature.download.domain.OfflineLibrary.sorted() = copy(

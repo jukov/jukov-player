@@ -1206,7 +1206,14 @@ private fun DownloadBadge(status: DownloadStatus?, modifier: Modifier = Modifier
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
-        else -> Unit
+        DownloadState.Failed -> DownloadStatusBadgeContainer(modifier) {
+            Text(
+                "!",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        null -> Unit
     }
 }
 

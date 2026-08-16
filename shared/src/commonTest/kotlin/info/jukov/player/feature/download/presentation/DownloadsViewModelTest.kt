@@ -31,6 +31,23 @@ class DownloadsViewModelTest {
         assertEquals(listOf("first", "second"), downloadsRepository.cancelledAlbumIds)
     }
 
+    @Test
+    fun retryAllDelegatesToRepository() = runTest {
+        kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val repository = RecordingDownloadsRepository()
+        val viewModel = DownloadsViewModel(
+            repository,
+            info.jukov.player.core.domain.SettingsSortPreferences(
+                com.russhwolf.settings.MapSettings(),
+            ),
+        )
+
+        viewModel.retryAllFailed()
+        advanceUntilIdle()
+
+        assertEquals(true, repository.retriedAll)
+    }
+
     private fun album(id: String) = Album(
         id = id,
         name = "Album $id",

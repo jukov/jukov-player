@@ -66,6 +66,7 @@ fun DownloadsScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val trackSort by viewModel.trackSort.collectAsStateWithLifecycle()
     val albumSort by viewModel.albumSort.collectAsStateWithLifecycle()
+    val failureSummary by viewModel.failureSummary.collectAsStateWithLifecycle()
     var confirmRemoveAll by remember { mutableStateOf(false) }
     val library = state.content ?: remember { OfflineLibrary() }
     val tracks = remember(library.tracks) { library.tracks.map { it.track } }
@@ -199,7 +200,11 @@ fun DownloadsScreen(
             }
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (failureSummary.count > 0) {
+                DownloadFailureBanner(failureSummary, viewModel::retryAllFailed)
+            }
+            Box(Modifier.fillMaxSize().weight(1f)) {
             if (state is LoadableState.Loading && state.content == null) {
                 LoadingIndicator(Modifier.align(Alignment.Center).size(96.dp))
             } else {
@@ -264,6 +269,7 @@ fun DownloadsScreen(
                     }
                 }
             }
+            }
         }
     }
     if (confirmRemoveAll) {
@@ -288,6 +294,51 @@ fun DownloadsScreen(
             },
         )
     }
+}
+
+@Composable
+private fun DownloadFailureBanner(
+    summary: DownloadFailureSummary,
+    onRetry: () -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.errorContainer) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(Res.string.failed_downloads, summary.count),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                summary.reasons.forEach { reason ->
+                    Text(
+                        downloadFailureReason(reason),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
+            }
+            TextButton(onClick = onRetry) { Text(stringResource(Res.string.retry)) }
+        }
+    }
+}
+
+@Composable
+private fun downloadFailureReason(reason: DownloadFailureReason): String = when (reason.kind) {
+    DownloadErrorKind.Http -> stringResource(
+        Res.string.download_error_http, reason.detail ?: "HTTP", reason.count,
+    )
+    DownloadErrorKind.Network -> stringResource(Res.string.download_error_network, reason.count)
+    DownloadErrorKind.Local -> stringResource(Res.string.download_error_local, reason.count)
+    DownloadErrorKind.Authentication -> stringResource(
+        Res.string.download_error_authentication, reason.count,
+    )
+    DownloadErrorKind.InvalidResponse -> stringResource(
+        Res.string.download_error_invalid_response, reason.count,
+    )
+    DownloadErrorKind.Unknown -> stringResource(Res.string.download_error_unknown, reason.count)
 }
 
 @Composable

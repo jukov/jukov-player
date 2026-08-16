@@ -2,6 +2,7 @@ package info.jukov.player.feature.download.presentation
 
 import info.jukov.player.feature.album.domain.Album
 import info.jukov.player.feature.download.domain.DownloadStatus
+import info.jukov.player.feature.download.domain.DownloadFailureSummary
 import info.jukov.player.feature.download.domain.DownloadsRepository
 import info.jukov.player.feature.download.domain.OfflineLibrary
 import info.jukov.player.feature.download.domain.OfflineTrack
@@ -21,11 +22,14 @@ internal class RecordingDownloadsRepository(
     val downloadedTracks = mutableListOf<Track>()
     val cancelledAlbumIds = mutableListOf<String>()
     val cancelledTrackIds = mutableListOf<String>()
+    var retriedAll = false
 
     override fun observeLibrary(): Flow<OfflineLibrary> = libraryFlow
     override fun searchLibrary(query: String): Flow<OfflineLibrary> = libraryFlow
     override fun observeTrackStatuses(): Flow<Map<String, DownloadStatus>> = flowOf(emptyMap())
     override fun observeAlbumTracks(albumId: String): Flow<List<OfflineTrack>> = emptyFlow()
+    override fun observeFailureSummary(): Flow<DownloadFailureSummary> =
+        flowOf(DownloadFailureSummary())
     override suspend fun downloadTrack(track: Track) {
         downloadedTracks += track
         onDownloadTrack(track)
@@ -42,6 +46,7 @@ internal class RecordingDownloadsRepository(
         cancelledAlbumIds += albumId
     }
     override suspend fun retryTrack(trackId: String) = Unit
+    override suspend fun retryAllFailed() { retriedAll = true }
     override suspend fun clearCurrentAccount() = Unit
     override suspend fun reconcile() = Unit
     override suspend fun localTrackUri(trackId: String): String? = null
