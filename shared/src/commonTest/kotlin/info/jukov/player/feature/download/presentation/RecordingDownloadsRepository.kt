@@ -29,6 +29,7 @@ internal class RecordingDownloadsRepository(
     )
     val downloadedAlbums = mutableListOf<Album>()
     val downloadedTracks = mutableListOf<Track>()
+    val requeuedTracks = mutableListOf<Track>()
     val cancelledAlbumIds = mutableListOf<String>()
     val cancelledTrackIds = mutableListOf<String>()
 
@@ -40,6 +41,9 @@ internal class RecordingDownloadsRepository(
     override suspend fun downloadTrack(track: Track) {
         downloadedTracks += track
         onDownloadTrack(track)
+    }
+    override suspend fun requeueTrack(track: Track) {
+        requeuedTracks += track
     }
     override suspend fun downloadAlbum(album: Album) {
         downloadedAlbums += album

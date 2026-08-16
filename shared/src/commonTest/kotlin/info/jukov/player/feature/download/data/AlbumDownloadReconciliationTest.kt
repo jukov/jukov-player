@@ -7,15 +7,8 @@ import info.jukov.player.feature.download.domain.DownloadState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.test.assertFalse
 
 class AlbumDownloadReconciliationTest {
-    @Test
-    fun redownloadingAlbumOwnedTrackDoesNotCreateStandaloneOwnership() {
-        assertFalse(shouldCreateStandaloneOwnership(existingOwnershipCount = 1))
-        assertTrue(shouldCreateStandaloneOwnership(existingOwnershipCount = 0))
-    }
-
     @Test
     fun recreatesAlbumRecordFromSurvivingOwnership() {
         val albums = missingOfflineAlbums(

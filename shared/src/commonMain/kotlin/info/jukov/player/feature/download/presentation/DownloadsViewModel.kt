@@ -87,7 +87,7 @@ class DownloadsViewModel(
             if (repository.localTrackUri(track.id) != null) {
                 onPlay(tracks, index)
             } else {
-                repository.downloadTrack(track)
+                repository.requeueTrack(track)
             }
         }
     fun playOrDownloadAlbum(

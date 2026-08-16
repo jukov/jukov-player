@@ -48,7 +48,8 @@ class DownloadsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(false, played)
-        assertEquals(listOf(selected), repository.downloadedTracks)
+        assertEquals(listOf(selected), repository.requeuedTracks)
+        assertEquals(emptyList(), repository.downloadedTracks)
     }
 
     @Test

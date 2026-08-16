@@ -25,6 +25,7 @@ interface DownloadsRepository : LocalMediaResolver, PersistentArtworkResolver {
     fun observeAlbumStatuses(): Flow<Map<String, DownloadStatus>>
     fun observeAlbumTracks(albumId: String): Flow<List<OfflineTrack>>
     suspend fun downloadTrack(track: Track)
+    suspend fun requeueTrack(track: Track)
     suspend fun downloadAlbum(album: Album)
     suspend fun cancelTrack(trackId: String)
     suspend fun removeTracks(trackIds: List<String>)
