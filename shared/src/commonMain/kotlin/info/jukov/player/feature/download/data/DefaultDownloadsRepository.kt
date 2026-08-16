@@ -138,7 +138,11 @@ class DefaultDownloadsRepository(
     override suspend fun downloadTrack(track: Track) {
         mutations.run {
             val key = accountKey() ?: return@run
-            storeTrack(key, track, OWNER_TRACK, track.id, position = 0)
+            if (shouldCreateStandaloneOwnership(dao.ownershipCount(key, track.id))) {
+                storeTrack(key, track, OWNER_TRACK, track.id, position = 0)
+            } else {
+                storeDownload(key, track)
+            }
             queueMissingTrack(key, track.id)
             platform.enqueue(key)
         }
@@ -387,6 +391,13 @@ class DefaultDownloadsRepository(
         ownerId: String,
         position: Int,
     ) {
+        storeDownload(key, track)
+        dao.upsertDownloadOwnership(
+            listOf(DownloadOwnershipEntity(key, ownerType, ownerId, track.id, position)),
+        )
+    }
+
+    private suspend fun storeDownload(key: String, track: Track) {
         val existing = dao.offlineTrack(key, track.id)
         dao.upsertOfflineTrack(
             OfflineTrackEntity(
@@ -400,9 +411,6 @@ class DefaultDownloadsRepository(
                 existing?.requestedAtMs ?: Clock.System.now().toEpochMilliseconds(),
                 existing?.completedAtMs,
             ),
-        )
-        dao.upsertDownloadOwnership(
-            listOf(DownloadOwnershipEntity(key, ownerType, ownerId, track.id, position)),
         )
     }
 
@@ -437,6 +445,9 @@ internal data class AlbumDownloadRepair(
     val createDownload: Boolean,
     val createOwnership: Boolean,
 )
+
+internal fun shouldCreateStandaloneOwnership(existingOwnershipCount: Int): Boolean =
+    existingOwnershipCount == 0
 
 internal data class StandaloneDownloadRepair(
     val trackId: String,
