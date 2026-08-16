@@ -10,6 +10,62 @@ import kotlin.test.assertTrue
 
 class AlbumDownloadReconciliationTest {
     @Test
+    fun recreatesAlbumRecordFromSurvivingOwnership() {
+        val albums = missingOfflineAlbums(
+            accountKey = ACCOUNT,
+            albums = emptyList(),
+            ownerships = listOf(ownership("track", position = 0)),
+            requestedAtMs = 456,
+        )
+
+        assertEquals(
+            listOf(OfflineAlbumEntity(ACCOUNT, ALBUM, 0, 456)),
+            albums,
+        )
+    }
+
+    @Test
+    fun recreatesStandaloneJobFromSurvivingOwnership() {
+        val repairs = missingStandaloneDownloadRecords(
+            downloads = emptyList(),
+            ownerships = listOf(
+                DownloadOwnershipEntity(ACCOUNT, "track", "track", "track", 0),
+            ),
+            requestedAtMs = 456,
+        )
+
+        assertEquals(
+            listOf(StandaloneDownloadRepair("track", 456, true, false)),
+            repairs,
+        )
+    }
+
+    @Test
+    fun recreatesStandaloneOwnershipForOrphanedDownloadJob() {
+        val repairs = missingStandaloneDownloadRecords(
+            downloads = listOf(download("track")),
+            ownerships = emptyList(),
+            requestedAtMs = 456,
+        )
+
+        assertEquals(
+            listOf(StandaloneDownloadRepair("track", 123, false, true)),
+            repairs,
+        )
+    }
+
+    @Test
+    fun albumOwnershipPreventsStandaloneOwnershipFromBeingInvented() {
+        val repairs = missingStandaloneDownloadRecords(
+            downloads = listOf(download("track")),
+            ownerships = listOf(ownership("track", position = 0)),
+            requestedAtMs = 456,
+        )
+
+        assertEquals(emptyList(), repairs)
+    }
+
+    @Test
     fun zeroTrackLegacyAlbumNeedsServerRepair() {
         assertTrue(
             albumNeedsDownloadRepair(

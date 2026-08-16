@@ -139,6 +139,7 @@ class DefaultDownloadsRepository(
         mutations.run {
             val key = accountKey() ?: return@run
             storeTrack(key, track, OWNER_TRACK, track.id, position = 0)
+            queueMissingTrack(key, track.id)
             platform.enqueue(key)
         }
     }
@@ -159,44 +160,10 @@ class DefaultDownloadsRepository(
             )
             tracks.forEachIndexed { index, track ->
                 storeTrack(session.accountKey, track, OWNER_ALBUM, album.id, index)
+                queueMissingTrack(session.accountKey, track.id)
             }
             platform.enqueue(session.accountKey)
         }
-    }
-
-    override suspend fun ensureDownloaded(tracks: List<Track>): Boolean = mutations.run {
-        val key = accountKey() ?: return@run false
-        if (tracks.isEmpty()) {
-            return@run false
-        }
-        var allDownloaded = true
-        tracks.forEach { track ->
-            val download = dao.offlineTrack(key, track.id)
-            val path = download?.relativePath
-            if (download != null && path != null && platform.exists(key, path)) {
-                if (download.state != DownloadState.Completed.name) {
-                    dao.updateOfflineTrackState(
-                        key, track.id, DownloadState.Completed.name,
-                        download.downloadedBytes, download.expectedSize, path, null,
-                        download.completedAtMs ?: Clock.System.now().toEpochMilliseconds(),
-                    )
-                }
-            } else {
-                allDownloaded = false
-                if (download == null) {
-                    storeTrack(key, track, OWNER_TRACK, track.id, position = 0)
-                }
-                val stored = download ?: dao.offlineTrack(key, track.id) ?: return@forEach
-                dao.updateOfflineTrackState(
-                    key, track.id, DownloadState.Queued.name, 0, stored.expectedSize,
-                    null, null, null,
-                )
-            }
-        }
-        if (!allDownloaded) {
-            platform.enqueue(key)
-        }
-        allDownloaded
     }
 
     override suspend fun cancelTrack(trackId: String) {
@@ -264,7 +231,45 @@ class DefaultDownloadsRepository(
             val albums = dao.allOfflineAlbums(key)
             val initialDownloads = dao.allOfflineTracks(key)
             val ownerships = dao.downloadOwnerships(key)
-            val repairs = albums.filter { album ->
+            val requestedAtMs = Clock.System.now().toEpochMilliseconds()
+            val standaloneRepairs = missingStandaloneDownloadRecords(
+                downloads = initialDownloads,
+                ownerships = ownerships,
+                requestedAtMs = requestedAtMs,
+            )
+            standaloneRepairs.forEach { repair ->
+                if (repair.createDownload) {
+                    dao.upsertOfflineTrack(
+                        OfflineTrackEntity(
+                            accountKey = key,
+                            trackId = repair.trackId,
+                            relativePath = null,
+                            expectedSize = null,
+                            downloadedBytes = 0,
+                            state = DownloadState.Queued.name,
+                            error = null,
+                            requestedAtMs = repair.requestedAtMs,
+                            completedAtMs = null,
+                        ),
+                    )
+                }
+                if (repair.createOwnership) {
+                    dao.upsertDownloadOwnership(
+                        listOf(
+                            DownloadOwnershipEntity(
+                                key, OWNER_TRACK, repair.trackId, repair.trackId, position = 0,
+                            ),
+                        ),
+                    )
+                }
+            }
+            val albumsToReconcile = albums + missingOfflineAlbums(
+                accountKey = key,
+                albums = albums,
+                ownerships = ownerships,
+                requestedAtMs = requestedAtMs,
+            )
+            val albumRepairs = albumsToReconcile.filter { album ->
                 albumNeedsDownloadRepair(album, initialDownloads, ownerships)
             }.flatMap { album ->
                 val metadataTracks = try {
@@ -293,7 +298,7 @@ class DefaultDownloadsRepository(
                     )
                 }
             }
-            repairs.forEach { repair ->
+            albumRepairs.forEach { repair ->
                 if (repair.createDownload) {
                     dao.upsertOfflineTrack(
                         OfflineTrackEntity(
@@ -335,7 +340,8 @@ class DefaultDownloadsRepository(
                     }
                 }
             }
-            if (repairs.isNotEmpty()) {
+            val repairedRecords = standaloneRepairs.isNotEmpty() || albumRepairs.isNotEmpty()
+            if (repairedRecords && hasPending) {
                 platform.enqueue(key)
             } else if (hasPending) {
                 platform.recover(key)
@@ -400,6 +406,20 @@ class DefaultDownloadsRepository(
         )
     }
 
+    private suspend fun queueMissingTrack(key: String, trackId: String) {
+        val download = dao.offlineTrack(key, trackId) ?: return
+        val path = download.relativePath
+        if (download.state == DownloadState.Completed.name && path != null &&
+            platform.exists(key, path)
+        ) {
+            return
+        }
+        dao.updateOfflineTrackState(
+            key, trackId, DownloadState.Queued.name, 0, download.expectedSize,
+            null, null, null,
+        )
+    }
+
     private fun session() = (authRepository.authState.value as? AuthState.LoggedIn)?.session
     private fun accountKey() = session()?.accountKey
 
@@ -417,6 +437,65 @@ internal data class AlbumDownloadRepair(
     val createDownload: Boolean,
     val createOwnership: Boolean,
 )
+
+internal data class StandaloneDownloadRepair(
+    val trackId: String,
+    val requestedAtMs: Long,
+    val createDownload: Boolean,
+    val createOwnership: Boolean,
+)
+
+internal fun missingStandaloneDownloadRecords(
+    downloads: List<OfflineTrackEntity>,
+    ownerships: List<DownloadOwnershipEntity>,
+    requestedAtMs: Long,
+): List<StandaloneDownloadRepair> {
+    val downloadsByTrackId = downloads.associateBy(OfflineTrackEntity::trackId)
+    val ownershipsByTrackId = ownerships.groupBy(DownloadOwnershipEntity::trackId)
+    val missingDownloads = ownerships.asSequence()
+        .filter { it.ownerType == "track" && it.trackId !in downloadsByTrackId }
+        .distinctBy(DownloadOwnershipEntity::trackId)
+        .map { ownership ->
+            StandaloneDownloadRepair(
+                trackId = ownership.trackId,
+                requestedAtMs = requestedAtMs,
+                createDownload = true,
+                createOwnership = false,
+            )
+        }
+    val missingOwnerships = downloads.asSequence()
+        .filter { ownershipsByTrackId[it.trackId].isNullOrEmpty() }
+        .map { download ->
+            StandaloneDownloadRepair(
+                trackId = download.trackId,
+                requestedAtMs = download.requestedAtMs,
+                createDownload = false,
+                createOwnership = true,
+            )
+        }
+    return (missingDownloads + missingOwnerships).toList()
+}
+
+internal fun missingOfflineAlbums(
+    accountKey: String,
+    albums: List<OfflineAlbumEntity>,
+    ownerships: List<DownloadOwnershipEntity>,
+    requestedAtMs: Long,
+): List<OfflineAlbumEntity> {
+    val albumIds = albums.mapTo(hashSetOf(), OfflineAlbumEntity::albumId)
+    return ownerships.asSequence()
+        .filter { it.ownerType == "album" && it.ownerId !in albumIds }
+        .distinctBy(DownloadOwnershipEntity::ownerId)
+        .map { ownership ->
+            OfflineAlbumEntity(
+                accountKey = accountKey,
+                albumId = ownership.ownerId,
+                trackCount = 0,
+                requestedAtMs = requestedAtMs,
+            )
+        }
+        .toList()
+}
 
 internal fun missingAlbumDownloadRecords(
     album: OfflineAlbumEntity,

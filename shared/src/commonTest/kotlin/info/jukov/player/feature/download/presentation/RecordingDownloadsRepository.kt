@@ -17,7 +17,8 @@ internal class RecordingDownloadsRepository(
     albumStatuses: Map<String, DownloadStatus>? = null,
     private val onDownloadTrack: suspend (Track) -> Unit = {},
     private val onDownloadAlbum: suspend (Album) -> Unit = {},
-    private val onEnsureDownloaded: suspend (List<Track>) -> Boolean = { true },
+    private val onLocalTrackUri: suspend (String) -> String? = { null },
+    private val onLocalTrackUris: suspend (List<String>) -> Map<String, String> = { emptyMap() },
 ) : DownloadsRepository {
     private val libraryFlow = MutableStateFlow(library)
     private val trackStatusesFlow = MutableStateFlow(
@@ -44,7 +45,6 @@ internal class RecordingDownloadsRepository(
         downloadedAlbums += album
         onDownloadAlbum(album)
     }
-    override suspend fun ensureDownloaded(tracks: List<Track>): Boolean = onEnsureDownloaded(tracks)
     override suspend fun cancelTrack(trackId: String) {
         cancelledTrackIds += trackId
     }
@@ -55,8 +55,9 @@ internal class RecordingDownloadsRepository(
     override suspend fun retryTrack(trackId: String) = Unit
     override suspend fun clearCurrentAccount() = Unit
     override suspend fun reconcile() = Unit
-    override suspend fun localTrackUri(trackId: String): String? = null
-    override suspend fun localTrackUris(trackIds: List<String>): Map<String, String> = emptyMap()
+    override suspend fun localTrackUri(trackId: String): String? = onLocalTrackUri(trackId)
+    override suspend fun localTrackUris(trackIds: List<String>): Map<String, String> =
+        onLocalTrackUris(trackIds)
     override suspend fun localArtworkUri(coverArtId: String?): String? = null
     override suspend fun localArtworkUris(coverArtIds: List<String>): Map<String, String> = emptyMap()
 }

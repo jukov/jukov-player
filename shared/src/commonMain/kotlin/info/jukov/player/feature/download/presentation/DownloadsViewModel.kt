@@ -81,19 +81,23 @@ class DownloadsViewModel(
     }
     fun removeAll() = viewModelScope.launch { repository.clearCurrentAccount() }
     fun retryTrack(id: String) = viewModelScope.launch { repository.retryTrack(id) }
-    fun playWhenDownloaded(tracks: List<Track>, index: Int, onPlay: (List<Track>, Int) -> Unit) =
+    fun playOrDownloadTrack(tracks: List<Track>, index: Int, onPlay: (List<Track>, Int) -> Unit) =
         viewModelScope.launch {
-            if (index in tracks.indices && repository.ensureDownloaded(listOf(tracks[index]))) {
+            val track = tracks.getOrNull(index) ?: return@launch
+            if (repository.localTrackUri(track.id) != null) {
                 onPlay(tracks, index)
+            } else {
+                repository.downloadTrack(track)
             }
         }
-    fun playAlbumWhenDownloaded(
+    fun playOrDownloadAlbum(
         album: OfflineAlbum,
         onPlay: (List<Track>, Int) -> Unit,
     ) =
         viewModelScope.launch {
             val tracks = album.tracks.map { it.track }
-            if (tracks.size != album.expectedTrackCount) {
+            val localTracks = repository.localTrackUris(tracks.map(Track::id))
+            if (tracks.size != album.expectedTrackCount || localTracks.size != tracks.size) {
                 try {
                     repository.downloadAlbum(album.album)
                 } catch (error: CancellationException) {
@@ -106,7 +110,7 @@ class DownloadsViewModel(
                         )
                     }
                 }
-            } else if (repository.ensureDownloaded(tracks)) {
+            } else {
                 onPlay(tracks, 0)
             }
         }

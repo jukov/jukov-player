@@ -110,9 +110,6 @@ private object EmptyDownloadsRepository : DownloadsRepository {
     override fun observeAlbumTracks(albumId: String): Flow<List<OfflineTrack>> = flowOf(emptyList())
     override suspend fun downloadTrack(track: info.jukov.player.feature.track.domain.Track) = Unit
     override suspend fun downloadAlbum(album: info.jukov.player.feature.album.domain.Album) = Unit
-    override suspend fun ensureDownloaded(
-        tracks: List<info.jukov.player.feature.track.domain.Track>,
-    ): Boolean = true
     override suspend fun cancelTrack(trackId: String) = Unit
     override suspend fun removeTracks(trackIds: List<String>) = Unit
     override suspend fun cancelAlbum(albumId: String) = Unit

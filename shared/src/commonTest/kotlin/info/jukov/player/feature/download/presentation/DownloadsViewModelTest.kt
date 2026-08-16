@@ -24,11 +24,11 @@ class DownloadsViewModelTest {
     fun downloadedTrackIsPlayedAfterFileVerification() = runTest {
         kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val selected = track("track")
-        val repository = RecordingDownloadsRepository(onEnsureDownloaded = { true })
+        val repository = RecordingDownloadsRepository(onLocalTrackUri = { "file://track" })
         val viewModel = viewModel(repository)
         var played = false
 
-        viewModel.playWhenDownloaded(listOf(selected), 0) { tracks, index ->
+        viewModel.playOrDownloadTrack(listOf(selected), 0) { tracks, index ->
             played = tracks[index] == selected
         }
         advanceUntilIdle()
@@ -39,14 +39,16 @@ class DownloadsViewModelTest {
     @Test
     fun missingTrackIsQueuedWithoutStartingPlayback() = runTest {
         kotlinx.coroutines.Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val repository = RecordingDownloadsRepository(onEnsureDownloaded = { false })
+        val selected = track("track")
+        val repository = RecordingDownloadsRepository()
         val viewModel = viewModel(repository)
         var played = false
 
-        viewModel.playWhenDownloaded(listOf(track("track")), 0) { _, _ -> played = true }
+        viewModel.playOrDownloadTrack(listOf(selected), 0) { _, _ -> played = true }
         advanceUntilIdle()
 
         assertEquals(false, played)
+        assertEquals(listOf(selected), repository.downloadedTracks)
     }
 
     @Test
@@ -63,7 +65,7 @@ class DownloadsViewModelTest {
         )
         var played = false
 
-        viewModel.playAlbumWhenDownloaded(album) { _, _ -> played = true }
+        viewModel.playOrDownloadAlbum(album) { _, _ -> played = true }
         advanceUntilIdle()
 
         assertEquals(listOf(album.album), repository.downloadedAlbums)
@@ -81,7 +83,7 @@ class DownloadsViewModelTest {
             expectedTrackCount = 2,
         )
 
-        viewModel.playAlbumWhenDownloaded(album) { _, _ -> }
+        viewModel.playOrDownloadAlbum(album) { _, _ -> }
         advanceUntilIdle()
 
         assertEquals(listOf(album.album), repository.downloadedAlbums)
@@ -100,7 +102,7 @@ class DownloadsViewModelTest {
             expectedTrackCount = 2,
         )
 
-        viewModel.playAlbumWhenDownloaded(album) { _, _ -> }
+        viewModel.playOrDownloadAlbum(album) { _, _ -> }
         advanceUntilIdle()
 
         assertIs<LoadableState.Failure<*>>(viewModel.state.value)
