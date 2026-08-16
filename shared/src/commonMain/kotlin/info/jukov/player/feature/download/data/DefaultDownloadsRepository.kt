@@ -252,14 +252,6 @@ class DefaultDownloadsRepository(
                     }
                 }
             }
-            tracks = dao.allOfflineTracks(key)
-            ownerships = dao.allDownloadOwnerships(key)
-            tracks.filter { track -> ownerships.none { it.trackId == track.trackId } }
-                .forEach { track ->
-                    dao.upsertDownloadOwnership(
-                        listOf(DownloadOwnershipEntity(key, OWNER_TRACK, track.trackId, track.trackId, 0)),
-                    )
-                }
             ownerships = dao.allDownloadOwnerships(key)
             val offlineAlbums = dao.allOfflineAlbums(key).associateBy(OfflineAlbumEntity::albumId)
             val albums = dao.allAccountAlbums(key).associateBy(AlbumEntity::id)
@@ -283,6 +275,17 @@ class DefaultDownloadsRepository(
                             )
                         }
                     }
+                }
+            ownerships = dao.allDownloadOwnerships(key)
+            tracks.filter { track -> ownerships.none { it.trackId == track.trackId } }
+                .forEach { track ->
+                    dao.upsertDownloadOwnership(
+                        listOf(
+                            DownloadOwnershipEntity(
+                                key, OWNER_TRACK, track.trackId, track.trackId, 0,
+                            ),
+                        ),
+                    )
                 }
             var hasPending = false
             platform.cleanupStaleParts(key, tracks.mapTo(mutableSetOf()) { it.trackId })
@@ -372,16 +375,9 @@ class DefaultDownloadsRepository(
     ) {
         val existing = dao.offlineTrack(key, track.id)
         dao.upsertOfflineTrack(
-            OfflineTrackEntity(
-                key,
-                track.id,
-                existing?.relativePath,
-                existing?.expectedSize,
-                existing?.downloadedBytes ?: 0,
-                existing?.state ?: DownloadState.Queued.name,
-                existing?.error,
-                existing?.requestedAtMs ?: Clock.System.now().toEpochMilliseconds(),
-                existing?.completedAtMs,
+            existing ?: OfflineTrackEntity(
+                key, track.id, null, null, 0, DownloadState.Queued.name, null,
+                Clock.System.now().toEpochMilliseconds(), null,
             ),
         )
         dao.upsertDownloadOwnership(
