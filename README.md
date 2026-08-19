@@ -36,10 +36,8 @@ One-time setup on the publishing Mac:
 3. Register the explicit App ID `com.nberezovskii.jukovplayer` and create the
    matching app record in App Store Connect. Automatic signing creates and
    refreshes the provisioning profile during archive/export.
-4. Register the same Bundle ID as a new iOS app in Firebase, download its
-   `GoogleService-Info.plist`, and replace `iosApp/iosApp/GoogleService-Info.plist`.
-   Until then the build works, but Crashlytics symbol upload is skipped because
-   the committed Firebase configuration still belongs to the previous Bundle ID.
+4. Keep the Firebase iOS app and `iosApp/iosApp/GoogleService-Info.plist`
+   registered to the same Bundle ID so Crashlytics can upload release symbols.
 
 Export a signed package without uploading it:
 
