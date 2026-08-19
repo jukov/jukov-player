@@ -22,7 +22,7 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 ### iOS App Store release
 
 The release target uses automatic signing for Apple team `UDTBP44Q7F` and the
-Bundle ID `info.jukov.player.Jukovplayer`. The signing certificate and its
+Bundle ID `com.nberezovskii.jukovplayer`. The signing certificate and its
 private key stay in the publisher's login keychain and are never committed.
 
 One-time setup on the publishing Mac:
@@ -33,9 +33,13 @@ One-time setup on the publishing Mac:
    its private key under **My Certificates** in Keychain Access. Apple
    Development is optional and is needed only to run development builds on a
    physical device.
-3. Register the explicit App ID `info.jukov.player.Jukovplayer` and create the
+3. Register the explicit App ID `com.nberezovskii.jukovplayer` and create the
    matching app record in App Store Connect. Automatic signing creates and
    refreshes the provisioning profile during archive/export.
+4. Register the same Bundle ID as a new iOS app in Firebase, download its
+   `GoogleService-Info.plist`, and replace `iosApp/iosApp/GoogleService-Info.plist`.
+   Until then the build works, but Crashlytics symbol upload is skipped because
+   the committed Firebase configuration still belongs to the previous Bundle ID.
 
 Export a signed package without uploading it:
 
