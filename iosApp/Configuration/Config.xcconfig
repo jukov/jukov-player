@@ -1,6 +1,8 @@
 TEAM_ID=UDTBP44Q7F
 APP_BUNDLE_IDENTIFIER=com.nberezovskii.jukovplayer
 APP_DISPLAY_NAME=the only player
+APP_STORE_TEAM_ID=UDTBP44Q7F
+APP_STORE_PROVISIONING_PROFILE=Jukovplayer App Store
 // Developers from another Apple team can override TEAM_ID and
 // APP_BUNDLE_IDENTIFIER in the gitignored Local.xcconfig. Firebase Crashlytics
 // symbol upload is enabled only when GoogleService-Info.plist matches it.
