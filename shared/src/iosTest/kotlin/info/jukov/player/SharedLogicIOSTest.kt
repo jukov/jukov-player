@@ -16,6 +16,7 @@ import info.jukov.player.feature.download.IosProgressCoalescer
 import info.jukov.player.feature.download.IosDownloadNotificationProgress
 import info.jukov.player.feature.download.IosNotificationProgressCoalescer
 import info.jukov.player.feature.download.IosNotificationDescriptor
+import info.jukov.player.feature.download.IosProgressNotificationReplacementCoordinator
 import info.jukov.player.feature.download.finalizeIosDownload
 import info.jukov.player.feature.download.iosDownloadNotificationText
 import info.jukov.player.feature.download.remainingIosDownloadCount
@@ -280,6 +281,23 @@ class SharedLogicIOSTest {
                 notificationsFromSystem,
                 keepingIdentifier = "progress-from-new-process",
             ),
+        )
+    }
+
+    @Test
+    fun staleProgressCleanupCannotRemoveNewerNotification() {
+        val coordinator = IosProgressNotificationReplacementCoordinator()
+        val cleanupA = coordinator.beginReplacement("progress-a")
+        val cleanupB = coordinator.beginReplacement("progress-b")
+        val notifications = listOf(
+            IosNotificationDescriptor("progress-a", isDownloadProgress = true),
+            IosNotificationDescriptor("progress-b", isDownloadProgress = true),
+        )
+
+        assertEquals(emptySet(), coordinator.staleIdentifiersIfCurrent(cleanupA, notifications))
+        assertEquals(
+            setOf("progress-a"),
+            coordinator.staleIdentifiersIfCurrent(cleanupB, notifications),
         )
     }
 

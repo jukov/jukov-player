@@ -84,6 +84,7 @@ class IosOfflinePlatform internal constructor(
     private val progressLock = NSLock()
     private val progressCoalescer = IosProgressCoalescer()
     private val notificationProgress = IosNotificationProgressCoalescer()
+    private val progressNotificationReplacement = IosProgressNotificationReplacementCoordinator()
     private var cancellationGeneration = 0L
     private val cancelledAccountTokens = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskDescriptions = MutableStateFlow<Set<String>>(emptySet())
@@ -881,6 +882,7 @@ class IosOfflinePlatform internal constructor(
         }
         val center = UNUserNotificationCenter.currentNotificationCenter()
         val identifier = "$PROGRESS_NOTIFICATION_IDENTIFIER-${NSUUID.UUID().UUIDString}"
+        val cleanupToken = progressNotificationReplacement.beginReplacement(identifier)
         val content = UNMutableNotificationContent().apply {
             setTitle("Downloading music")
             setBody(iosDownloadNotificationText(state))
@@ -901,7 +903,7 @@ class IosOfflinePlatform internal constructor(
             submitOperation {
                 try {
                     if (error == null) {
-                        removeStaleProgressNotifications(keepingIdentifier = identifier)
+                        removeStaleProgressNotifications(cleanupToken)
                     }
                 } finally {
                     endCallbackProcessing()
@@ -915,50 +917,57 @@ class IosOfflinePlatform internal constructor(
         val center = UNUserNotificationCenter.currentNotificationCenter()
         center.removePendingNotificationRequestsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
         center.removeDeliveredNotificationsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
-        removeStaleProgressNotifications(keepingIdentifier = null)
+        removeStaleProgressNotifications(progressNotificationReplacement.beginClear())
     }
 
-    private fun removeStaleProgressNotifications(keepingIdentifier: String?) {
+    private fun removeStaleProgressNotifications(cleanupToken: IosNotificationCleanupToken) {
         val center = UNUserNotificationCenter.currentNotificationCenter()
         beginCallbackProcessing()
         center.getPendingNotificationRequestsWithCompletionHandler { requests ->
-            try {
-                val staleIdentifiers = staleIosProgressNotificationIdentifiers(
-                    requests.orEmpty().filterIsInstance<UNNotificationRequest>().map { request ->
-                        IosNotificationDescriptor(
-                            identifier = request.identifier,
-                            isDownloadProgress = request.content.userInfo
-                                .isDownloadProgressNotification(),
-                        )
-                    },
-                    keepingIdentifier = keepingIdentifier,
-                ).toList()
-                if (staleIdentifiers.isNotEmpty()) {
-                    center.removePendingNotificationRequestsWithIdentifiers(staleIdentifiers)
+            submitOperation {
+                try {
+                    val notifications = requests.orEmpty()
+                        .filterIsInstance<UNNotificationRequest>()
+                        .map { request ->
+                            IosNotificationDescriptor(
+                                identifier = request.identifier,
+                                isDownloadProgress = request.content.userInfo
+                                    .isDownloadProgressNotification(),
+                            )
+                        }
+                    val staleIdentifiers = progressNotificationReplacement
+                        .staleIdentifiersIfCurrent(cleanupToken, notifications)
+                        .toList()
+                    if (staleIdentifiers.isNotEmpty()) {
+                        center.removePendingNotificationRequestsWithIdentifiers(staleIdentifiers)
+                    }
+                } finally {
+                    endCallbackProcessing()
                 }
-            } finally {
-                endCallbackProcessing()
             }
         }
         beginCallbackProcessing()
         center.getDeliveredNotificationsWithCompletionHandler { notifications ->
-            try {
-                val staleIdentifiers = staleIosProgressNotificationIdentifiers(
-                    notifications.orEmpty().filterIsInstance<platform.UserNotifications.UNNotification>()
+            submitOperation {
+                try {
+                    val descriptors = notifications.orEmpty()
+                        .filterIsInstance<platform.UserNotifications.UNNotification>()
                         .map { notification ->
-                        IosNotificationDescriptor(
-                            identifier = notification.request.identifier,
-                            isDownloadProgress = notification.request.content.userInfo
-                                .isDownloadProgressNotification(),
-                        )
-                    },
-                    keepingIdentifier = keepingIdentifier,
-                ).toList()
-                if (staleIdentifiers.isNotEmpty()) {
-                    center.removeDeliveredNotificationsWithIdentifiers(staleIdentifiers)
+                            IosNotificationDescriptor(
+                                identifier = notification.request.identifier,
+                                isDownloadProgress = notification.request.content.userInfo
+                                    .isDownloadProgressNotification(),
+                            )
+                        }
+                    val staleIdentifiers = progressNotificationReplacement
+                        .staleIdentifiersIfCurrent(cleanupToken, descriptors)
+                        .toList()
+                    if (staleIdentifiers.isNotEmpty()) {
+                        center.removeDeliveredNotificationsWithIdentifiers(staleIdentifiers)
+                    }
+                } finally {
+                    endCallbackProcessing()
                 }
-            } finally {
-                endCallbackProcessing()
             }
         }
     }
@@ -1109,6 +1118,34 @@ internal data class IosNotificationDescriptor(
     val identifier: String,
     val isDownloadProgress: Boolean,
 )
+
+internal data class IosNotificationCleanupToken(
+    val generation: Long,
+    val keepingIdentifier: String?,
+)
+
+internal class IosProgressNotificationReplacementCoordinator {
+    private var generation = 0L
+
+    fun beginReplacement(identifier: String): IosNotificationCleanupToken =
+        IosNotificationCleanupToken(++generation, identifier)
+
+    fun beginClear(): IosNotificationCleanupToken =
+        IosNotificationCleanupToken(++generation, keepingIdentifier = null)
+
+    fun staleIdentifiersIfCurrent(
+        token: IosNotificationCleanupToken,
+        notifications: List<IosNotificationDescriptor>,
+    ): Set<String> {
+        if (token.generation != generation) {
+            return emptySet()
+        }
+        return staleIosProgressNotificationIdentifiers(
+            notifications,
+            keepingIdentifier = token.keepingIdentifier,
+        )
+    }
+}
 
 internal fun staleIosProgressNotificationIdentifiers(
     notifications: List<IosNotificationDescriptor>,
