@@ -7,13 +7,13 @@ struct DownloadActivityWidget: Widget {
         ActivityConfiguration(for: DownloadActivityAttributes.self) { context in
             DownloadActivityView(state: context.state)
                 .widgetURL(DownloadActivityAttributes.downloadsURL)
-                .activityBackgroundTint(DownloadActivityPalette.background)
+                .downloadActivityBackgroundTint()
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Image(systemName: "arrow.down.circle.fill")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(DownloadActivityPalette.accent)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     ProgressLabel(state: context.state)
@@ -23,15 +23,15 @@ struct DownloadActivityWidget: Widget {
                 }
             } compactLeading: {
                 Image(systemName: "arrow.down")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(DownloadActivityPalette.accent)
             } compactTrailing: {
                 ProgressLabel(state: context.state)
             } minimal: {
                 Image(systemName: "arrow.down")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(DownloadActivityPalette.accent)
             }
             .widgetURL(DownloadActivityAttributes.downloadsURL)
-            .keylineTint(.blue)
+            .keylineTint(DownloadActivityPalette.accent)
         }
     }
 }
@@ -39,34 +39,72 @@ struct DownloadActivityWidget: Widget {
 private struct DownloadActivityView: View {
     let state: DownloadActivityAttributes.ContentState
 
+    @ViewBuilder
     var body: some View {
-        ZStack {
-            DownloadActivityPalette.background
-            HStack(spacing: 12) {
-                Image(systemName: "arrow.down.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.blue)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Downloading music")
-                        .font(.headline)
-                    DownloadProgressView(state: state)
-                }
-            }
-            .foregroundStyle(.white)
-            .padding()
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(
+                    .regular.tint(DownloadActivityPalette.glassTint)
+                )
+                .containerBackground(.clear, for: .widget)
+        } else {
+            content
+                .background(DownloadActivityPalette.fallbackBackground)
+                .containerBackground(
+                    DownloadActivityPalette.fallbackBackground,
+                    for: .widget
+                )
         }
-        .containerBackground(DownloadActivityPalette.background, for: .widget)
+    }
+
+    private var content: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.title2)
+                .foregroundStyle(DownloadActivityPalette.accent)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Downloading music")
+                    .font(.headline)
+                DownloadProgressView(state: state)
+            }
+        }
+        .foregroundStyle(.white)
+        .padding()
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .leading
+        )
     }
 }
 
 private enum DownloadActivityPalette {
-    static let background = Color(
+    static let accent = Color(
         .sRGB,
-        red: 0,
-        green: 0,
-        blue: 0,
+        red: 38.0 / 255.0,
+        green: 166.0 / 255.0,
+        blue: 154.0 / 255.0,
         opacity: 1
     )
+    static let glassTint = accent.opacity(0.28)
+    static let fallbackBackground = Color(
+        .sRGB,
+        red: 0,
+        green: 80.0 / 255.0,
+        blue: 72.0 / 255.0,
+        opacity: 1
+    )
+}
+
+private extension View {
+    @ViewBuilder
+    func downloadActivityBackgroundTint() -> some View {
+        if #available(iOS 26.0, *) {
+            activityBackgroundTint(.clear)
+        } else {
+            activityBackgroundTint(DownloadActivityPalette.fallbackBackground)
+        }
+    }
 }
 
 private struct DownloadProgressView: View {
@@ -76,10 +114,10 @@ private struct DownloadProgressView: View {
         VStack(alignment: .leading, spacing: 4) {
             if let progress = state.progress {
                 ProgressView(value: progress)
-                    .tint(.blue)
+                    .tint(DownloadActivityPalette.accent)
             } else {
                 ProgressView()
-                    .tint(.blue)
+                    .tint(DownloadActivityPalette.accent)
             }
             Text(remainingText)
                 .font(.caption)
