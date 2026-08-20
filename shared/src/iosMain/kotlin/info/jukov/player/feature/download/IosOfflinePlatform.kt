@@ -83,6 +83,7 @@ class IosOfflinePlatform internal constructor(
     private val generationLock = NSLock()
     private val progressLock = NSLock()
     private val progressCoalescer = IosProgressCoalescer()
+    private val notificationProgress = IosNotificationProgressCoalescer()
     private var cancellationGeneration = 0L
     private val cancelledAccountTokens = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskDescriptions = MutableStateFlow<Set<String>>(emptySet())
@@ -386,11 +387,18 @@ class IosOfflinePlatform internal constructor(
                     return@forEach
                 }
                 task.resume()
+                postProgressNotification(
+                    progress = null,
+                    pendingCount = dao.pendingOfflineTrackCount(accountKey),
+                )
             }
         }
         dao.allOfflineTracks(accountKey)
             .filter { it.state == DownloadState.Completed.name }
             .forEach { scheduleArtwork(accountKey, it.trackId, generation) }
+        if (dao.pendingOfflineTrackCount(accountKey) == 0) {
+            clearProgressNotification()
+        }
     }
 
     private suspend fun processCompletedDownload(
@@ -614,6 +622,8 @@ class IosOfflinePlatform internal constructor(
                             schedulePending(accountKey, generation, allowCancelledRetry = true)
                         }
                     }
+                } else if (dao.pendingOfflineTrackCount(accountKey) == 0) {
+                    clearProgressNotification()
                 }
             }
             TASK_ARTWORK -> {
@@ -651,6 +661,16 @@ class IosOfflinePlatform internal constructor(
                     trackId = progress.metadata.id,
                     downloadedBytes = progress.downloadedBytes,
                     expectedSize = progress.expectedSize,
+                )
+                postProgressNotification(
+                    progress = progress.expectedSize?.let { expectedSize ->
+                        if (expectedSize > 0) {
+                            (progress.downloadedBytes * 100 / expectedSize).toInt().coerceIn(0, 100)
+                        } else {
+                            null
+                        }
+                    },
+                    pendingCount = dao.pendingOfflineTrackCount(accountKey),
                 )
             }
         }
@@ -823,6 +843,7 @@ class IosOfflinePlatform internal constructor(
     }
 
     private fun postCompletionNotification(completedCount: Int) {
+        clearProgressNotification()
         val content = UNMutableNotificationContent().apply {
             setTitle("Downloads completed")
             setBody("$completedCount tracks are available offline")
@@ -835,6 +856,38 @@ class IosOfflinePlatform internal constructor(
             trigger = null,
         )
         UNUserNotificationCenter.currentNotificationCenter().addNotificationRequest(request) { }
+    }
+
+    private fun postProgressNotification(progress: Int?, pendingCount: Int) {
+        val state = IosDownloadNotificationProgress(progress, pendingCount)
+        if (!notificationProgress.shouldPublish(state)) {
+            return
+        }
+        val center = UNUserNotificationCenter.currentNotificationCenter()
+        center.removeDeliveredNotificationsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
+        val content = UNMutableNotificationContent().apply {
+            setTitle("Downloading music")
+            setBody(iosDownloadNotificationText(state))
+            setUserInfo(
+                mapOf(
+                    NOTIFICATION_OPEN_DOWNLOADS_KEY to true,
+                    NOTIFICATION_PROGRESS_KEY to true,
+                ),
+            )
+        }
+        val request = UNNotificationRequest.requestWithIdentifier(
+            identifier = PROGRESS_NOTIFICATION_IDENTIFIER,
+            content = content,
+            trigger = null,
+        )
+        center.addNotificationRequest(request) { }
+    }
+
+    private fun clearProgressNotification() {
+        notificationProgress.reset()
+        val center = UNUserNotificationCenter.currentNotificationCenter()
+        center.removePendingNotificationRequestsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
+        center.removeDeliveredNotificationsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
     }
 
     private suspend fun currentTasks(): List<NSURLSessionTask> = suspendCoroutine { continuation ->
@@ -928,6 +981,34 @@ internal class IosProgressCoalescer {
         pending.remove(taskIdentifier)
         scheduled.remove(taskIdentifier)
     }
+}
+
+internal data class IosDownloadNotificationProgress(
+    val percent: Int?,
+    val pendingCount: Int,
+)
+
+internal class IosNotificationProgressCoalescer {
+    private var lastPublished: IosDownloadNotificationProgress? = null
+
+    fun shouldPublish(progress: IosDownloadNotificationProgress): Boolean {
+        val normalized = progress.copy(percent = progress.percent?.coerceIn(0, 100))
+        if (normalized == lastPublished) {
+            return false
+        }
+        lastPublished = normalized
+        return true
+    }
+
+    fun reset() {
+        lastPublished = null
+    }
+}
+
+internal fun iosDownloadNotificationText(progress: IosDownloadNotificationProgress): String {
+    val count = progress.pendingCount.coerceAtLeast(1)
+    val tracks = if (count == 1) "1 track remaining" else "$count tracks remaining"
+    return progress.percent?.let { "${it.coerceIn(0, 100)}% • $tracks" } ?: tracks
 }
 
 internal class IosBackgroundCallbackCoordinator {
@@ -1039,6 +1120,8 @@ internal fun isApiErrorContentType(contentType: String?): Boolean =
 
 private const val BACKGROUND_SESSION_IDENTIFIER = "info.jukov.player.offline-downloads"
 private const val NOTIFICATION_OPEN_DOWNLOADS_KEY = "openDownloads"
+private const val NOTIFICATION_PROGRESS_KEY = "downloadProgress"
+private const val PROGRESS_NOTIFICATION_IDENTIFIER = "offline-downloads-progress"
 private const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-completed"
 private const val OFFLINE_DIRECTORY = "offline"
 private const val TRACKS_DIRECTORY = "tracks"

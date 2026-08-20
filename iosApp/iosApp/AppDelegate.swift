@@ -41,7 +41,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        if notification.request.content.userInfo["downloadProgress"] as? Bool == true {
+            return [.list]
+        }
+        return [.banner, .list, .sound]
     }
 
     func userNotificationCenter(

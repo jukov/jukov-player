@@ -13,7 +13,10 @@ import info.jukov.player.feature.download.IosDownloadFinalization
 import info.jukov.player.feature.download.IosDownloadTaskMetadata
 import info.jukov.player.feature.download.IosBackgroundCallbackCoordinator
 import info.jukov.player.feature.download.IosProgressCoalescer
+import info.jukov.player.feature.download.IosDownloadNotificationProgress
+import info.jukov.player.feature.download.IosNotificationProgressCoalescer
 import info.jukov.player.feature.download.finalizeIosDownload
+import info.jukov.player.feature.download.iosDownloadNotificationText
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
@@ -216,6 +219,30 @@ class SharedLogicIOSTest {
 
         assertEquals(1_010, coalescer.take(7u)?.downloadedBytes)
         assertFalse(coalescer.completeFlush(7u))
+    }
+
+    @Test
+    fun downloadNotificationPublishesOnlyChangedProgress() {
+        val coalescer = IosNotificationProgressCoalescer()
+        val progress = IosDownloadNotificationProgress(percent = 25, pendingCount = 2)
+
+        assertTrue(coalescer.shouldPublish(progress))
+        assertFalse(coalescer.shouldPublish(progress))
+        assertTrue(coalescer.shouldPublish(progress.copy(percent = 26)))
+        coalescer.reset()
+        assertTrue(coalescer.shouldPublish(progress.copy(percent = 26)))
+    }
+
+    @Test
+    fun downloadNotificationTextIncludesProgressAndQueueSize() {
+        assertEquals(
+            "25% • 2 tracks remaining",
+            iosDownloadNotificationText(IosDownloadNotificationProgress(25, 2)),
+        )
+        assertEquals(
+            "1 track remaining",
+            iosDownloadNotificationText(IosDownloadNotificationProgress(null, 1)),
+        )
     }
 
     @Test
