@@ -7,7 +7,7 @@ struct DownloadActivityWidget: Widget {
         ActivityConfiguration(for: DownloadActivityAttributes.self) { context in
             DownloadActivityView(state: context.state)
                 .widgetURL(DownloadActivityAttributes.downloadsURL)
-                .downloadActivityBackgroundTint()
+                .activityBackgroundTint(DownloadActivityPalette.background)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -39,41 +39,25 @@ struct DownloadActivityWidget: Widget {
 private struct DownloadActivityView: View {
     let state: DownloadActivityAttributes.ContentState
 
-    @ViewBuilder
     var body: some View {
-        if #available(iOS 26.0, *) {
-            content
-                .glassEffect(
-                    .regular.tint(DownloadActivityPalette.glassTint)
-                )
-                .containerBackground(.clear, for: .widget)
-        } else {
-            content
-                .background(DownloadActivityPalette.fallbackBackground)
-                .containerBackground(
-                    DownloadActivityPalette.fallbackBackground,
-                    for: .widget
-                )
-        }
-    }
-
-    private var content: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.title2)
-                .foregroundStyle(DownloadActivityPalette.accent)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Downloading music")
-                    .font(.headline)
-                DownloadProgressView(state: state)
+        ZStack {
+            DownloadActivityPalette.background
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(DownloadActivityPalette.accent)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Downloading music")
+                        .font(.headline)
+                    DownloadProgressView(state: state)
+                }
             }
+            .foregroundStyle(.white)
+            .padding()
         }
-        .foregroundStyle(.white)
-        .padding()
-        .frame(
-            maxWidth: .infinity,
-            maxHeight: .infinity,
-            alignment: .leading
+        .containerBackground(
+            DownloadActivityPalette.background,
+            for: .widget
         )
     }
 }
@@ -86,25 +70,13 @@ private enum DownloadActivityPalette {
         blue: 154.0 / 255.0,
         opacity: 1
     )
-    static let glassTint = accent.opacity(0.28)
-    static let fallbackBackground = Color(
+    static let background = Color(
         .sRGB,
         red: 0,
         green: 80.0 / 255.0,
         blue: 72.0 / 255.0,
         opacity: 1
     )
-}
-
-private extension View {
-    @ViewBuilder
-    func downloadActivityBackgroundTint() -> some View {
-        if #available(iOS 26.0, *) {
-            activityBackgroundTint(.clear)
-        } else {
-            activityBackgroundTint(DownloadActivityPalette.fallbackBackground)
-        }
-    }
 }
 
 private struct DownloadProgressView: View {
