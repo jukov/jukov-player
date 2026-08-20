@@ -12,6 +12,7 @@ play-service-account.json
 *.keystore
 .idea
 .DS_Store
+.context/
 captures
 .externalNativeBuild
 .cxx

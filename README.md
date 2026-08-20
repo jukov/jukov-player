@@ -19,6 +19,41 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 - Android app: `./gradlew :androidApp:assembleDebug`
 - iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there.
 
+### iOS App Store release
+
+The release target uses automatic signing for Apple team `UDTBP44Q7F` and the
+Bundle ID `com.nberezovskii.jukovplayer`. The signing certificate and its
+private key stay in the publisher's login keychain and are never committed.
+
+One-time setup on the publishing Mac:
+
+1. In Xcode, add an Apple ID that belongs to team `UDTBP44Q7F`.
+2. Create an Apple Distribution certificate from a CSR generated on that Mac,
+   then install the returned `.cer`. The certificate must appear together with
+   its private key under **My Certificates** in Keychain Access. Apple
+   Development is optional and is needed only to run development builds on a
+   physical device.
+3. Register the explicit App ID `com.nberezovskii.jukovplayer` and create the
+   matching app record in App Store Connect. Automatic signing creates and
+   refreshes the provisioning profile during archive/export.
+4. Keep the Firebase iOS app and `iosApp/iosApp/GoogleService-Info.plist`
+   registered to the same Bundle ID so Crashlytics can upload release symbols.
+
+Export a signed package without uploading it:
+
+```shell
+./scripts/publish-ios.sh 1 1.0
+```
+
+After validation, upload a new build to App Store Connect/TestFlight:
+
+```shell
+./scripts/publish-ios.sh 2 1.0.1 --upload
+```
+
+Every upload must use a new build number. Generated archives and export output
+are kept under the gitignored `.context/ios-release/` directory.
+
 ### Signed Android release
 
 Generate a release key (keep this file and its passwords backed up):
