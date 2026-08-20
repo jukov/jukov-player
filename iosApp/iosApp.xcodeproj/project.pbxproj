@@ -8,11 +8,39 @@
 
 /* Begin PBXFileReference section */
 		60307725C9095B843936670A /* Jukovplayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jukovplayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D10000000000000000000001 /* DownloadActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DownloadActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D10000000000000000000002 /* DownloadActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosApp/DownloadActivityAttributes.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXBuildFile section */
 		A9C1A734B8D54E2584492D70 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = A9C1A733B8D54E2584492D70 /* FirebaseCrashlytics */; };
+		D10000000000000000000003 /* DownloadActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000002 /* DownloadActivityAttributes.swift */; };
+		D10000000000000000000004 /* DownloadActivityExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = D10000000000000000000001 /* DownloadActivityExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D10000000000000000000005 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6AA7EF32009E4B046AC2FF13 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D10000000000000000000010;
+			remoteInfo = DownloadActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D10000000000000000000006 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D10000000000000000000004 /* DownloadActivityExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		BE38DFB6C777611BC202697D /* Exceptions for "iosApp" folder in "iosApp" target */ = {
@@ -20,7 +48,14 @@
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = EE4134CFE9FB7C5CF93261A1 /* iosApp */;
+			 target = EE4134CFE9FB7C5CF93261A1 /* iosApp */;
+		};
+		D10000000000000000000007 /* Exceptions for "DownloadActivityExtension" folder in "DownloadActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D10000000000000000000010 /* DownloadActivityExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -38,6 +73,14 @@
 			path = Configuration;
 			sourceTree = "<group>";
 		};
+		D10000000000000000000008 /* DownloadActivityExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D10000000000000000000007 /* Exceptions for "DownloadActivityExtension" folder in "DownloadActivityExtension" target */,
+			);
+			path = DownloadActivityExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -49,6 +92,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D10000000000000000000009 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -57,6 +107,8 @@
 			children = (
 				EFB6DA9FBC9F4E32FF2D05F8 /* Configuration */,
 				57D25EE306AEB7A1088DB372 /* iosApp */,
+				D10000000000000000000008 /* DownloadActivityExtension */,
+				D10000000000000000000002 /* DownloadActivityAttributes.swift */,
 				C96AEB1201964F3D31C350CD /* Products */,
 			);
 			sourceTree = "<group>";
@@ -65,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				60307725C9095B843936670A /* Jukovplayer.app */,
+				D10000000000000000000001 /* DownloadActivityExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,11 +133,13 @@
 				1AA9048A148066046A7F7E27 /* Sources */,
 				F33B995F89300A890FE090CD /* Frameworks */,
 				BABFA0497FFB7467B8F38EE5 /* Resources */,
+				D10000000000000000000006 /* Embed App Extensions */,
 				A9C1A736B8D54E2584492D70 /* Upload Crashlytics dSYMs */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D10000000000000000000011 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				57D25EE306AEB7A1088DB372 /* iosApp */,
@@ -97,6 +152,28 @@
 			productReference = 60307725C9095B843936670A /* Jukovplayer.app */;
 			productType = "com.apple.product-type.application";
 		};
+		D10000000000000000000010 /* DownloadActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D10000000000000000000016 /* Build configuration list for PBXNativeTarget "DownloadActivityExtension" */;
+			buildPhases = (
+				D10000000000000000000012 /* Sources */,
+				D10000000000000000000009 /* Frameworks */,
+				D10000000000000000000013 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D10000000000000000000008 /* DownloadActivityExtension */,
+			);
+			name = DownloadActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = DownloadActivityExtension;
+			productReference = D10000000000000000000001 /* DownloadActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -107,6 +184,9 @@
 				LastSwiftUpdateCheck = 1620;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
+					D10000000000000000000010 = {
+						CreatedOnToolsVersion = 16.2;
+					};
 					EE4134CFE9FB7C5CF93261A1 = {
 						CreatedOnToolsVersion = 16.2;
 					};
@@ -131,12 +211,20 @@
 			);
 			targets = (
 				EE4134CFE9FB7C5CF93261A1 /* iosApp */,
+				D10000000000000000000010 /* DownloadActivityExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		BABFA0497FFB7467B8F38EE5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D10000000000000000000013 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -199,7 +287,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D10000000000000000000012 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D10000000000000000000003 /* DownloadActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D10000000000000000000011 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D10000000000000000000010 /* DownloadActivityExtension */;
+			targetProxy = D10000000000000000000005 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		313186C799D61C85BCE64F4A /* Debug */ = {
@@ -391,6 +495,50 @@
 			};
 			name = Release;
 		};
+		D10000000000000000000014 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DownloadActivityExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).debug.DownloadActivity";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D10000000000000000000015 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DownloadActivityExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).DownloadActivity";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -408,6 +556,15 @@
 			buildConfigurations = (
 				B1A0D373258B5F269AE40741 /* Debug */,
 				10E8163C2868DB275B0BCD97 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D10000000000000000000016 /* Build configuration list for PBXNativeTarget "DownloadActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D10000000000000000000014 /* Debug */,
+				D10000000000000000000015 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

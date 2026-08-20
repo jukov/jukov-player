@@ -13,16 +13,12 @@ import info.jukov.player.feature.download.IosDownloadFinalization
 import info.jukov.player.feature.download.IosDownloadTaskMetadata
 import info.jukov.player.feature.download.IosBackgroundCallbackCoordinator
 import info.jukov.player.feature.download.IosProgressCoalescer
-import info.jukov.player.feature.download.IosDownloadNotificationProgress
-import info.jukov.player.feature.download.IosNotificationProgressCoalescer
-import info.jukov.player.feature.download.IosNotificationDescriptor
-import info.jukov.player.feature.download.IosProgressNotificationReplacementCoordinator
+import info.jukov.player.feature.download.IosLiveActivityProgress
+import info.jukov.player.feature.download.IosLiveActivityProgressCoalescer
 import info.jukov.player.feature.download.finalizeIosDownload
-import info.jukov.player.feature.download.iosDownloadNotificationText
 import info.jukov.player.feature.download.remainingIosDownloadCount
 import info.jukov.player.feature.download.COMPLETION_NOTIFICATION_IDENTIFIER
 import info.jukov.player.feature.download.iosNotificationsClearedOnDownloadStart
-import info.jukov.player.feature.download.staleIosProgressNotificationIdentifiers
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
@@ -228,9 +224,9 @@ class SharedLogicIOSTest {
     }
 
     @Test
-    fun downloadNotificationPublishesOnlyChangedProgress() {
-        val coalescer = IosNotificationProgressCoalescer()
-        val progress = IosDownloadNotificationProgress(percent = 25, pendingCount = 2)
+    fun liveActivityPublishesOnlyChangedProgress() {
+        val coalescer = IosLiveActivityProgressCoalescer()
+        val progress = IosLiveActivityProgress(percent = 25, pendingCount = 2)
 
         assertTrue(coalescer.shouldPublish(progress))
         assertFalse(coalescer.shouldPublish(progress))
@@ -240,19 +236,7 @@ class SharedLogicIOSTest {
     }
 
     @Test
-    fun downloadNotificationTextIncludesProgressAndQueueSize() {
-        assertEquals(
-            "25% • 2 tracks remaining",
-            iosDownloadNotificationText(IosDownloadNotificationProgress(25, 2)),
-        )
-        assertEquals(
-            "1 track remaining",
-            iosDownloadNotificationText(IosDownloadNotificationProgress(null, 1)),
-        )
-    }
-
-    @Test
-    fun cancelledDownloadsAreExcludedFromNotificationQueueSize() {
+    fun cancelledDownloadsAreExcludedFromLiveActivityQueueSize() {
         val pending = setOf("one", "two", "three")
 
         assertEquals(2, remainingIosDownloadCount(pending, setOf("two")))
@@ -265,64 +249,6 @@ class SharedLogicIOSTest {
             setOf(COMPLETION_NOTIFICATION_IDENTIFIER),
             iosNotificationsClearedOnDownloadStart(),
         )
-    }
-
-    @Test
-    fun progressNotificationReplacementFindsOldVersionsAfterProcessRelaunch() {
-        val notificationsFromSystem = listOf(
-            IosNotificationDescriptor("progress-from-old-process", isDownloadProgress = true),
-            IosNotificationDescriptor("progress-from-new-process", isDownloadProgress = true),
-            IosNotificationDescriptor("unrelated", isDownloadProgress = false),
-        )
-
-        assertEquals(
-            setOf("progress-from-old-process"),
-            staleIosProgressNotificationIdentifiers(
-                notificationsFromSystem,
-                keepingIdentifier = "progress-from-new-process",
-            ),
-        )
-    }
-
-    @Test
-    fun staleProgressCleanupCannotRemoveNewerNotification() {
-        val coordinator = IosProgressNotificationReplacementCoordinator()
-        val cleanupA = coordinator.beginReplacement("progress-a")
-        val cleanupB = coordinator.beginReplacement("progress-b")
-        val notifications = listOf(
-            IosNotificationDescriptor("progress-a", isDownloadProgress = true),
-            IosNotificationDescriptor("progress-b", isDownloadProgress = true),
-        )
-
-        assertEquals(emptySet(), coordinator.staleIdentifiersIfCurrent(cleanupA, notifications))
-        assertEquals(
-            setOf("progress-a"),
-            coordinator.staleIdentifiersIfCurrent(cleanupB, notifications),
-        )
-    }
-
-    @Test
-    fun progressCleanupKeepsOldVersionUntilReplacementAppearsInSystemSnapshot() {
-        val coordinator = IosProgressNotificationReplacementCoordinator()
-        val cleanup = coordinator.beginReplacement("progress-new")
-        val oldOnly = listOf(
-            IosNotificationDescriptor("progress-old", isDownloadProgress = true),
-        )
-
-        val deferred = coordinator.cleanupDecision(cleanup, oldOnly)
-        assertEquals(emptySet(), deferred.staleIdentifiers)
-        assertTrue(deferred.shouldRetry)
-        val delivered = coordinator.cleanupDecision(
-            cleanup,
-            oldOnly + IosNotificationDescriptor("progress-new", isDownloadProgress = true),
-        )
-        assertEquals(
-            setOf("progress-old"),
-            delivered.staleIdentifiers,
-        )
-        assertFalse(delivered.shouldRetry)
-        coordinator.beginClear()
-        assertFalse(coordinator.cleanupDecision(cleanup, oldOnly).shouldRetry)
     }
 
     @Test

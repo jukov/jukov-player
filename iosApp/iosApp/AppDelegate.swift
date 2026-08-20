@@ -4,11 +4,14 @@ import UIKit
 import UserNotifications
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    private let downloadLiveActivityManager = DownloadLiveActivityManager()
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         configureFirebaseIfRegistered()
+        downloadLiveActivityManager.start()
         IosAppRuntime.shared.start()
         UNUserNotificationCenter.current().delegate = self
         return true
@@ -33,7 +36,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     ) {
         IosAppRuntime.shared.handleEventsForBackgroundSession(
             identifier: identifier,
-            completionHandler: completionHandler
+            completionHandler: { [weak self] in
+                guard let self else {
+                    completionHandler()
+                    return
+                }
+                MainActor.assumeIsolated {
+                    self.downloadLiveActivityManager.finishPendingOperations(
+                        then: completionHandler
+                    )
+                }
+            }
         )
     }
 
@@ -41,9 +54,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        if notification.request.content.userInfo["downloadProgress"] as? Bool == true {
-            return [.list]
-        }
         return [.banner, .list, .sound]
     }
 

@@ -83,8 +83,7 @@ class IosOfflinePlatform internal constructor(
     private val generationLock = NSLock()
     private val progressLock = NSLock()
     private val progressCoalescer = IosProgressCoalescer()
-    private val notificationProgress = IosNotificationProgressCoalescer()
-    private val progressNotificationReplacement = IosProgressNotificationReplacementCoordinator()
+    private val liveActivityProgress = IosLiveActivityProgressCoalescer()
     private var cancellationGeneration = 0L
     private val cancelledAccountTokens = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskDescriptions = MutableStateFlow<Set<String>>(emptySet())
@@ -149,7 +148,7 @@ class IosOfflinePlatform internal constructor(
         cancelledAccountTokens.update { it + accountToken }
         runOperationAndWait {
             cancelTasks { parseIosTaskDescription(it)?.accountToken == accountToken }
-            clearProgressNotification()
+            endLiveActivity()
         }
     }
 
@@ -392,7 +391,7 @@ class IosOfflinePlatform internal constructor(
                     return@forEach
                 }
                 task.resume()
-                postProgressNotification(
+                postLiveActivityProgress(
                     progress = null,
                     pendingCount = dao.pendingOfflineTrackCount(accountKey),
                 )
@@ -402,7 +401,7 @@ class IosOfflinePlatform internal constructor(
             .filter { it.state == DownloadState.Completed.name }
             .forEach { scheduleArtwork(accountKey, it.trackId, generation) }
         if (dao.pendingOfflineTrackCount(accountKey) == 0) {
-            clearProgressNotification()
+            endLiveActivity()
         }
     }
 
@@ -628,7 +627,7 @@ class IosOfflinePlatform internal constructor(
                         }
                     }
                 } else if (dao.pendingOfflineTrackCount(accountKey) == 0) {
-                    clearProgressNotification()
+                    endLiveActivity()
                 }
             }
             TASK_ARTWORK -> {
@@ -667,7 +666,7 @@ class IosOfflinePlatform internal constructor(
                     downloadedBytes = progress.downloadedBytes,
                     expectedSize = progress.expectedSize,
                 )
-                postProgressNotification(
+                postLiveActivityProgress(
                     progress = progress.expectedSize?.let { expectedSize ->
                         if (expectedSize > 0) {
                             (progress.downloadedBytes * 100 / expectedSize).toInt().coerceIn(0, 100)
@@ -859,7 +858,7 @@ class IosOfflinePlatform internal constructor(
     }
 
     private fun postCompletionNotification(completedCount: Int) {
-        clearProgressNotification()
+        endLiveActivity()
         val content = UNMutableNotificationContent().apply {
             setTitle("Downloads completed")
             setBody("$completedCount tracks are available offline")
@@ -874,139 +873,30 @@ class IosOfflinePlatform internal constructor(
         UNUserNotificationCenter.currentNotificationCenter().addNotificationRequest(request) { }
     }
 
-    private fun postProgressNotification(progress: Int?, pendingCount: Int) {
+    private fun postLiveActivityProgress(progress: Int?, pendingCount: Int) {
         clearCompletionNotification()
-        val state = IosDownloadNotificationProgress(progress, pendingCount)
-        if (!notificationProgress.shouldPublish(state)) {
+        val state = IosLiveActivityProgress(progress, pendingCount)
+        if (!liveActivityProgress.shouldPublish(state)) {
             return
         }
-        val center = UNUserNotificationCenter.currentNotificationCenter()
-        val identifier = "$PROGRESS_NOTIFICATION_IDENTIFIER-${NSUUID.UUID().UUIDString}"
-        val cleanupToken = progressNotificationReplacement.beginReplacement(identifier)
-        val content = UNMutableNotificationContent().apply {
-            setTitle("Downloading music")
-            setBody(iosDownloadNotificationText(state))
-            setUserInfo(
-                mapOf(
-                    NOTIFICATION_OPEN_DOWNLOADS_KEY to true,
-                    NOTIFICATION_PROGRESS_KEY to true,
-                ),
-            )
+        val userInfo = mutableMapOf<Any?, Any?>(
+            LIVE_ACTIVITY_PENDING_COUNT_KEY to pendingCount.coerceAtLeast(1),
+        ).apply {
+            progress?.let { put(LIVE_ACTIVITY_PERCENT_KEY, it.coerceIn(0, 100)) }
         }
-        val request = UNNotificationRequest.requestWithIdentifier(
-            identifier = identifier,
-            content = content,
-            trigger = null,
+        NSNotificationCenter.defaultCenter.postNotificationName(
+            aName = LIVE_ACTIVITY_UPDATE_NOTIFICATION,
+            `object` = null,
+            userInfo = userInfo,
         )
-        beginCallbackProcessing()
-        center.addNotificationRequest(request) { error ->
-            submitOperation {
-                try {
-                    if (error == null) {
-                        removeStaleProgressNotifications(cleanupToken)
-                    }
-                } finally {
-                    endCallbackProcessing()
-                }
-            }
-        }
     }
 
-    private fun clearProgressNotification() {
-        notificationProgress.reset()
-        val center = UNUserNotificationCenter.currentNotificationCenter()
-        center.removePendingNotificationRequestsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
-        center.removeDeliveredNotificationsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
-        removeStaleProgressNotifications(progressNotificationReplacement.beginClear())
-    }
-
-    private fun removeStaleProgressNotifications(cleanupToken: IosNotificationCleanupToken) {
-        val center = UNUserNotificationCenter.currentNotificationCenter()
-        beginCallbackProcessing()
-        center.getPendingNotificationRequestsWithCompletionHandler { requests ->
-            submitOperation {
-                try {
-                    val notifications = requests.orEmpty()
-                        .filterIsInstance<UNNotificationRequest>()
-                        .map { request ->
-                            IosNotificationDescriptor(
-                                identifier = request.identifier,
-                                isDownloadProgress = request.content.userInfo
-                                    .isDownloadProgressNotification(),
-                            )
-                        }
-                    val staleIdentifiers = progressNotificationReplacement
-                        .staleIdentifiersIfCurrent(cleanupToken, notifications)
-                        .toList()
-                    if (staleIdentifiers.isNotEmpty()) {
-                        center.removePendingNotificationRequestsWithIdentifiers(staleIdentifiers)
-                    }
-                } finally {
-                    endCallbackProcessing()
-                }
-            }
-        }
-        queryDeliveredProgressNotifications(cleanupToken, attempt = 0)
-    }
-
-    private fun queryDeliveredProgressNotifications(
-        cleanupToken: IosNotificationCleanupToken,
-        attempt: Int,
-    ) {
-        val center = UNUserNotificationCenter.currentNotificationCenter()
-        beginCallbackProcessing()
-        center.getDeliveredNotificationsWithCompletionHandler { notifications ->
-            submitOperation {
-                try {
-                    val descriptors = notifications.orEmpty()
-                        .filterIsInstance<platform.UserNotifications.UNNotification>()
-                        .map { notification ->
-                            IosNotificationDescriptor(
-                                identifier = notification.request.identifier,
-                                isDownloadProgress = notification.request.content.userInfo
-                                    .isDownloadProgressNotification(),
-                            )
-                        }
-                    val decision = progressNotificationReplacement.cleanupDecision(
-                        cleanupToken,
-                        descriptors,
-                    )
-                    val staleIdentifiers = decision.staleIdentifiers.toList()
-                    if (staleIdentifiers.isNotEmpty()) {
-                        center.removeDeliveredNotificationsWithIdentifiers(staleIdentifiers)
-                    }
-                    if (decision.shouldRetry && attempt < MAX_PROGRESS_NOTIFICATION_CLEANUP_RETRIES) {
-                        scheduleDeliveredProgressCleanupRetry(cleanupToken, attempt + 1)
-                    }
-                } finally {
-                    endCallbackProcessing()
-                }
-            }
-        }
-    }
-
-    private fun scheduleDeliveredProgressCleanupRetry(
-        cleanupToken: IosNotificationCleanupToken,
-        attempt: Int,
-    ) {
-        beginCallbackProcessing()
-        scope.launch {
-            delay(PROGRESS_NOTIFICATION_CLEANUP_RETRY_DELAY_MS)
-            submitOperation {
-                try {
-                    if (progressNotificationReplacement.isCurrent(cleanupToken)) {
-                        queryDeliveredProgressNotifications(cleanupToken, attempt)
-                    }
-                } finally {
-                    endCallbackProcessing()
-                }
-            }
-        }
-    }
-
-    private fun Map<Any?, *>.isDownloadProgressNotification(): Boolean {
-        val value = this[NOTIFICATION_PROGRESS_KEY]
-        return value == true || (value as? NSNumber)?.boolValue == true
+    private fun endLiveActivity() {
+        liveActivityProgress.reset()
+        NSNotificationCenter.defaultCenter.postNotificationName(
+            aName = LIVE_ACTIVITY_END_NOTIFICATION,
+            `object` = null,
+        )
     }
 
     private fun clearCompletionNotification() {
@@ -1025,9 +915,9 @@ class IosOfflinePlatform internal constructor(
             cancelledTrackIds = cancelledTrackIds,
         )
         if (pendingCount == 0) {
-            clearProgressNotification()
+            endLiveActivity()
         } else {
-            postProgressNotification(progress = null, pendingCount = pendingCount)
+            postLiveActivityProgress(progress = null, pendingCount = pendingCount)
         }
     }
 
@@ -1124,15 +1014,15 @@ internal class IosProgressCoalescer {
     }
 }
 
-internal data class IosDownloadNotificationProgress(
+internal data class IosLiveActivityProgress(
     val percent: Int?,
     val pendingCount: Int,
 )
 
-internal class IosNotificationProgressCoalescer {
-    private var lastPublished: IosDownloadNotificationProgress? = null
+internal class IosLiveActivityProgressCoalescer {
+    private var lastPublished: IosLiveActivityProgress? = null
 
-    fun shouldPublish(progress: IosDownloadNotificationProgress): Boolean {
+    fun shouldPublish(progress: IosLiveActivityProgress): Boolean {
         val normalized = progress.copy(percent = progress.percent?.coerceIn(0, 100))
         if (normalized == lastPublished) {
             return false
@@ -1144,72 +1034,6 @@ internal class IosNotificationProgressCoalescer {
     fun reset() {
         lastPublished = null
     }
-}
-
-internal data class IosNotificationDescriptor(
-    val identifier: String,
-    val isDownloadProgress: Boolean,
-)
-
-internal data class IosNotificationCleanupToken(
-    val generation: Long,
-    val keepingIdentifier: String?,
-)
-
-internal data class IosNotificationCleanupDecision(
-    val staleIdentifiers: Set<String> = emptySet(),
-    val shouldRetry: Boolean = false,
-)
-
-internal class IosProgressNotificationReplacementCoordinator {
-    private var generation = 0L
-
-    fun beginReplacement(identifier: String): IosNotificationCleanupToken =
-        IosNotificationCleanupToken(++generation, identifier)
-
-    fun beginClear(): IosNotificationCleanupToken =
-        IosNotificationCleanupToken(++generation, keepingIdentifier = null)
-
-    fun isCurrent(token: IosNotificationCleanupToken): Boolean = token.generation == generation
-
-    fun cleanupDecision(
-        token: IosNotificationCleanupToken,
-        notifications: List<IosNotificationDescriptor>,
-    ): IosNotificationCleanupDecision {
-        if (!isCurrent(token)) {
-            return IosNotificationCleanupDecision()
-        }
-        val keepingIdentifier = token.keepingIdentifier
-        if (keepingIdentifier != null && notifications.none { it.identifier == keepingIdentifier }) {
-            return IosNotificationCleanupDecision(shouldRetry = true)
-        }
-        return IosNotificationCleanupDecision(
-            staleIdentifiers = staleIosProgressNotificationIdentifiers(
-                notifications,
-                keepingIdentifier = keepingIdentifier,
-            ),
-        )
-    }
-
-    fun staleIdentifiersIfCurrent(
-        token: IosNotificationCleanupToken,
-        notifications: List<IosNotificationDescriptor>,
-    ): Set<String> {
-        return cleanupDecision(token, notifications).staleIdentifiers
-    }
-}
-
-internal fun staleIosProgressNotificationIdentifiers(
-    notifications: List<IosNotificationDescriptor>,
-    keepingIdentifier: String?,
-): Set<String> = notifications.asSequence()
-    .filter { it.isDownloadProgress && it.identifier != keepingIdentifier }
-    .mapTo(hashSetOf()) { it.identifier }
-
-internal fun iosDownloadNotificationText(progress: IosDownloadNotificationProgress): String {
-    val count = progress.pendingCount.coerceAtLeast(1)
-    val tracks = if (count == 1) "1 track remaining" else "$count tracks remaining"
-    return progress.percent?.let { "${it.coerceIn(0, 100)}% • $tracks" } ?: tracks
 }
 
 internal fun remainingIosDownloadCount(
@@ -1345,10 +1169,10 @@ internal fun isApiErrorContentType(contentType: String?): Boolean =
 
 private const val BACKGROUND_SESSION_IDENTIFIER = "info.jukov.player.offline-downloads"
 private const val NOTIFICATION_OPEN_DOWNLOADS_KEY = "openDownloads"
-private const val NOTIFICATION_PROGRESS_KEY = "downloadProgress"
-private const val PROGRESS_NOTIFICATION_IDENTIFIER = "offline-downloads-progress"
-private const val PROGRESS_NOTIFICATION_CLEANUP_RETRY_DELAY_MS = 250L
-private const val MAX_PROGRESS_NOTIFICATION_CLEANUP_RETRIES = 4
+private const val LIVE_ACTIVITY_UPDATE_NOTIFICATION = "info.jukov.player.downloadActivity.update"
+private const val LIVE_ACTIVITY_END_NOTIFICATION = "info.jukov.player.downloadActivity.end"
+private const val LIVE_ACTIVITY_PERCENT_KEY = "percent"
+private const val LIVE_ACTIVITY_PENDING_COUNT_KEY = "pendingCount"
 internal const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-completed"
 private const val OFFLINE_DIRECTORY = "offline"
 private const val TRACKS_DIRECTORY = "tracks"
