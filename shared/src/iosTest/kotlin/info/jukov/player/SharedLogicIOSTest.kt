@@ -302,6 +302,24 @@ class SharedLogicIOSTest {
     }
 
     @Test
+    fun progressCleanupKeepsOldVersionUntilReplacementAppearsInSystemSnapshot() {
+        val coordinator = IosProgressNotificationReplacementCoordinator()
+        val cleanup = coordinator.beginReplacement("progress-new")
+        val oldOnly = listOf(
+            IosNotificationDescriptor("progress-old", isDownloadProgress = true),
+        )
+
+        assertEquals(emptySet(), coordinator.staleIdentifiersIfCurrent(cleanup, oldOnly))
+        assertEquals(
+            setOf("progress-old"),
+            coordinator.staleIdentifiersIfCurrent(
+                cleanup,
+                oldOnly + IosNotificationDescriptor("progress-new", isDownloadProgress = true),
+            ),
+        )
+    }
+
+    @Test
     fun progressArrivingDuringAFlushSchedulesOneFollowUp() {
         val coalescer = IosProgressCoalescer()
         val metadata = IosDownloadTaskMetadata("track", "account", "track-id")

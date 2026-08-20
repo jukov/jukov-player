@@ -1140,9 +1140,13 @@ internal class IosProgressNotificationReplacementCoordinator {
         if (token.generation != generation) {
             return emptySet()
         }
+        val keepingIdentifier = token.keepingIdentifier
+        if (keepingIdentifier != null && notifications.none { it.identifier == keepingIdentifier }) {
+            return emptySet()
+        }
         return staleIosProgressNotificationIdentifiers(
             notifications,
-            keepingIdentifier = token.keepingIdentifier,
+            keepingIdentifier = keepingIdentifier,
         )
     }
 }
