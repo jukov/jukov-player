@@ -448,7 +448,7 @@ internal class IosPlaybackController(
     private fun Track.toPlayerItem(): AVPlayerItem {
         val url = NSURL.URLWithString(requireNotNull(streamUrl))
             ?: error("Invalid playback URL for track $id")
-        return AVPlayerItem(uRL = url)
+        return createIosPlayerItem(url, contentType)
     }
 
     private fun installNotifications() {
@@ -998,6 +998,19 @@ internal fun shouldResumeAfterInterruption(
 
 internal fun shouldPublishPlaybackFailure(isCurrentItem: Boolean, hasError: Boolean): Boolean =
     isCurrentItem && hasError
+
+internal fun createIosPlayerItem(url: NSURL, contentType: String?): AVPlayerItem {
+    val asset = createIosPlaybackAsset(url, contentType) ?: return AVPlayerItem(uRL = url)
+    return AVPlayerItem(asset = asset)
+}
+
+internal fun createIosPlaybackAsset(url: NSURL, contentType: String?): AVURLAsset? {
+    val localContentType = contentType?.takeIf { url.isFileURL() && it.isNotBlank() } ?: return null
+    return AVURLAsset(
+        uRL = url,
+        options = mapOf(AVURLAssetOverrideMIMETypeKey to localContentType),
+    )
+}
 
 internal fun isCurrentArtworkRequest(
     submittedGeneration: Long,
