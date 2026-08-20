@@ -7,7 +7,7 @@ struct DownloadActivityWidget: Widget {
         ActivityConfiguration(for: DownloadActivityAttributes.self) { context in
             DownloadActivityView(state: context.state)
                 .widgetURL(DownloadActivityAttributes.downloadsURL)
-                .activityBackgroundTint(.black)
+                .activityBackgroundTint(DownloadActivityPalette.background)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -40,19 +40,33 @@ private struct DownloadActivityView: View {
     let state: DownloadActivityAttributes.ContentState
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.title2)
-                .foregroundStyle(.blue)
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Downloading music")
-                    .font(.headline)
-                DownloadProgressView(state: state)
+        ZStack {
+            DownloadActivityPalette.background
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.blue)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Downloading music")
+                        .font(.headline)
+                    DownloadProgressView(state: state)
+                }
             }
+            .foregroundStyle(.white)
+            .padding()
         }
-        .foregroundStyle(.white)
-        .padding()
+        .containerBackground(DownloadActivityPalette.background, for: .widget)
     }
+}
+
+private enum DownloadActivityPalette {
+    static let background = Color(
+        .sRGB,
+        red: 0,
+        green: 0,
+        blue: 0,
+        opacity: 1
+    )
 }
 
 private struct DownloadProgressView: View {
