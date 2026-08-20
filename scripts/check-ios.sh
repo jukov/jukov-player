@@ -60,6 +60,23 @@ assert_release_setting "DEVELOPMENT_TEAM" "UDTBP44Q7F"
 assert_release_setting "PRODUCT_BUNDLE_IDENTIFIER" "com.nberezovskii.jukovplayer"
 assert_release_setting "PROVISIONING_PROFILE_SPECIFIER" "Jukovplayer App Store"
 
+debug_override_settings="$(
+  xcodebuild \
+    -project iosApp/iosApp.xcodeproj \
+    -scheme iosApp \
+    -configuration Debug \
+    -sdk iphonesimulator \
+    TEAM_ID=LOCALTEAM123 \
+    APP_BUNDLE_IDENTIFIER=dev.example.jukovplayer \
+    -showBuildSettings
+)"
+
+if ! grep -Fq "    DEVELOPMENT_TEAM = LOCALTEAM123" <<< "$debug_override_settings" ||
+   ! grep -Fq "    PRODUCT_BUNDLE_IDENTIFIER = dev.example.jukovplayer.debug" <<< "$debug_override_settings"; then
+  echo "Debug signing overrides must remain independent from App Store Release signing." >&2
+  exit 1
+fi
+
 for export_options in \
   iosApp/Configuration/AppStoreExportOptions.plist \
   iosApp/Configuration/AppStoreUploadOptions.plist; do
