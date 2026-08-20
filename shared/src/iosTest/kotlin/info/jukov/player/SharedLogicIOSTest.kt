@@ -13,7 +13,12 @@ import info.jukov.player.feature.download.IosDownloadFinalization
 import info.jukov.player.feature.download.IosDownloadTaskMetadata
 import info.jukov.player.feature.download.IosBackgroundCallbackCoordinator
 import info.jukov.player.feature.download.IosProgressCoalescer
+import info.jukov.player.feature.download.IosLiveActivityProgress
+import info.jukov.player.feature.download.IosLiveActivityProgressCoalescer
 import info.jukov.player.feature.download.finalizeIosDownload
+import info.jukov.player.feature.download.remainingIosDownloadCount
+import info.jukov.player.feature.download.COMPLETION_NOTIFICATION_IDENTIFIER
+import info.jukov.player.feature.download.iosNotificationsClearedOnDownloadStart
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
@@ -40,6 +45,15 @@ import kotlin.test.assertTrue
 import kotlin.test.assertNull
 
 class SharedLogicIOSTest {
+
+    @Test
+    fun downloadsDeepLinkMatchesOnlyDownloadsDestination() {
+        assertTrue(isIosDownloadsDeepLink("jukovplayer://downloads"))
+        assertTrue(isIosDownloadsDeepLink("JUKOVPLAYER://DOWNLOADS/"))
+        assertFalse(isIosDownloadsDeepLink("jukovplayer://library"))
+        assertFalse(isIosDownloadsDeepLink("https://downloads"))
+        assertFalse(isIosDownloadsDeepLink("not a url"))
+    }
 
     @Test
     fun offlinePathComponentsAreStableAndAccountScoped() {
@@ -219,6 +233,34 @@ class SharedLogicIOSTest {
     }
 
     @Test
+    fun liveActivityPublishesOnlyChangedProgress() {
+        val coalescer = IosLiveActivityProgressCoalescer()
+        val progress = IosLiveActivityProgress(percent = 25, pendingCount = 2)
+
+        assertTrue(coalescer.shouldPublish(progress))
+        assertFalse(coalescer.shouldPublish(progress))
+        assertTrue(coalescer.shouldPublish(progress.copy(percent = 26)))
+        coalescer.reset()
+        assertTrue(coalescer.shouldPublish(progress.copy(percent = 26)))
+    }
+
+    @Test
+    fun cancelledDownloadsAreExcludedFromLiveActivityQueueSize() {
+        val pending = setOf("one", "two", "three")
+
+        assertEquals(2, remainingIosDownloadCount(pending, setOf("two")))
+        assertEquals(0, remainingIosDownloadCount(pending, pending))
+    }
+
+    @Test
+    fun startingDownloadClearsPreviousCompletionNotification() {
+        assertEquals(
+            setOf(COMPLETION_NOTIFICATION_IDENTIFIER),
+            iosNotificationsClearedOnDownloadStart(),
+        )
+    }
+
+    @Test
     fun progressArrivingDuringAFlushSchedulesOneFollowUp() {
         val coalescer = IosProgressCoalescer()
         val metadata = IosDownloadTaskMetadata("track", "account", "track-id")
@@ -245,6 +287,18 @@ class SharedLogicIOSTest {
         completion()
         assertEquals(1, completions)
         assertNull(coordinator.finishEvents())
+    }
+
+    @Test
+    fun backgroundCompletionWaitsForNotificationReplacementAfterProgressFlush() {
+        val coordinator = IosBackgroundCallbackCoordinator()
+
+        coordinator.beginProcessing() // Progress flush.
+        coordinator.beginProcessing() // Notification-center replacement callback.
+        assertNull(coordinator.register { })
+        assertNull(coordinator.finishEvents())
+        assertNull(coordinator.endProcessing())
+        assertNotNull(coordinator.endProcessing())
     }
 
     @Test

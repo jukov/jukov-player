@@ -83,6 +83,7 @@ class IosOfflinePlatform internal constructor(
     private val generationLock = NSLock()
     private val progressLock = NSLock()
     private val progressCoalescer = IosProgressCoalescer()
+    private val liveActivityProgress = IosLiveActivityProgressCoalescer()
     private var cancellationGeneration = 0L
     private val cancelledAccountTokens = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskDescriptions = MutableStateFlow<Set<String>>(emptySet())
@@ -104,6 +105,7 @@ class IosOfflinePlatform internal constructor(
     }
 
     override fun enqueue(accountKey: String) {
+        clearCompletionNotification()
         requestNotificationAuthorization()
         val generation = currentCancellationGeneration()
         submitOperation { schedulePending(accountKey, generation, allowCancelledRetry = true) }
@@ -121,6 +123,7 @@ class IosOfflinePlatform internal constructor(
         runOperationAndWait {
             cancelTasks { it == description }
             schedulePending(accountKey, generation, allowCancelledRetry = false)
+            refreshProgressAfterCancellation(accountKey, setOf(trackId))
         }
         partUrl(accountKey, trackId).removeIfPresent()
     }
@@ -134,6 +137,7 @@ class IosOfflinePlatform internal constructor(
         runOperationAndWait {
             cancelTasks { it in descriptions }
             schedulePending(accountKey, generation, allowCancelledRetry = false)
+            refreshProgressAfterCancellation(accountKey, trackIds.toSet())
         }
         trackIds.forEach { partUrl(accountKey, it).removeIfPresent() }
     }
@@ -144,6 +148,7 @@ class IosOfflinePlatform internal constructor(
         cancelledAccountTokens.update { it + accountToken }
         runOperationAndWait {
             cancelTasks { parseIosTaskDescription(it)?.accountToken == accountToken }
+            endLiveActivity()
         }
     }
 
@@ -231,7 +236,7 @@ class IosOfflinePlatform internal constructor(
             )
         }
         if (shouldSchedule) {
-            submitOperation { flushProgress(taskIdentifier) }
+            submitProgressFlush(taskIdentifier)
         }
     }
 
@@ -386,11 +391,18 @@ class IosOfflinePlatform internal constructor(
                     return@forEach
                 }
                 task.resume()
+                postLiveActivityProgress(
+                    progress = null,
+                    pendingCount = dao.pendingOfflineTrackCount(accountKey),
+                )
             }
         }
         dao.allOfflineTracks(accountKey)
             .filter { it.state == DownloadState.Completed.name }
             .forEach { scheduleArtwork(accountKey, it.trackId, generation) }
+        if (dao.pendingOfflineTrackCount(accountKey) == 0) {
+            endLiveActivity()
+        }
     }
 
     private suspend fun processCompletedDownload(
@@ -614,6 +626,8 @@ class IosOfflinePlatform internal constructor(
                             schedulePending(accountKey, generation, allowCancelledRetry = true)
                         }
                     }
+                } else if (dao.pendingOfflineTrackCount(accountKey) == 0) {
+                    endLiveActivity()
                 }
             }
             TASK_ARTWORK -> {
@@ -652,11 +666,32 @@ class IosOfflinePlatform internal constructor(
                     downloadedBytes = progress.downloadedBytes,
                     expectedSize = progress.expectedSize,
                 )
+                postLiveActivityProgress(
+                    progress = progress.expectedSize?.let { expectedSize ->
+                        if (expectedSize > 0) {
+                            (progress.downloadedBytes * 100 / expectedSize).toInt().coerceIn(0, 100)
+                        } else {
+                            null
+                        }
+                    },
+                    pendingCount = dao.pendingOfflineTrackCount(accountKey),
+                )
             }
         }
         val shouldReschedule = withProgressLock { progressCoalescer.completeFlush(taskIdentifier) }
         if (shouldReschedule) {
-            submitOperation { flushProgress(taskIdentifier) }
+            submitProgressFlush(taskIdentifier)
+        }
+    }
+
+    private fun submitProgressFlush(taskIdentifier: ULong) {
+        beginCallbackProcessing()
+        submitOperation {
+            try {
+                flushProgress(taskIdentifier)
+            } finally {
+                endCallbackProcessing()
+            }
         }
     }
 
@@ -823,6 +858,7 @@ class IosOfflinePlatform internal constructor(
     }
 
     private fun postCompletionNotification(completedCount: Int) {
+        endLiveActivity()
         val content = UNMutableNotificationContent().apply {
             setTitle("Downloads completed")
             setBody("$completedCount tracks are available offline")
@@ -835,6 +871,54 @@ class IosOfflinePlatform internal constructor(
             trigger = null,
         )
         UNUserNotificationCenter.currentNotificationCenter().addNotificationRequest(request) { }
+    }
+
+    private fun postLiveActivityProgress(progress: Int?, pendingCount: Int) {
+        clearCompletionNotification()
+        val state = IosLiveActivityProgress(progress, pendingCount)
+        if (!liveActivityProgress.shouldPublish(state)) {
+            return
+        }
+        val userInfo = mutableMapOf<Any?, Any?>(
+            LIVE_ACTIVITY_PENDING_COUNT_KEY to pendingCount.coerceAtLeast(1),
+        ).apply {
+            progress?.let { put(LIVE_ACTIVITY_PERCENT_KEY, it.coerceIn(0, 100)) }
+        }
+        NSNotificationCenter.defaultCenter.postNotificationName(
+            aName = LIVE_ACTIVITY_UPDATE_NOTIFICATION,
+            `object` = null,
+            userInfo = userInfo,
+        )
+    }
+
+    private fun endLiveActivity() {
+        liveActivityProgress.reset()
+        NSNotificationCenter.defaultCenter.postNotificationName(
+            aName = LIVE_ACTIVITY_END_NOTIFICATION,
+            `object` = null,
+        )
+    }
+
+    private fun clearCompletionNotification() {
+        val identifiers = iosNotificationsClearedOnDownloadStart().toList()
+        val center = UNUserNotificationCenter.currentNotificationCenter()
+        center.removePendingNotificationRequestsWithIdentifiers(identifiers)
+        center.removeDeliveredNotificationsWithIdentifiers(identifiers)
+    }
+
+    private suspend fun refreshProgressAfterCancellation(
+        accountKey: String,
+        cancelledTrackIds: Set<String>,
+    ) {
+        val pendingCount = remainingIosDownloadCount(
+            pendingTrackIds = dao.pendingOfflineTracks(accountKey).mapTo(hashSetOf()) { it.trackId },
+            cancelledTrackIds = cancelledTrackIds,
+        )
+        if (pendingCount == 0) {
+            endLiveActivity()
+        } else {
+            postLiveActivityProgress(progress = null, pendingCount = pendingCount)
+        }
     }
 
     private suspend fun currentTasks(): List<NSURLSessionTask> = suspendCoroutine { continuation ->
@@ -930,29 +1014,75 @@ internal class IosProgressCoalescer {
     }
 }
 
+internal data class IosLiveActivityProgress(
+    val percent: Int?,
+    val pendingCount: Int,
+)
+
+internal class IosLiveActivityProgressCoalescer {
+    private var lastPublished: IosLiveActivityProgress? = null
+
+    fun shouldPublish(progress: IosLiveActivityProgress): Boolean {
+        val normalized = progress.copy(percent = progress.percent?.coerceIn(0, 100))
+        if (normalized == lastPublished) {
+            return false
+        }
+        lastPublished = normalized
+        return true
+    }
+
+    fun reset() {
+        lastPublished = null
+    }
+}
+
+internal fun remainingIosDownloadCount(
+    pendingTrackIds: Set<String>,
+    cancelledTrackIds: Set<String>,
+): Int = pendingTrackIds.count { it !in cancelledTrackIds }
+
+internal fun iosNotificationsClearedOnDownloadStart(): Set<String> =
+    setOf(COMPLETION_NOTIFICATION_IDENTIFIER)
+
 internal class IosBackgroundCallbackCoordinator {
+    private val lock = NSLock()
     private var completionHandler: (() -> Unit)? = null
     private var eventsFinished = false
     private var processingCallbacks = 0
 
     fun register(handler: () -> Unit): (() -> Unit)? {
-        completionHandler = handler
-        return takeCompletionIfReady()
+        return withLock {
+            completionHandler = handler
+            takeCompletionIfReady()
+        }
     }
 
     fun beginProcessing() {
-        processingCallbacks++
+        withLock { processingCallbacks++ }
     }
 
     fun endProcessing(): (() -> Unit)? {
-        check(processingCallbacks > 0) { "No background callback is being processed" }
-        processingCallbacks--
-        return takeCompletionIfReady()
+        return withLock {
+            check(processingCallbacks > 0) { "No background callback is being processed" }
+            processingCallbacks--
+            takeCompletionIfReady()
+        }
     }
 
     fun finishEvents(): (() -> Unit)? {
-        eventsFinished = true
-        return takeCompletionIfReady()
+        return withLock {
+            eventsFinished = true
+            takeCompletionIfReady()
+        }
+    }
+
+    private fun <T> withLock(block: () -> T): T {
+        lock.lock()
+        return try {
+            block()
+        } finally {
+            lock.unlock()
+        }
     }
 
     private fun takeCompletionIfReady(): (() -> Unit)? {
@@ -1039,7 +1169,11 @@ internal fun isApiErrorContentType(contentType: String?): Boolean =
 
 private const val BACKGROUND_SESSION_IDENTIFIER = "info.jukov.player.offline-downloads"
 private const val NOTIFICATION_OPEN_DOWNLOADS_KEY = "openDownloads"
-private const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-completed"
+private const val LIVE_ACTIVITY_UPDATE_NOTIFICATION = "info.jukov.player.downloadActivity.update"
+private const val LIVE_ACTIVITY_END_NOTIFICATION = "info.jukov.player.downloadActivity.end"
+private const val LIVE_ACTIVITY_PERCENT_KEY = "percent"
+private const val LIVE_ACTIVITY_PENDING_COUNT_KEY = "pendingCount"
+internal const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-completed"
 private const val OFFLINE_DIRECTORY = "offline"
 private const val TRACKS_DIRECTORY = "tracks"
 private const val ARTWORK_DIRECTORY = "artwork"

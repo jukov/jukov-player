@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import platform.Foundation.NSLock
+import platform.Foundation.NSURL
 
 object IosAppRuntime {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -47,6 +48,12 @@ object IosAppRuntime {
 
     fun requestOpenDownloads() {
         _openDownloads.value = true
+    }
+
+    fun handleDeepLink(url: String) {
+        if (isIosDownloadsDeepLink(url)) {
+            requestOpenDownloads()
+        }
     }
 
     fun start() {
@@ -90,6 +97,17 @@ object IosAppRuntime {
         _openDownloads.value = false
     }
 }
+
+internal fun isIosDownloadsDeepLink(value: String): Boolean {
+    val url = NSURL.URLWithString(value) ?: return false
+    val path = url.path.orEmpty()
+    return url.scheme.equals(IOS_APP_URL_SCHEME, ignoreCase = true) &&
+        url.host.equals(IOS_DOWNLOADS_URL_HOST, ignoreCase = true) &&
+        (path.isEmpty() || path == "/")
+}
+
+private const val IOS_APP_URL_SCHEME = "jukovplayer"
+private const val IOS_DOWNLOADS_URL_HOST = "downloads"
 
 fun MainViewController() = ComposeUIViewController {
     val openDownloads by IosAppRuntime.openDownloads.collectAsStateWithLifecycle()
