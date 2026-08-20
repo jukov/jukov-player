@@ -47,6 +47,15 @@ import kotlin.test.assertNull
 class SharedLogicIOSTest {
 
     @Test
+    fun downloadsDeepLinkMatchesOnlyDownloadsDestination() {
+        assertTrue(isIosDownloadsDeepLink("jukovplayer://downloads"))
+        assertTrue(isIosDownloadsDeepLink("JUKOVPLAYER://DOWNLOADS/"))
+        assertFalse(isIosDownloadsDeepLink("jukovplayer://library"))
+        assertFalse(isIosDownloadsDeepLink("https://downloads"))
+        assertFalse(isIosDownloadsDeepLink("not a url"))
+    }
+
+    @Test
     fun offlinePathComponentsAreStableAndAccountScoped() {
         val first = safeComponent("https://music.example|listener")
         val repeated = safeComponent("https://music.example|listener")

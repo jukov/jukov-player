@@ -6,7 +6,8 @@ struct DownloadActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: DownloadActivityAttributes.self) { context in
             DownloadActivityView(state: context.state)
-                .activityBackgroundTint(Color.black.opacity(0.9))
+                .widgetURL(DownloadActivityAttributes.downloadsURL)
+                .activityBackgroundTint(.black)
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -29,6 +30,8 @@ struct DownloadActivityWidget: Widget {
                 Image(systemName: "arrow.down")
                     .foregroundStyle(.blue)
             }
+            .widgetURL(DownloadActivityAttributes.downloadsURL)
+            .keylineTint(.blue)
         }
     }
 }

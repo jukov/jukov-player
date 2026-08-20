@@ -15,6 +15,19 @@
 	<string>$(APP_DISPLAY_NAME)</string>
 	<key>CFBundleName</key>
 	<string>the only player</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>info.jukov.player.downloads</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>jukovplayer</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>the only player connects to your Navidrome server on your local network.</string>
 	<key>UIBackgroundModes</key>
