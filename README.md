@@ -34,7 +34,9 @@ One-time setup on the publishing Mac:
 2. Install the `Jukovplayer App Store` provisioning profile for the explicit
    App ID `com.nberezovskii.jukovplayer`. The profile must contain the installed
    distribution certificate. A team Account Holder or Admin creates and
-   refreshes this profile in Certificates, Identifiers & Profiles.
+   refreshes this profile in Certificates, Identifiers & Profiles. Xcode
+   validates the profile type, expiration, App ID, and embedded certificate
+   when it archives the app.
 3. Sign in to Xcode with an App Store Connect user who can upload builds.
 4. Keep the Firebase iOS app and `iosApp/iosApp/GoogleService-Info.plist`
    registered to the same Bundle ID so Crashlytics can upload release symbols.
