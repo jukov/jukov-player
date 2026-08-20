@@ -239,7 +239,7 @@ class IosOfflinePlatform internal constructor(
             )
         }
         if (shouldSchedule) {
-            submitOperation { flushProgress(taskIdentifier) }
+            submitProgressFlush(taskIdentifier)
         }
     }
 
@@ -683,7 +683,18 @@ class IosOfflinePlatform internal constructor(
         }
         val shouldReschedule = withProgressLock { progressCoalescer.completeFlush(taskIdentifier) }
         if (shouldReschedule) {
-            submitOperation { flushProgress(taskIdentifier) }
+            submitProgressFlush(taskIdentifier)
+        }
+    }
+
+    private fun submitProgressFlush(taskIdentifier: ULong) {
+        beginCallbackProcessing()
+        submitOperation {
+            try {
+                flushProgress(taskIdentifier)
+            } finally {
+                endCallbackProcessing()
+            }
         }
     }
 
@@ -888,11 +899,11 @@ class IosOfflinePlatform internal constructor(
             content = content,
             trigger = null,
         )
+        beginCallbackProcessing()
         center.addNotificationRequest(request) { error ->
-            if (error == null) {
-                scope.launch {
-                    delay(PROGRESS_NOTIFICATION_REPLACEMENT_DELAY_MS)
-                    submitOperation {
+            submitOperation {
+                try {
+                    if (error == null) {
                         val staleIdentifiers = progressNotificationReplacement
                             .staleIdentifiersAfterDelivery(identifier)
                             .toList()
@@ -901,6 +912,8 @@ class IosOfflinePlatform internal constructor(
                             center.removeDeliveredNotificationsWithIdentifiers(staleIdentifiers)
                         }
                     }
+                } finally {
+                    endCallbackProcessing()
                 }
             }
         }
@@ -1098,28 +1111,44 @@ internal fun iosNotificationsClearedOnDownloadStart(): Set<String> =
     setOf(COMPLETION_NOTIFICATION_IDENTIFIER)
 
 internal class IosBackgroundCallbackCoordinator {
+    private val lock = NSLock()
     private var completionHandler: (() -> Unit)? = null
     private var eventsFinished = false
     private var processingCallbacks = 0
 
     fun register(handler: () -> Unit): (() -> Unit)? {
-        completionHandler = handler
-        return takeCompletionIfReady()
+        return withLock {
+            completionHandler = handler
+            takeCompletionIfReady()
+        }
     }
 
     fun beginProcessing() {
-        processingCallbacks++
+        withLock { processingCallbacks++ }
     }
 
     fun endProcessing(): (() -> Unit)? {
-        check(processingCallbacks > 0) { "No background callback is being processed" }
-        processingCallbacks--
-        return takeCompletionIfReady()
+        return withLock {
+            check(processingCallbacks > 0) { "No background callback is being processed" }
+            processingCallbacks--
+            takeCompletionIfReady()
+        }
     }
 
     fun finishEvents(): (() -> Unit)? {
-        eventsFinished = true
-        return takeCompletionIfReady()
+        return withLock {
+            eventsFinished = true
+            takeCompletionIfReady()
+        }
+    }
+
+    private fun <T> withLock(block: () -> T): T {
+        lock.lock()
+        return try {
+            block()
+        } finally {
+            lock.unlock()
+        }
     }
 
     private fun takeCompletionIfReady(): (() -> Unit)? {
@@ -1208,7 +1237,6 @@ private const val BACKGROUND_SESSION_IDENTIFIER = "info.jukov.player.offline-dow
 private const val NOTIFICATION_OPEN_DOWNLOADS_KEY = "openDownloads"
 private const val NOTIFICATION_PROGRESS_KEY = "downloadProgress"
 private const val PROGRESS_NOTIFICATION_IDENTIFIER = "offline-downloads-progress"
-private const val PROGRESS_NOTIFICATION_REPLACEMENT_DELAY_MS = 750L
 internal const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-completed"
 private const val OFFLINE_DIRECTORY = "offline"
 private const val TRACKS_DIRECTORY = "tracks"

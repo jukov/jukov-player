@@ -306,6 +306,18 @@ class SharedLogicIOSTest {
     }
 
     @Test
+    fun backgroundCompletionWaitsForNotificationReplacementAfterProgressFlush() {
+        val coordinator = IosBackgroundCallbackCoordinator()
+
+        coordinator.beginProcessing() // Progress flush.
+        coordinator.beginProcessing() // Notification-center replacement callback.
+        assertNull(coordinator.register { })
+        assertNull(coordinator.finishEvents())
+        assertNull(coordinator.endProcessing())
+        assertNotNull(coordinator.endProcessing())
+    }
+
+    @Test
     fun backgroundCompletionHandlesSystemCallbackBeforeRuntimeRegistration() {
         val coordinator = IosBackgroundCallbackCoordinator()
         var completions = 0
