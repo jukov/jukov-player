@@ -15,6 +15,7 @@ import info.jukov.player.feature.download.IosBackgroundCallbackCoordinator
 import info.jukov.player.feature.download.IosProgressCoalescer
 import info.jukov.player.feature.download.IosDownloadNotificationProgress
 import info.jukov.player.feature.download.IosNotificationProgressCoalescer
+import info.jukov.player.feature.download.IosProgressNotificationReplacementCoordinator
 import info.jukov.player.feature.download.finalizeIosDownload
 import info.jukov.player.feature.download.iosDownloadNotificationText
 import info.jukov.player.feature.download.remainingIosDownloadCount
@@ -262,6 +263,17 @@ class SharedLogicIOSTest {
             setOf(COMPLETION_NOTIFICATION_IDENTIFIER),
             iosNotificationsClearedOnDownloadStart(),
         )
+    }
+
+    @Test
+    fun progressNotificationReplacementKeepsOldVersionUntilNewOneIsDelivered() {
+        val coordinator = IosProgressNotificationReplacementCoordinator("progress")
+        val first = coordinator.nextIdentifier()
+        val second = coordinator.nextIdentifier()
+
+        assertEquals(emptySet(), coordinator.staleIdentifiersAfterDelivery(first))
+        assertEquals(setOf(first), coordinator.staleIdentifiersAfterDelivery(second))
+        assertEquals(setOf(second), coordinator.reset())
     }
 
     @Test
