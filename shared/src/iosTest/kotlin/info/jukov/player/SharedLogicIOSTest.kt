@@ -18,6 +18,8 @@ import info.jukov.player.feature.download.IosNotificationProgressCoalescer
 import info.jukov.player.feature.download.finalizeIosDownload
 import info.jukov.player.feature.download.iosDownloadNotificationText
 import info.jukov.player.feature.download.remainingIosDownloadCount
+import info.jukov.player.feature.download.COMPLETION_NOTIFICATION_IDENTIFIER
+import info.jukov.player.feature.download.iosNotificationsClearedOnDownloadStart
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
@@ -252,6 +254,14 @@ class SharedLogicIOSTest {
 
         assertEquals(2, remainingIosDownloadCount(pending, setOf("two")))
         assertEquals(0, remainingIosDownloadCount(pending, pending))
+    }
+
+    @Test
+    fun startingDownloadClearsPreviousCompletionNotification() {
+        assertEquals(
+            setOf(COMPLETION_NOTIFICATION_IDENTIFIER),
+            iosNotificationsClearedOnDownloadStart(),
+        )
     }
 
     @Test

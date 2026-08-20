@@ -105,6 +105,7 @@ class IosOfflinePlatform internal constructor(
     }
 
     override fun enqueue(accountKey: String) {
+        clearCompletionNotification()
         requestNotificationAuthorization()
         val generation = currentCancellationGeneration()
         submitOperation { schedulePending(accountKey, generation, allowCancelledRetry = true) }
@@ -862,6 +863,7 @@ class IosOfflinePlatform internal constructor(
     }
 
     private fun postProgressNotification(progress: Int?, pendingCount: Int) {
+        clearCompletionNotification()
         val state = IosDownloadNotificationProgress(progress, pendingCount)
         if (!notificationProgress.shouldPublish(state)) {
             return
@@ -891,6 +893,13 @@ class IosOfflinePlatform internal constructor(
         val center = UNUserNotificationCenter.currentNotificationCenter()
         center.removePendingNotificationRequestsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
         center.removeDeliveredNotificationsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
+    }
+
+    private fun clearCompletionNotification() {
+        val identifiers = iosNotificationsClearedOnDownloadStart().toList()
+        val center = UNUserNotificationCenter.currentNotificationCenter()
+        center.removePendingNotificationRequestsWithIdentifiers(identifiers)
+        center.removeDeliveredNotificationsWithIdentifiers(identifiers)
     }
 
     private suspend fun refreshProgressAfterCancellation(
@@ -1034,6 +1043,9 @@ internal fun remainingIosDownloadCount(
     cancelledTrackIds: Set<String>,
 ): Int = pendingTrackIds.count { it !in cancelledTrackIds }
 
+internal fun iosNotificationsClearedOnDownloadStart(): Set<String> =
+    setOf(COMPLETION_NOTIFICATION_IDENTIFIER)
+
 internal class IosBackgroundCallbackCoordinator {
     private var completionHandler: (() -> Unit)? = null
     private var eventsFinished = false
@@ -1145,7 +1157,7 @@ private const val BACKGROUND_SESSION_IDENTIFIER = "info.jukov.player.offline-dow
 private const val NOTIFICATION_OPEN_DOWNLOADS_KEY = "openDownloads"
 private const val NOTIFICATION_PROGRESS_KEY = "downloadProgress"
 private const val PROGRESS_NOTIFICATION_IDENTIFIER = "offline-downloads-progress"
-private const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-completed"
+internal const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-completed"
 private const val OFFLINE_DIRECTORY = "offline"
 private const val TRACKS_DIRECTORY = "tracks"
 private const val ARTWORK_DIRECTORY = "artwork"
