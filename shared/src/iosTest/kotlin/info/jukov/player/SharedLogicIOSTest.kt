@@ -17,6 +17,7 @@ import info.jukov.player.feature.download.IosDownloadNotificationProgress
 import info.jukov.player.feature.download.IosNotificationProgressCoalescer
 import info.jukov.player.feature.download.finalizeIosDownload
 import info.jukov.player.feature.download.iosDownloadNotificationText
+import info.jukov.player.feature.download.remainingIosDownloadCount
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
@@ -243,6 +244,14 @@ class SharedLogicIOSTest {
             "1 track remaining",
             iosDownloadNotificationText(IosDownloadNotificationProgress(null, 1)),
         )
+    }
+
+    @Test
+    fun cancelledDownloadsAreExcludedFromNotificationQueueSize() {
+        val pending = setOf("one", "two", "three")
+
+        assertEquals(2, remainingIosDownloadCount(pending, setOf("two")))
+        assertEquals(0, remainingIosDownloadCount(pending, pending))
     }
 
     @Test

@@ -122,6 +122,7 @@ class IosOfflinePlatform internal constructor(
         runOperationAndWait {
             cancelTasks { it == description }
             schedulePending(accountKey, generation, allowCancelledRetry = false)
+            refreshProgressAfterCancellation(accountKey, setOf(trackId))
         }
         partUrl(accountKey, trackId).removeIfPresent()
     }
@@ -135,6 +136,7 @@ class IosOfflinePlatform internal constructor(
         runOperationAndWait {
             cancelTasks { it in descriptions }
             schedulePending(accountKey, generation, allowCancelledRetry = false)
+            refreshProgressAfterCancellation(accountKey, trackIds.toSet())
         }
         trackIds.forEach { partUrl(accountKey, it).removeIfPresent() }
     }
@@ -145,6 +147,7 @@ class IosOfflinePlatform internal constructor(
         cancelledAccountTokens.update { it + accountToken }
         runOperationAndWait {
             cancelTasks { parseIosTaskDescription(it)?.accountToken == accountToken }
+            clearProgressNotification()
         }
     }
 
@@ -890,6 +893,21 @@ class IosOfflinePlatform internal constructor(
         center.removeDeliveredNotificationsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
     }
 
+    private suspend fun refreshProgressAfterCancellation(
+        accountKey: String,
+        cancelledTrackIds: Set<String>,
+    ) {
+        val pendingCount = remainingIosDownloadCount(
+            pendingTrackIds = dao.pendingOfflineTracks(accountKey).mapTo(hashSetOf()) { it.trackId },
+            cancelledTrackIds = cancelledTrackIds,
+        )
+        if (pendingCount == 0) {
+            clearProgressNotification()
+        } else {
+            postProgressNotification(progress = null, pendingCount = pendingCount)
+        }
+    }
+
     private suspend fun currentTasks(): List<NSURLSessionTask> = suspendCoroutine { continuation ->
         session.getAllTasksWithCompletionHandler { tasks ->
             continuation.resume(
@@ -1010,6 +1028,11 @@ internal fun iosDownloadNotificationText(progress: IosDownloadNotificationProgre
     val tracks = if (count == 1) "1 track remaining" else "$count tracks remaining"
     return progress.percent?.let { "${it.coerceIn(0, 100)}% • $tracks" } ?: tracks
 }
+
+internal fun remainingIosDownloadCount(
+    pendingTrackIds: Set<String>,
+    cancelledTrackIds: Set<String>,
+): Int = pendingTrackIds.count { it !in cancelledTrackIds }
 
 internal class IosBackgroundCallbackCoordinator {
     private var completionHandler: (() -> Unit)? = null
