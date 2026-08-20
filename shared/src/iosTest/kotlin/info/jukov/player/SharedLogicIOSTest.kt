@@ -15,12 +15,13 @@ import info.jukov.player.feature.download.IosBackgroundCallbackCoordinator
 import info.jukov.player.feature.download.IosProgressCoalescer
 import info.jukov.player.feature.download.IosDownloadNotificationProgress
 import info.jukov.player.feature.download.IosNotificationProgressCoalescer
-import info.jukov.player.feature.download.IosProgressNotificationReplacementCoordinator
+import info.jukov.player.feature.download.IosNotificationDescriptor
 import info.jukov.player.feature.download.finalizeIosDownload
 import info.jukov.player.feature.download.iosDownloadNotificationText
 import info.jukov.player.feature.download.remainingIosDownloadCount
 import info.jukov.player.feature.download.COMPLETION_NOTIFICATION_IDENTIFIER
 import info.jukov.player.feature.download.iosNotificationsClearedOnDownloadStart
+import info.jukov.player.feature.download.staleIosProgressNotificationIdentifiers
 import info.jukov.player.feature.download.parseIosTaskDescription
 import info.jukov.player.feature.playback.indexAfterQueueAppend
 import info.jukov.player.feature.playback.playbackToggleAction
@@ -266,14 +267,20 @@ class SharedLogicIOSTest {
     }
 
     @Test
-    fun progressNotificationReplacementKeepsOldVersionUntilNewOneIsDelivered() {
-        val coordinator = IosProgressNotificationReplacementCoordinator("progress")
-        val first = coordinator.nextIdentifier()
-        val second = coordinator.nextIdentifier()
+    fun progressNotificationReplacementFindsOldVersionsAfterProcessRelaunch() {
+        val notificationsFromSystem = listOf(
+            IosNotificationDescriptor("progress-from-old-process", isDownloadProgress = true),
+            IosNotificationDescriptor("progress-from-new-process", isDownloadProgress = true),
+            IosNotificationDescriptor("unrelated", isDownloadProgress = false),
+        )
 
-        assertEquals(emptySet(), coordinator.staleIdentifiersAfterDelivery(first))
-        assertEquals(setOf(first), coordinator.staleIdentifiersAfterDelivery(second))
-        assertEquals(setOf(second), coordinator.reset())
+        assertEquals(
+            setOf("progress-from-old-process"),
+            staleIosProgressNotificationIdentifiers(
+                notificationsFromSystem,
+                keepingIdentifier = "progress-from-new-process",
+            ),
+        )
     }
 
     @Test

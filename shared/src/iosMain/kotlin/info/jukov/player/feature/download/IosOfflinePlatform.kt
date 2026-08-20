@@ -84,9 +84,6 @@ class IosOfflinePlatform internal constructor(
     private val progressLock = NSLock()
     private val progressCoalescer = IosProgressCoalescer()
     private val notificationProgress = IosNotificationProgressCoalescer()
-    private val progressNotificationReplacement = IosProgressNotificationReplacementCoordinator(
-        PROGRESS_NOTIFICATION_IDENTIFIER,
-    )
     private var cancellationGeneration = 0L
     private val cancelledAccountTokens = MutableStateFlow<Set<String>>(emptySet())
     private val cancelledTaskDescriptions = MutableStateFlow<Set<String>>(emptySet())
@@ -883,7 +880,7 @@ class IosOfflinePlatform internal constructor(
             return
         }
         val center = UNUserNotificationCenter.currentNotificationCenter()
-        val identifier = progressNotificationReplacement.nextIdentifier()
+        val identifier = "$PROGRESS_NOTIFICATION_IDENTIFIER-${NSUUID.UUID().UUIDString}"
         val content = UNMutableNotificationContent().apply {
             setTitle("Downloading music")
             setBody(iosDownloadNotificationText(state))
@@ -904,13 +901,7 @@ class IosOfflinePlatform internal constructor(
             submitOperation {
                 try {
                     if (error == null) {
-                        val staleIdentifiers = progressNotificationReplacement
-                            .staleIdentifiersAfterDelivery(identifier)
-                            .toList()
-                        if (staleIdentifiers.isNotEmpty()) {
-                            center.removePendingNotificationRequestsWithIdentifiers(staleIdentifiers)
-                            center.removeDeliveredNotificationsWithIdentifiers(staleIdentifiers)
-                        }
+                        removeStaleProgressNotifications(keepingIdentifier = identifier)
                     }
                 } finally {
                     endCallbackProcessing()
@@ -921,12 +912,60 @@ class IosOfflinePlatform internal constructor(
 
     private fun clearProgressNotification() {
         notificationProgress.reset()
-        val identifiers = progressNotificationReplacement.reset().toMutableSet().apply {
-            add(PROGRESS_NOTIFICATION_IDENTIFIER)
-        }.toList()
         val center = UNUserNotificationCenter.currentNotificationCenter()
-        center.removePendingNotificationRequestsWithIdentifiers(identifiers)
-        center.removeDeliveredNotificationsWithIdentifiers(identifiers)
+        center.removePendingNotificationRequestsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
+        center.removeDeliveredNotificationsWithIdentifiers(listOf(PROGRESS_NOTIFICATION_IDENTIFIER))
+        removeStaleProgressNotifications(keepingIdentifier = null)
+    }
+
+    private fun removeStaleProgressNotifications(keepingIdentifier: String?) {
+        val center = UNUserNotificationCenter.currentNotificationCenter()
+        beginCallbackProcessing()
+        center.getPendingNotificationRequestsWithCompletionHandler { requests ->
+            try {
+                val staleIdentifiers = staleIosProgressNotificationIdentifiers(
+                    requests.orEmpty().filterIsInstance<UNNotificationRequest>().map { request ->
+                        IosNotificationDescriptor(
+                            identifier = request.identifier,
+                            isDownloadProgress = request.content.userInfo
+                                .isDownloadProgressNotification(),
+                        )
+                    },
+                    keepingIdentifier = keepingIdentifier,
+                ).toList()
+                if (staleIdentifiers.isNotEmpty()) {
+                    center.removePendingNotificationRequestsWithIdentifiers(staleIdentifiers)
+                }
+            } finally {
+                endCallbackProcessing()
+            }
+        }
+        beginCallbackProcessing()
+        center.getDeliveredNotificationsWithCompletionHandler { notifications ->
+            try {
+                val staleIdentifiers = staleIosProgressNotificationIdentifiers(
+                    notifications.orEmpty().filterIsInstance<platform.UserNotifications.UNNotification>()
+                        .map { notification ->
+                        IosNotificationDescriptor(
+                            identifier = notification.request.identifier,
+                            isDownloadProgress = notification.request.content.userInfo
+                                .isDownloadProgressNotification(),
+                        )
+                    },
+                    keepingIdentifier = keepingIdentifier,
+                ).toList()
+                if (staleIdentifiers.isNotEmpty()) {
+                    center.removeDeliveredNotificationsWithIdentifiers(staleIdentifiers)
+                }
+            } finally {
+                endCallbackProcessing()
+            }
+        }
+    }
+
+    private fun Map<Any?, *>.isDownloadProgressNotification(): Boolean {
+        val value = this[NOTIFICATION_PROGRESS_KEY]
+        return value == true || (value as? NSNumber)?.boolValue == true
     }
 
     private fun clearCompletionNotification() {
@@ -1066,35 +1105,17 @@ internal class IosNotificationProgressCoalescer {
     }
 }
 
-internal class IosProgressNotificationReplacementCoordinator(
-    private val identifierPrefix: String,
-) {
-    private var generation = 0L
-    private var currentIdentifier: String? = null
-    private val identifiers = mutableSetOf<String>()
+internal data class IosNotificationDescriptor(
+    val identifier: String,
+    val isDownloadProgress: Boolean,
+)
 
-    fun nextIdentifier(): String {
-        generation++
-        return "$identifierPrefix-$generation".also { identifier ->
-            currentIdentifier = identifier
-            identifiers += identifier
-        }
-    }
-
-    fun staleIdentifiersAfterDelivery(deliveredIdentifier: String): Set<String> {
-        if (deliveredIdentifier != currentIdentifier) {
-            return emptySet()
-        }
-        return identifiers.filterTo(hashSetOf()) { it != deliveredIdentifier }.also { stale ->
-            identifiers.removeAll(stale)
-        }
-    }
-
-    fun reset(): Set<String> = identifiers.toSet().also {
-        identifiers.clear()
-        currentIdentifier = null
-    }
-}
+internal fun staleIosProgressNotificationIdentifiers(
+    notifications: List<IosNotificationDescriptor>,
+    keepingIdentifier: String?,
+): Set<String> = notifications.asSequence()
+    .filter { it.isDownloadProgress && it.identifier != keepingIdentifier }
+    .mapTo(hashSetOf()) { it.identifier }
 
 internal fun iosDownloadNotificationText(progress: IosDownloadNotificationProgress): String {
     val count = progress.pendingCount.coerceAtLeast(1)
