@@ -946,6 +946,14 @@ class IosOfflinePlatform internal constructor(
                 }
             }
         }
+        queryDeliveredProgressNotifications(cleanupToken, attempt = 0)
+    }
+
+    private fun queryDeliveredProgressNotifications(
+        cleanupToken: IosNotificationCleanupToken,
+        attempt: Int,
+    ) {
+        val center = UNUserNotificationCenter.currentNotificationCenter()
         beginCallbackProcessing()
         center.getDeliveredNotificationsWithCompletionHandler { notifications ->
             submitOperation {
@@ -959,11 +967,35 @@ class IosOfflinePlatform internal constructor(
                                     .isDownloadProgressNotification(),
                             )
                         }
-                    val staleIdentifiers = progressNotificationReplacement
-                        .staleIdentifiersIfCurrent(cleanupToken, descriptors)
-                        .toList()
+                    val decision = progressNotificationReplacement.cleanupDecision(
+                        cleanupToken,
+                        descriptors,
+                    )
+                    val staleIdentifiers = decision.staleIdentifiers.toList()
                     if (staleIdentifiers.isNotEmpty()) {
                         center.removeDeliveredNotificationsWithIdentifiers(staleIdentifiers)
+                    }
+                    if (decision.shouldRetry && attempt < MAX_PROGRESS_NOTIFICATION_CLEANUP_RETRIES) {
+                        scheduleDeliveredProgressCleanupRetry(cleanupToken, attempt + 1)
+                    }
+                } finally {
+                    endCallbackProcessing()
+                }
+            }
+        }
+    }
+
+    private fun scheduleDeliveredProgressCleanupRetry(
+        cleanupToken: IosNotificationCleanupToken,
+        attempt: Int,
+    ) {
+        beginCallbackProcessing()
+        scope.launch {
+            delay(PROGRESS_NOTIFICATION_CLEANUP_RETRY_DELAY_MS)
+            submitOperation {
+                try {
+                    if (progressNotificationReplacement.isCurrent(cleanupToken)) {
+                        queryDeliveredProgressNotifications(cleanupToken, attempt)
                     }
                 } finally {
                     endCallbackProcessing()
@@ -1124,6 +1156,11 @@ internal data class IosNotificationCleanupToken(
     val keepingIdentifier: String?,
 )
 
+internal data class IosNotificationCleanupDecision(
+    val staleIdentifiers: Set<String> = emptySet(),
+    val shouldRetry: Boolean = false,
+)
+
 internal class IosProgressNotificationReplacementCoordinator {
     private var generation = 0L
 
@@ -1133,21 +1170,32 @@ internal class IosProgressNotificationReplacementCoordinator {
     fun beginClear(): IosNotificationCleanupToken =
         IosNotificationCleanupToken(++generation, keepingIdentifier = null)
 
+    fun isCurrent(token: IosNotificationCleanupToken): Boolean = token.generation == generation
+
+    fun cleanupDecision(
+        token: IosNotificationCleanupToken,
+        notifications: List<IosNotificationDescriptor>,
+    ): IosNotificationCleanupDecision {
+        if (!isCurrent(token)) {
+            return IosNotificationCleanupDecision()
+        }
+        val keepingIdentifier = token.keepingIdentifier
+        if (keepingIdentifier != null && notifications.none { it.identifier == keepingIdentifier }) {
+            return IosNotificationCleanupDecision(shouldRetry = true)
+        }
+        return IosNotificationCleanupDecision(
+            staleIdentifiers = staleIosProgressNotificationIdentifiers(
+                notifications,
+                keepingIdentifier = keepingIdentifier,
+            ),
+        )
+    }
+
     fun staleIdentifiersIfCurrent(
         token: IosNotificationCleanupToken,
         notifications: List<IosNotificationDescriptor>,
     ): Set<String> {
-        if (token.generation != generation) {
-            return emptySet()
-        }
-        val keepingIdentifier = token.keepingIdentifier
-        if (keepingIdentifier != null && notifications.none { it.identifier == keepingIdentifier }) {
-            return emptySet()
-        }
-        return staleIosProgressNotificationIdentifiers(
-            notifications,
-            keepingIdentifier = keepingIdentifier,
-        )
+        return cleanupDecision(token, notifications).staleIdentifiers
     }
 }
 
@@ -1299,6 +1347,8 @@ private const val BACKGROUND_SESSION_IDENTIFIER = "info.jukov.player.offline-dow
 private const val NOTIFICATION_OPEN_DOWNLOADS_KEY = "openDownloads"
 private const val NOTIFICATION_PROGRESS_KEY = "downloadProgress"
 private const val PROGRESS_NOTIFICATION_IDENTIFIER = "offline-downloads-progress"
+private const val PROGRESS_NOTIFICATION_CLEANUP_RETRY_DELAY_MS = 250L
+private const val MAX_PROGRESS_NOTIFICATION_CLEANUP_RETRIES = 4
 internal const val COMPLETION_NOTIFICATION_IDENTIFIER = "offline-downloads-completed"
 private const val OFFLINE_DIRECTORY = "offline"
 private const val TRACKS_DIRECTORY = "tracks"

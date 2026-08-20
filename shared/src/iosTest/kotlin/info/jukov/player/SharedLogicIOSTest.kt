@@ -309,14 +309,20 @@ class SharedLogicIOSTest {
             IosNotificationDescriptor("progress-old", isDownloadProgress = true),
         )
 
-        assertEquals(emptySet(), coordinator.staleIdentifiersIfCurrent(cleanup, oldOnly))
+        val deferred = coordinator.cleanupDecision(cleanup, oldOnly)
+        assertEquals(emptySet(), deferred.staleIdentifiers)
+        assertTrue(deferred.shouldRetry)
+        val delivered = coordinator.cleanupDecision(
+            cleanup,
+            oldOnly + IosNotificationDescriptor("progress-new", isDownloadProgress = true),
+        )
         assertEquals(
             setOf("progress-old"),
-            coordinator.staleIdentifiersIfCurrent(
-                cleanup,
-                oldOnly + IosNotificationDescriptor("progress-new", isDownloadProgress = true),
-            ),
+            delivered.staleIdentifiers,
         )
+        assertFalse(delivered.shouldRetry)
+        coordinator.beginClear()
+        assertFalse(coordinator.cleanupDecision(cleanup, oldOnly).shouldRetry)
     }
 
     @Test
