@@ -9,6 +9,7 @@ import info.jukov.player.feature.playback.data.PlaybackStore
 import info.jukov.player.feature.playback.domain.PlaybackOrigin
 import info.jukov.player.feature.playback.domain.RepeatMode
 import info.jukov.player.feature.track.domain.Track
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,15 +19,23 @@ import platform.AVFAudio.AVAudioSessionInterruptionOptionShouldResume
 import platform.AVFAudio.AVAudioSessionInterruptionTypeBegan
 import platform.AVFAudio.AVAudioSessionInterruptionTypeEnded
 import platform.AVFoundation.AVQueuePlayer
+import platform.AVFoundation.isPlayable
+import platform.Foundation.NSData
+import platform.Foundation.NSFileManager
+import platform.Foundation.NSTemporaryDirectory
+import platform.Foundation.NSURL
+import platform.Foundation.create
+import platform.Foundation.writeToURL
 import platform.MediaPlayer.MPRemoteCommandHandlerStatusNoSuchContent
 import platform.MediaPlayer.MPRemoteCommandHandlerStatusSuccess
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 class IosPlaybackControllerIntegrationTest {
     @Test
     fun playerItemCompletionAdvancesQueueAndPersistsIndex() {
@@ -121,6 +130,34 @@ class IosPlaybackControllerIntegrationTest {
     }
 
     @Test
+    fun localAudioUsesContentTypeWhenFileExtensionIsGeneric() {
+        val url = NSURL.fileURLWithPath(NSTemporaryDirectory())
+            .URLByAppendingPathComponent("offline-playback-test.audio")!!
+        val data = NSData.create(
+            base64EncodedString = WAV_FIXTURE_BASE64,
+            options = 0u,
+        )!!
+        assertTrue(data.writeToURL(url, atomically = true))
+
+        try {
+            val asset = createIosPlaybackAsset(url, contentType = "audio/wav")!!
+
+            assertTrue(asset.isPlayable())
+        } finally {
+            NSFileManager.defaultManager.removeItemAtURL(url, error = null)
+        }
+    }
+
+    @Test
+    fun contentTypeOverrideIsLimitedToLocalFiles() {
+        val remoteUrl = NSURL.URLWithString("https://example.invalid/track.mp3")!!
+        val localUrl = NSURL.fileURLWithPath("/tmp/track.audio")
+
+        assertNull(createIosPlaybackAsset(remoteUrl, contentType = "audio/mpeg"))
+        assertNull(createIosPlaybackAsset(localUrl, contentType = null))
+    }
+
+    @Test
     fun interruptionPausesAndResumesPlaybackIntent() {
         val controller = controller(RecordingPlaybackStore())
         controller.play(tracks(1), startIndex = 0)
@@ -212,6 +249,9 @@ class IosPlaybackControllerIntegrationTest {
         )
     }
 }
+
+private const val WAV_FIXTURE_BASE64 =
+    "UklGRmYDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAATElTVBoAAABJTkZPSVNGVA0AAABMYXZmNjIuMy4xMDAAAGRhdGEgAwAAIgE/BUgKtg3BD8QPDA6PCucFfwAR+zH2f/Jj8CHwv/EN9aX5/v52BGcJOw1+D+0Peg5QC9AGggEG/AP3D/Ok8AnwUvFX9Lz4/v19A5IIpAw3D/0P4A4ADLUHgQIB/dz3rfPz8AHw8/Cs89v3Af2AArUHAAzfDv0PNw+kDJMIfgMA/r34V/RS8Qnwo/AP8wL3BfyBAc8GTwt5Du0Pfw87DWcJdwT//qb5DfW/8SHwY/B+8jL2DvuAAOMFlAoEDs0Ptw/FDTMKbAUAAJX6zvU78krwM/D78Wz1HPp///EEzgmCDZwP3w9BDvQKWwYCAYr7mfbF8oLwE/CG8bD0MPl+/voD/gjxDFwP9w+vDqkLQwcCAoP8bvdc88nwA/Ag8QD0S/h//f8CJAhTDA0P/w8ND1MMJQgAA4D9TPgA9CHxA/DJ8FzzbfeD/AECQgepC64O9w9cD/EM/gj7A3/+Mfmw9IfxE/CC8MXymfaJ+wEBWgbzCkAO3w+cD4INzgnyBID/Hfpt9fzxM/BJ8DvyzvWU+v//awUyCsUNtw/NDwUOlArkBYEAD/sz9n7yZPAh8L/xDPWl+f/+dgRnCTsNfg/tD3kOUAvQBoIBBvwC9w/zpPAJ8FLxVvS9+P79fQOSCKQMNw/9D+AOAAy1B4ECAf3b963z8/AB8PPwrfPb9wD9gAK1B/8L3w79DzcPpAySCH4D//29+Ff0UvEJ8KPwD/MC9wX8gQHPBlALeQ7tD38POw1oCXcE//6m+Q31v/Eh8GPwfvIy9g77gADjBZQKBQ7ND7YPxQ0yCmwFAQCV+s71PPJJ8DPw+/Fs9Rz6f//xBM4JgQ2cD98PQQ70ClsGAgGK+5r2xfKC8BPwh/Gw9DD5fv76A/0I8QxdD/cPrg6pC0MHAQKD/G73XPPJ8APwIPEA9Ev4f/3/AiQIUwwND/8PDQ9TDCUIAAOA/Uv4APQg8QPwyfBc8273gvwBAkMHqQuuDvcPXQ/xDP4I+wN//jH5sfSH8RPwgfDF8pn2ifsBAVoG8wpBDt8PnQ+BDc8J8ASC/xn6cvXz8T/wO/BQ8q311vo="
 
 private class RecordingFavoriteMutator : FavoriteMutator {
     override val pending: StateFlow<Set<String>> = MutableStateFlow(emptySet())
