@@ -65,11 +65,11 @@ class ArtistsViewModel(
             authRepository.authState.collect { authState ->
                 when (authState) {
                     is AuthState.LoggedIn -> loadArtists(forceRefresh = false)
-                    AuthState.LoggedOut -> _state.update {
+                    AuthState.LoggedOut -> {
                         loadJob?.cancel()
                         closeSearch()
                         _loadingOrigin.value = null
-                        LoadableState.Content(emptyList())
+                        _state.value = LoadableState.Content(emptyList())
                     }
                 }
             }
@@ -151,13 +151,40 @@ class ArtistsViewModel(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             getArtistsUseCase(forceRefresh).collect { state ->
-                _state.value = state.mapContent { it.sortedArtists(_sort.value) }
-                _loadingOrigin.value = when (state) {
-                    is LoadableState.Loading -> requestedOrigin
-                        ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic
-                    else -> null
-                }
+                publish(state, requestedOrigin)
             }
         }
+    }
+
+    private fun publish(
+        state: LoadableState<List<Artist>>,
+        requestedOrigin: LoadingOrigin?,
+    ) {
+        _state.update { current ->
+            state.withFallbackContent(current.content).mapContent { artists ->
+                artists.sortedArtists(_sort.value)
+            }
+        }
+        _loadingOrigin.value = _state.value.loadingOrigin(requestedOrigin)
+    }
+
+    private fun LoadableState<List<Artist>>.withFallbackContent(
+        fallback: List<Artist>?,
+    ): LoadableState<List<Artist>> = when (this) {
+        is LoadableState.Content -> this
+        is LoadableState.Loading -> LoadableState.Loading(content ?: fallback)
+        is LoadableState.Failure -> LoadableState.Failure(error, content ?: fallback)
+    }
+
+    private fun LoadableState<List<Artist>>.loadingOrigin(
+        requestedOrigin: LoadingOrigin?,
+    ): LoadingOrigin? = when (this) {
+        is LoadableState.Loading -> requestedOrigin ?: if (content == null) {
+            LoadingOrigin.Initial
+        } else {
+            LoadingOrigin.Automatic
+        }
+
+        else -> null
     }
 }

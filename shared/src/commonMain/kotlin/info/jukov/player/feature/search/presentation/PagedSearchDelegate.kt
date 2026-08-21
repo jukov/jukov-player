@@ -11,6 +11,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class PagedSearchDelegate<T>(
@@ -41,24 +42,21 @@ class PagedSearchDelegate<T>(
         if (value.trim().length < MIN_QUERY_LENGTH) {
             _state.value = LoadableState.Content(emptyList())
         } else {
-            job = scope.launch {
-                delay(DEBOUNCE_MS)
-                requestPage(append = false)
-            }
+            launchRequest(append = false, debounce = true)
         }
     }
 
     fun loadMore() {
         if (_hasMore.value && job?.isActive != true) {
-            job = scope.launch { requestPage(append = true) }
+            launchRequest(append = true, debounce = false)
         }
     }
 
     fun retry() {
-        job?.cancel()
-        job = scope.launch {
-            requestPage(append = _state.value.content?.isNotEmpty() == true)
-        }
+        launchRequest(
+            append = _state.value.content?.isNotEmpty() == true,
+            debounce = false,
+        )
     }
 
     fun close() {
@@ -74,29 +72,59 @@ class PagedSearchDelegate<T>(
         _state.updateItem(predicate, transform)
     }
 
+    private fun launchRequest(append: Boolean, debounce: Boolean) {
+        job?.cancel()
+        job = scope.launch {
+            if (debounce) {
+                delay(DEBOUNCE_MS)
+            }
+            requestPage(append)
+        }
+    }
+
     private suspend fun requestPage(append: Boolean) {
         val activeQuery = _query.value.trim()
         if (!_active.value || activeQuery.length < MIN_QUERY_LENGTH) {
             return
         }
-        val old = if (append) _state.value.content.orEmpty() else emptyList()
-        _state.value = LoadableState.Loading(old.ifEmpty { null })
+        val old = if (append) {
+            _state.value.content.orEmpty()
+        } else {
+            emptyList()
+        }
+        _state.update { current ->
+            val displayed = if (append) {
+                current.content.orEmpty()
+            } else {
+                emptyList()
+            }
+            LoadableState.Loading(displayed.ifEmpty { null })
+        }
         try {
-            val page = loadPage(activeQuery, if (append) offset else 0, PAGE_SIZE)
+            val requestOffset = if (append) {
+                offset
+            } else {
+                0
+            }
+            val page = loadPage(activeQuery, requestOffset, PAGE_SIZE)
             if (!_active.value || _query.value.trim() != activeQuery) {
                 return
             }
             offset = page.nextOffset
             _hasMore.value = page.hasMore
-            _state.value = LoadableState.Content(old + page.items)
+            _state.update { LoadableState.Content(old + page.items) }
         } catch (error: Throwable) {
             if (error is CancellationException) {
                 throw error
             }
-            _state.value = LoadableState.Failure(
-                error = error.toAppError(AppError.SearchFailed),
-                content = old.ifEmpty { null },
-            )
+            if (_active.value && _query.value.trim() == activeQuery) {
+                _state.update { current ->
+                    LoadableState.Failure(
+                        error = error.toAppError(AppError.SearchFailed),
+                        content = current.content ?: old.ifEmpty { null },
+                    )
+                }
+            }
         }
     }
 

@@ -30,6 +30,9 @@ import info.jukov.player.core.domain.SortPreferences
 import info.jukov.player.core.domain.TrackSortCriterion
 import info.jukov.player.core.domain.sortedTracks
 import info.jukov.player.core.domain.mapContent
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.currentCoroutineContext
 
 class TracksViewModel(
     private val getTracksUseCase: GetTracksUseCase,
@@ -84,27 +87,34 @@ class TracksViewModel(
     }
 
     fun load(filter: TracksFilter, albumIsFavorite: Boolean = false) {
-        if (this.filter == filter) return
+        if (this.filter == filter) {
+            return
+        }
         closeSearch()
-        loadJob?.cancel()
         this.filter = filter
         _hasMore.value = false
         _albumIsFavorite.value = albumIsFavorite
         _state.value = LoadableState.Loading(content = null)
         _loadingOrigin.value = LoadingOrigin.Initial
-        if (filter == TracksFilter.All) loadPage(forceRefresh = false) else loadTracks(forceRefresh = false)
+        loadCurrent(forceRefresh = false)
     }
 
     fun retry() {
         if (filter == TracksFilter.All) {
-            if (_state.value.content.isNullOrEmpty()) loadPage(forceRefresh = true) else loadMore()
-        } else loadTracks(forceRefresh = true)
+            if (_state.value.content.isNullOrEmpty()) {
+                loadPage(forceRefresh = true)
+            } else {
+                loadMore()
+            }
+        } else {
+            loadTracks(forceRefresh = true)
+        }
     }
 
-    fun refresh() {
-        if (filter == TracksFilter.All) loadPage(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
-        else loadTracks(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
-    }
+    fun refresh() = loadCurrent(
+        forceRefresh = true,
+        requestedOrigin = LoadingOrigin.PullToRefresh,
+    )
 
     fun loadMore() {
         if (filter == TracksFilter.All && _hasMore.value && loadJob?.isActive != true) {
@@ -182,19 +192,9 @@ class TracksViewModel(
 
     private fun loadTracks(forceRefresh: Boolean, requestedOrigin: LoadingOrigin? = null) {
         val currentFilter = filter ?: return
-        if (loadJob?.isActive == true) return
-        loadJob = viewModelScope.launch {
+        replaceLoadJob {
             getTracksUseCase(currentFilter, forceRefresh).collect { state ->
-                _state.value = if (currentFilter is TracksFilter.ByArtist) {
-                    state.mapContent { it.sortedTracks(_sort.value) }
-                } else {
-                    state
-                }
-                _loadingOrigin.value = when (state) {
-                    is LoadableState.Loading -> requestedOrigin
-                        ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic
-                    else -> null
-                }
+                publish(state, currentFilter, requestedOrigin)
             }
         }
     }
@@ -204,25 +204,97 @@ class TracksViewModel(
         append: Boolean = false,
         requestedOrigin: LoadingOrigin? = null,
     ) {
-        loadJob?.cancel()
         val displayed = _state.value.content.orEmpty()
-        val previous = if (append) displayed else emptyList()
-        loadJob = viewModelScope.launch {
-            _state.value = LoadableState.Loading(displayed.ifEmpty { null })
+        val offset = if (append) {
+            displayed.size
+        } else {
+            0
+        }
+        replaceLoadJob {
+            _state.update { current ->
+                LoadableState.Loading(current.content?.ifEmpty { null })
+            }
             _loadingOrigin.value = requestedOrigin ?: LoadingOrigin.Initial
             try {
-                val page = getTracksUseCase.page(previous.size, PAGE_SIZE, forceRefresh)
+                val page = getTracksUseCase.page(offset, PAGE_SIZE, forceRefresh)
                 _hasMore.value = page.hasMore
-                _state.value = LoadableState.Content(previous + page.items)
+                _state.update { current ->
+                    val content = if (append) {
+                        current.content.orEmpty() + page.items
+                    } else {
+                        page.items
+                    }
+                    LoadableState.Content(content)
+                }
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Throwable) {
-                _state.value = LoadableState.Failure(
-                    error.toAppError(AppError.TracksLoadFailed),
-                    displayed.ifEmpty { null },
-                )
+                _state.update { current ->
+                    LoadableState.Failure(
+                        error.toAppError(AppError.TracksLoadFailed),
+                        current.content?.ifEmpty { null },
+                    )
+                }
             } finally {
-                _loadingOrigin.value = null
+                if (loadJob === currentCoroutineContext()[Job]) {
+                    _loadingOrigin.value = null
+                }
             }
         }
+    }
+
+    private fun loadCurrent(
+        forceRefresh: Boolean,
+        requestedOrigin: LoadingOrigin? = null,
+    ) {
+        if (filter == TracksFilter.All) {
+            loadPage(forceRefresh, requestedOrigin = requestedOrigin)
+        } else {
+            loadTracks(forceRefresh, requestedOrigin)
+        }
+    }
+
+    private fun replaceLoadJob(block: suspend () -> Unit) {
+        loadJob?.cancel()
+        val replacement = viewModelScope.launch(start = CoroutineStart.LAZY) { block() }
+        loadJob = replacement
+        replacement.start()
+    }
+
+    private fun publish(
+        state: LoadableState<List<Track>>,
+        currentFilter: TracksFilter,
+        requestedOrigin: LoadingOrigin?,
+    ) {
+        _state.update { current ->
+            val displayed = state.withFallbackContent(current.content)
+            if (currentFilter is TracksFilter.ByArtist) {
+                displayed.mapContent { tracks -> tracks.sortedTracks(_sort.value) }
+            } else {
+                displayed
+            }
+        }
+        _loadingOrigin.value = _state.value.loadingOrigin(requestedOrigin)
+    }
+
+    private fun LoadableState<List<Track>>.withFallbackContent(
+        fallback: List<Track>?,
+    ): LoadableState<List<Track>> = when (this) {
+        is LoadableState.Content -> this
+        is LoadableState.Loading -> LoadableState.Loading(content ?: fallback)
+        is LoadableState.Failure -> LoadableState.Failure(error, content ?: fallback)
+    }
+
+    private fun LoadableState<List<Track>>.loadingOrigin(
+        requestedOrigin: LoadingOrigin?,
+    ): LoadingOrigin? = when (this) {
+        is LoadableState.Loading -> requestedOrigin ?: if (content == null) {
+            LoadingOrigin.Initial
+        } else {
+            LoadingOrigin.Automatic
+        }
+
+        else -> null
     }
 
     private companion object {

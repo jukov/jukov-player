@@ -33,6 +33,9 @@ import info.jukov.player.core.domain.SortPreferences
 import info.jukov.player.core.domain.sortedAlbums
 import info.jukov.player.core.domain.mapContent
 import info.jukov.player.core.domain.supportedForGlobalAlbums
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.currentCoroutineContext
 
 class AlbumsViewModel(
     private val getAlbumsUseCase: GetAlbumsUseCase,
@@ -79,7 +82,9 @@ class AlbumsViewModel(
     }
 
     fun load(artistId: String?) {
-        if (initialized && this.artistId == artistId) return
+        if (initialized && this.artistId == artistId) {
+            return
+        }
         closeSearch()
         this.artistId = artistId
         if (artistId == null) {
@@ -93,19 +98,25 @@ class AlbumsViewModel(
         _hasMore.value = false
         _state.value = LoadableState.Loading(content = null)
         _loadingOrigin.value = LoadingOrigin.Initial
-        if (artistId == null) loadPage(forceRefresh = false) else loadAlbums(forceRefresh = false)
+        loadCurrent(forceRefresh = false)
     }
 
     fun retry() {
         if (artistId == null) {
-            if (_state.value.content.isNullOrEmpty()) loadPage(forceRefresh = true) else loadMore()
-        } else loadAlbums(forceRefresh = true)
+            if (_state.value.content.isNullOrEmpty()) {
+                loadPage(forceRefresh = true)
+            } else {
+                loadMore()
+            }
+        } else {
+            loadAlbums(forceRefresh = true)
+        }
     }
 
-    fun refresh() {
-        if (artistId == null) loadPage(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
-        else loadAlbums(forceRefresh = true, requestedOrigin = LoadingOrigin.PullToRefresh)
-    }
+    fun refresh() = loadCurrent(
+        forceRefresh = true,
+        requestedOrigin = LoadingOrigin.PullToRefresh,
+    )
 
     fun loadMore() {
         if (artistId == null && _hasMore.value && loadJob?.isActive != true) {
@@ -171,15 +182,9 @@ class AlbumsViewModel(
     }
 
     private fun loadAlbums(forceRefresh: Boolean, requestedOrigin: LoadingOrigin? = null) {
-        loadJob?.cancel()
-        loadJob = viewModelScope.launch {
+        replaceLoadJob {
             getAlbumsUseCase(artistId, forceRefresh).collect { state ->
-                _state.value = state.mapContent { it.sortedAlbums(_sort.value) }
-                _loadingOrigin.value = when (state) {
-                    is LoadableState.Loading -> requestedOrigin
-                        ?: if (state.content == null) LoadingOrigin.Initial else LoadingOrigin.Automatic
-                    else -> null
-                }
+                publish(state, requestedOrigin)
             }
         }
     }
@@ -189,25 +194,93 @@ class AlbumsViewModel(
         append: Boolean = false,
         requestedOrigin: LoadingOrigin? = null,
     ) {
-        loadJob?.cancel()
         val displayed = _state.value.content.orEmpty()
-        val previous = if (append) displayed else emptyList()
-        loadJob = viewModelScope.launch {
-            _state.value = LoadableState.Loading(displayed.ifEmpty { null })
+        val offset = if (append) {
+            displayed.size
+        } else {
+            0
+        }
+        replaceLoadJob {
+            _state.update { current ->
+                LoadableState.Loading(current.content?.ifEmpty { null })
+            }
             _loadingOrigin.value = requestedOrigin ?: LoadingOrigin.Initial
             try {
-                val page = getAlbumsUseCase.page(previous.size, PAGE_SIZE, _sort.value, forceRefresh)
+                val page = getAlbumsUseCase.page(offset, PAGE_SIZE, _sort.value, forceRefresh)
                 _hasMore.value = page.hasMore
-                _state.value = LoadableState.Content(previous + page.items)
+                _state.update { current ->
+                    val content = if (append) {
+                        current.content.orEmpty() + page.items
+                    } else {
+                        page.items
+                    }
+                    LoadableState.Content(content)
+                }
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Throwable) {
-                _state.value = LoadableState.Failure(
-                    error.toAppError(AppError.AlbumsLoadFailed),
-                    displayed.ifEmpty { null },
-                )
+                _state.update { current ->
+                    LoadableState.Failure(
+                        error.toAppError(AppError.AlbumsLoadFailed),
+                        current.content?.ifEmpty { null },
+                    )
+                }
             } finally {
-                _loadingOrigin.value = null
+                if (loadJob === currentCoroutineContext()[Job]) {
+                    _loadingOrigin.value = null
+                }
             }
         }
+    }
+
+    private fun loadCurrent(
+        forceRefresh: Boolean,
+        requestedOrigin: LoadingOrigin? = null,
+    ) {
+        if (artistId == null) {
+            loadPage(forceRefresh, requestedOrigin = requestedOrigin)
+        } else {
+            loadAlbums(forceRefresh, requestedOrigin)
+        }
+    }
+
+    private fun replaceLoadJob(block: suspend () -> Unit) {
+        loadJob?.cancel()
+        val replacement = viewModelScope.launch(start = CoroutineStart.LAZY) { block() }
+        loadJob = replacement
+        replacement.start()
+    }
+
+    private fun publish(
+        state: LoadableState<List<Album>>,
+        requestedOrigin: LoadingOrigin?,
+    ) {
+        _state.update { current ->
+            state.withFallbackContent(current.content).mapContent { albums ->
+                albums.sortedAlbums(_sort.value)
+            }
+        }
+        _loadingOrigin.value = _state.value.loadingOrigin(requestedOrigin)
+    }
+
+    private fun LoadableState<List<Album>>.withFallbackContent(
+        fallback: List<Album>?,
+    ): LoadableState<List<Album>> = when (this) {
+        is LoadableState.Content -> this
+        is LoadableState.Loading -> LoadableState.Loading(content ?: fallback)
+        is LoadableState.Failure -> LoadableState.Failure(error, content ?: fallback)
+    }
+
+    private fun LoadableState<List<Album>>.loadingOrigin(
+        requestedOrigin: LoadingOrigin?,
+    ): LoadingOrigin? = when (this) {
+        is LoadableState.Loading -> requestedOrigin ?: if (content == null) {
+            LoadingOrigin.Initial
+        } else {
+            LoadingOrigin.Automatic
+        }
+
+        else -> null
     }
 
     private companion object {
