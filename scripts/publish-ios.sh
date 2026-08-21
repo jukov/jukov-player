@@ -66,7 +66,6 @@ xcodebuild \
   -configuration Release \
   -destination "generic/platform=iOS" \
   -archivePath "$archive_path" \
-  -allowProvisioningUpdates \
   CURRENT_PROJECT_VERSION="$build_number" \
   MARKETING_VERSION="$marketing_version" \
   clean archive
@@ -75,8 +74,7 @@ xcodebuild \
   -exportArchive \
   -archivePath "$archive_path" \
   -exportPath "$export_path" \
-  -exportOptionsPlist "$export_options" \
-  -allowProvisioningUpdates
+  -exportOptionsPlist "$export_options"
 
 if [[ "$mode" == "--upload" ]]; then
   echo "Build ${marketing_version} (${build_number}) uploaded to App Store Connect."
