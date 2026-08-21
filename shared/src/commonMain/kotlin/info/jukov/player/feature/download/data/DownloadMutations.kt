@@ -19,28 +19,35 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 
-internal class DownloadMutations(
-    private val dao: CacheDao,
-    private val tracksApi: TracksApi,
-    private val platform: OfflinePlatform,
-    private val session: () -> AuthSession?,
+internal suspend fun downloadTrackMutation(
+    coordinator: DownloadMutationCoordinator,
+    accountKey: () -> String?,
+    dao: CacheDao,
+    platform: OfflinePlatform,
+    track: Track,
 ) {
-    private val coordinator = DownloadMutationCoordinator()
-
-    suspend fun downloadTrack(track: Track) {
-        coordinator.run {
-            val key = accountKey() ?: return@run
-            storeTrack(key, track, DOWNLOAD_OWNER_TRACK, track.id, position = 0)
-            platform.enqueue(key)
-        }
+    coordinator.run {
+        val key = accountKey() ?: return@run
+        storeTrack(dao, key, track, DOWNLOAD_OWNER_TRACK, track.id, position = 0)
+        platform.enqueue(key)
     }
+}
 
-    suspend fun downloadAlbum(album: Album) {
-        val (generation, requestedSession) = coordinator.snapshot(session) ?: return
-        val tracks = tracksApi.getTracks(requestedSession, TracksFilter.ByAlbum(album.id))
-        coordinator.runIfCurrent(generation) {
-            val currentSession = matchingAccountSession(requestedSession, session())
-                ?: return@runIfCurrent
+internal suspend fun downloadAlbumMutation(
+    coordinator: DownloadMutationCoordinator,
+    session: () -> AuthSession?,
+    dao: CacheDao,
+    tracksApi: TracksApi,
+    platform: OfflinePlatform,
+    album: Album,
+) {
+    fetchAndCommitIfCurrentAccount(
+        coordinator = coordinator,
+        session = session,
+        fetch = { requestedSession ->
+            tracksApi.getTracks(requestedSession, TracksFilter.ByAlbum(album.id))
+        },
+        commit = { currentSession, tracks ->
             val now = Clock.System.now().toEpochMilliseconds()
             dao.upsertAlbums(listOf(album.toEntity(currentSession.accountKey)))
             dao.upsertTracks(tracks.map { it.toEntity(currentSession.accountKey) })
@@ -54,6 +61,7 @@ internal class DownloadMutations(
             )
             tracks.forEachIndexed { index, track ->
                 storeTrack(
+                    dao = dao,
                     key = currentSession.accountKey,
                     track = track,
                     ownerType = DOWNLOAD_OWNER_ALBUM,
@@ -62,118 +70,159 @@ internal class DownloadMutations(
                 )
             }
             platform.enqueue(currentSession.accountKey)
+        },
+    )
+}
+
+internal suspend fun removeTracksMutation(
+    coordinator: DownloadMutationCoordinator,
+    accountKey: () -> String?,
+    dao: CacheDao,
+    platform: OfflinePlatform,
+    trackIds: List<String>,
+) {
+    coordinator.invalidateAndRun {
+        val key = accountKey() ?: return@invalidateAndRun
+        if (trackIds.isEmpty()) {
+            return@invalidateAndRun
+        }
+        withContext(NonCancellable) {
+            platform.cancelTracks(key, trackIds)
+            val removed = dao.removeOfflineTracks(key, trackIds)
+            platform.deleteTracks(key, removed.trackPaths)
+            platform.deleteArtworks(key, removed.artworkPaths)
         }
     }
+}
 
-    suspend fun removeTracks(trackIds: List<String>) {
-        coordinator.invalidateAndRun {
-            val key = accountKey() ?: return@invalidateAndRun
-            if (trackIds.isEmpty()) {
-                return@invalidateAndRun
+internal suspend fun cancelAlbumMutation(
+    coordinator: DownloadMutationCoordinator,
+    accountKey: () -> String?,
+    dao: CacheDao,
+    platform: OfflinePlatform,
+    albumId: String,
+) {
+    coordinator.invalidateAndRun {
+        val key = accountKey() ?: return@invalidateAndRun
+        withContext(NonCancellable) {
+            val tracks = dao.offlineAlbumTracks(key, albumId)
+            val ownershipCounts = tracks.associate { track ->
+                track.trackId to dao.ownershipCount(key, track.trackId)
             }
-            withContext(NonCancellable) {
-                platform.cancelTracks(key, trackIds)
-                val removed = dao.removeOfflineTracks(key, trackIds)
-                platform.deleteTracks(key, removed.trackPaths)
-                platform.deleteArtworks(key, removed.artworkPaths)
-            }
+            val unownedTrackIds = trackIdsWithoutOtherOwners(tracks, ownershipCounts)
+            platform.cancelTracks(key, unownedTrackIds)
+            val removed = dao.removeOfflineAlbumDownload(key, albumId, unownedTrackIds)
+            platform.deleteTracks(key, removed.trackPaths)
+            platform.deleteArtworks(key, removed.artworkPaths)
         }
     }
+}
 
-    suspend fun cancelAlbum(albumId: String) {
-        coordinator.invalidateAndRun {
-            val key = accountKey() ?: return@invalidateAndRun
-            withContext(NonCancellable) {
-                val tracks = dao.offlineAlbumTracks(key, albumId)
-                val ownershipCounts = tracks.associate { track ->
-                    track.trackId to dao.ownershipCount(key, track.trackId)
-                }
-                val unownedTrackIds = trackIdsWithoutOtherOwners(tracks, ownershipCounts)
-                platform.cancelTracks(key, unownedTrackIds)
-                val removed = dao.removeOfflineAlbumDownload(key, albumId, unownedTrackIds)
-                platform.deleteTracks(key, removed.trackPaths)
-                platform.deleteArtworks(key, removed.artworkPaths)
-            }
-        }
+internal suspend fun retryTrackMutation(
+    coordinator: DownloadMutationCoordinator,
+    accountKey: () -> String?,
+    dao: CacheDao,
+    platform: OfflinePlatform,
+    trackId: String,
+) {
+    coordinator.run {
+        val key = accountKey() ?: return@run
+        val track = dao.offlineTrack(key, trackId) ?: return@run
+        dao.updateOfflineTrackState(
+            accountKey = key,
+            trackId = trackId,
+            state = DownloadState.Queued.name,
+            downloadedBytes = track.downloadedBytes,
+            expectedSize = track.expectedSize,
+            relativePath = track.relativePath,
+            error = null,
+            completedAtMs = null,
+        )
+        platform.enqueue(key)
     }
+}
 
-    suspend fun retryTrack(trackId: String) {
-        coordinator.run {
-            val key = accountKey() ?: return@run
-            val track = dao.offlineTrack(key, trackId) ?: return@run
-            dao.updateOfflineTrackState(
-                accountKey = key,
-                trackId = trackId,
-                state = DownloadState.Queued.name,
-                downloadedBytes = track.downloadedBytes,
-                expectedSize = track.expectedSize,
-                relativePath = track.relativePath,
-                error = null,
-                completedAtMs = null,
-            )
+internal suspend fun retryAllFailedMutation(
+    coordinator: DownloadMutationCoordinator,
+    accountKey: () -> String?,
+    dao: CacheDao,
+    platform: OfflinePlatform,
+) {
+    coordinator.run {
+        val key = accountKey() ?: return@run
+        if (dao.retryAllFailedTracks(key) > 0) {
             platform.enqueue(key)
         }
     }
+}
 
-    suspend fun retryAllFailed() {
-        coordinator.run {
-            val key = accountKey() ?: return@run
-            if (dao.retryAllFailedTracks(key) > 0) {
-                platform.enqueue(key)
-            }
+internal suspend fun clearCurrentAccountMutation(
+    coordinator: DownloadMutationCoordinator,
+    accountKey: () -> String?,
+    dao: CacheDao,
+    platform: OfflinePlatform,
+) {
+    coordinator.invalidateAndRun {
+        val key = accountKey() ?: return@invalidateAndRun
+        withContext(NonCancellable) {
+            platform.cancelAccount(key)
+            platform.deleteAccount(key)
+            dao.clearOfflineAccount(key)
         }
     }
+}
 
-    suspend fun clearCurrentAccount() {
-        coordinator.invalidateAndRun {
-            val key = accountKey() ?: return@invalidateAndRun
-            withContext(NonCancellable) {
-                platform.cancelAccount(key)
-                platform.deleteAccount(key)
-                dao.clearOfflineAccount(key)
-            }
-        }
+internal suspend fun <T> fetchAndCommitIfCurrentAccount(
+    coordinator: DownloadMutationCoordinator,
+    session: () -> AuthSession?,
+    fetch: suspend (AuthSession) -> T,
+    commit: suspend (AuthSession, T) -> Unit,
+): Boolean {
+    val (generation, requestedSession) = coordinator.snapshot(session) ?: return false
+    val fetched = fetch(requestedSession)
+    var committed = false
+    coordinator.runIfCurrent(generation) {
+        val currentSession = matchingAccountSession(requestedSession, session())
+            ?: return@runIfCurrent
+        commit(currentSession, fetched)
+        committed = true
     }
+    return committed
+}
 
-    suspend fun runSerialized(block: suspend () -> Unit) {
-        coordinator.run(block)
-    }
-
-    private suspend fun storeTrack(
-        key: String,
-        track: Track,
-        ownerType: String,
-        ownerId: String,
-        position: Int,
-    ) {
-        val existing = dao.offlineTrack(key, track.id)
-        dao.upsertOfflineTrack(
-            existing ?: OfflineTrackEntity(
+private suspend fun storeTrack(
+    dao: CacheDao,
+    key: String,
+    track: Track,
+    ownerType: String,
+    ownerId: String,
+    position: Int,
+) {
+    val existing = dao.offlineTrack(key, track.id)
+    dao.upsertOfflineTrack(
+        existing ?: OfflineTrackEntity(
+            accountKey = key,
+            trackId = track.id,
+            relativePath = null,
+            expectedSize = null,
+            downloadedBytes = 0,
+            state = DownloadState.Queued.name,
+            error = null,
+            requestedAtMs = Clock.System.now().toEpochMilliseconds(),
+            completedAtMs = null,
+        ),
+    )
+    dao.upsertDownloadOwnership(
+        listOf(
+            DownloadOwnershipEntity(
                 accountKey = key,
+                ownerType = ownerType,
+                ownerId = ownerId,
                 trackId = track.id,
-                relativePath = null,
-                expectedSize = null,
-                downloadedBytes = 0,
-                state = DownloadState.Queued.name,
-                error = null,
-                requestedAtMs = Clock.System.now().toEpochMilliseconds(),
-                completedAtMs = null,
+                position = position,
             ),
-        )
-        dao.upsertDownloadOwnership(
-            listOf(
-                DownloadOwnershipEntity(
-                    accountKey = key,
-                    ownerType = ownerType,
-                    ownerId = ownerId,
-                    trackId = track.id,
-                    position = position,
-                ),
-            ),
-        )
-    }
-
-    private fun accountKey() = session()?.accountKey
+        ),
+    )
 }
 
 internal fun matchingAccountSession(

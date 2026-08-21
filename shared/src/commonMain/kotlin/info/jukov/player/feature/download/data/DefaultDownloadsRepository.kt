@@ -23,39 +23,31 @@ import kotlinx.coroutines.flow.map
 @OptIn(ExperimentalCoroutinesApi::class)
 class DefaultDownloadsRepository(
     private val authRepository: AuthRepository,
-    dao: CacheDao,
-    tracksApi: TracksApi,
-    platform: OfflinePlatform,
-    client: SubsonicApiClient,
+    private val dao: CacheDao,
+    private val tracksApi: TracksApi,
+    private val platform: OfflinePlatform,
+    private val client: SubsonicApiClient,
 ) : DownloadsRepository {
-    private val library = OfflineLibraryDataSource(dao, OfflineLibraryBuilder(platform, client))
-    private val mutations = DownloadMutations(
-        dao = dao,
-        tracksApi = tracksApi,
-        platform = platform,
-        session = ::session,
-    )
-    private val reconciler = DownloadReconciler(dao, platform)
-    private val localMedia = OfflineLocalMediaResolver(dao, platform, ::accountKey)
+    private val mutationCoordinator = DownloadMutationCoordinator()
 
     override fun observeLibrary(): Flow<OfflineLibrary> = authRepository.authState.flatMapLatest { state ->
         val session = (state as? AuthState.LoggedIn)?.session
             ?: return@flatMapLatest flowOf(OfflineLibrary())
-        library.observe(session, query = null)
+        observeOfflineLibrary(dao, platform, client, session, query = null)
     }
 
     override fun searchLibrary(query: String): Flow<OfflineLibrary> =
         authRepository.authState.flatMapLatest { state ->
             val session = (state as? AuthState.LoggedIn)?.session
                 ?: return@flatMapLatest flowOf(OfflineLibrary())
-            library.observe(session, query.trim())
+            observeOfflineLibrary(dao, platform, client, session, query.trim())
         }
 
     override fun observeTrackStatuses(): Flow<Map<String, DownloadStatus>> =
         authRepository.authState.flatMapLatest { state ->
             val accountKey = (state as? AuthState.LoggedIn)?.session?.accountKey
                 ?: return@flatMapLatest flowOf(emptyMap())
-            library.observeTrackStatuses(accountKey)
+            observeDownloadStatuses(dao, accountKey)
         }
 
     override fun observeAlbumTracks(albumId: String): Flow<List<OfflineTrack>> =
@@ -67,42 +59,91 @@ class DefaultDownloadsRepository(
         authRepository.authState.flatMapLatest { state ->
             val accountKey = (state as? AuthState.LoggedIn)?.session?.accountKey
                 ?: return@flatMapLatest flowOf(DownloadFailureSummary())
-            library.observeFailureSummary(accountKey)
+            observeDownloadFailureSummary(dao, accountKey)
         }
 
-    override suspend fun downloadTrack(track: Track) = mutations.downloadTrack(track)
+    override suspend fun downloadTrack(track: Track) = downloadTrackMutation(
+        coordinator = mutationCoordinator,
+        accountKey = ::accountKey,
+        dao = dao,
+        platform = platform,
+        track = track,
+    )
 
-    override suspend fun downloadAlbum(album: Album) = mutations.downloadAlbum(album)
+    override suspend fun downloadAlbum(album: Album) = downloadAlbumMutation(
+        coordinator = mutationCoordinator,
+        session = ::session,
+        dao = dao,
+        tracksApi = tracksApi,
+        platform = platform,
+        album = album,
+    )
 
-    override suspend fun cancelTrack(trackId: String) = mutations.removeTracks(listOf(trackId))
+    override suspend fun cancelTrack(trackId: String) = removeTracksMutation(
+        coordinator = mutationCoordinator,
+        accountKey = ::accountKey,
+        dao = dao,
+        platform = platform,
+        trackIds = listOf(trackId),
+    )
 
-    override suspend fun removeTracks(trackIds: List<String>) = mutations.removeTracks(trackIds)
+    override suspend fun removeTracks(trackIds: List<String>) = removeTracksMutation(
+        coordinator = mutationCoordinator,
+        accountKey = ::accountKey,
+        dao = dao,
+        platform = platform,
+        trackIds = trackIds,
+    )
 
-    override suspend fun cancelAlbum(albumId: String) = mutations.cancelAlbum(albumId)
+    override suspend fun cancelAlbum(albumId: String) = cancelAlbumMutation(
+        coordinator = mutationCoordinator,
+        accountKey = ::accountKey,
+        dao = dao,
+        platform = platform,
+        albumId = albumId,
+    )
 
-    override suspend fun retryTrack(trackId: String) = mutations.retryTrack(trackId)
+    override suspend fun retryTrack(trackId: String) = retryTrackMutation(
+        coordinator = mutationCoordinator,
+        accountKey = ::accountKey,
+        dao = dao,
+        platform = platform,
+        trackId = trackId,
+    )
 
-    override suspend fun retryAllFailed() = mutations.retryAllFailed()
+    override suspend fun retryAllFailed() = retryAllFailedMutation(
+        coordinator = mutationCoordinator,
+        accountKey = ::accountKey,
+        dao = dao,
+        platform = platform,
+    )
 
-    override suspend fun clearCurrentAccount() = mutations.clearCurrentAccount()
+    override suspend fun clearCurrentAccount() = clearCurrentAccountMutation(
+        coordinator = mutationCoordinator,
+        accountKey = ::accountKey,
+        dao = dao,
+        platform = platform,
+    )
 
     override suspend fun reconcile() {
-        mutations.runSerialized {
-            val key = accountKey() ?: return@runSerialized
-            reconciler.reconcile(key)
+        mutationCoordinator.run {
+            val key = accountKey() ?: return@run
+            reconcileDownloads(dao, platform, key)
         }
     }
 
-    override suspend fun localTrackUri(trackId: String): String? = localMedia.localTrackUri(trackId)
+    override suspend fun localTrackUri(trackId: String): String? = localTrackUris(listOf(trackId))[trackId]
 
     override suspend fun localTrackUris(trackIds: List<String>): Map<String, String> =
-        localMedia.localTrackUris(trackIds)
+        resolveLocalTrackUris(dao, platform, accountKey(), trackIds)
 
-    override suspend fun localArtworkUri(coverArtId: String?): String? =
-        localMedia.localArtworkUri(coverArtId)
+    override suspend fun localArtworkUri(coverArtId: String?): String? {
+        val id = coverArtId ?: return null
+        return localArtworkUris(listOf(id))[id]
+    }
 
     override suspend fun localArtworkUris(coverArtIds: List<String>): Map<String, String> =
-        localMedia.localArtworkUris(coverArtIds)
+        resolveLocalArtworkUris(dao, platform, accountKey(), coverArtIds)
 
     private fun session() = (authRepository.authState.value as? AuthState.LoggedIn)?.session
 

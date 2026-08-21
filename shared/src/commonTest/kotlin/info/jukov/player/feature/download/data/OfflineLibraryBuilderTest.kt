@@ -17,13 +17,11 @@ import kotlin.test.assertEquals
 class OfflineLibraryBuilderTest {
     @Test
     fun buildsAlbumsFromAlbumOwnershipInPositionOrderWhileKeepingTrackSearchFiltered() {
-        val builder = OfflineLibraryBuilder(
-            platform = FakeOfflinePlatform(),
-            client = SubsonicApiClient(HttpClient(), Json),
-        )
         val first = offlineTrack("first", requestedAtMs = 10)
         val second = offlineTrack("second", requestedAtMs = 20)
-        val library = builder.build(
+        val library = buildOfflineLibrary(
+            platform = FakeOfflinePlatform(),
+            client = SubsonicApiClient(HttpClient(), Json),
             session = SESSION,
             snapshot = OfflineLibrarySnapshot(
                 visibleDownloads = listOf(second),
@@ -47,13 +45,11 @@ class OfflineLibraryBuilderTest {
 
     @Test
     fun ignoresDownloadsAndAlbumsWhoseMetadataIsMissing() {
-        val builder = OfflineLibraryBuilder(
-            platform = FakeOfflinePlatform(),
-            client = SubsonicApiClient(HttpClient(), Json),
-        )
         val missing = offlineTrack("missing", requestedAtMs = 10)
 
-        val library = builder.build(
+        val library = buildOfflineLibrary(
+            platform = FakeOfflinePlatform(),
+            client = SubsonicApiClient(HttpClient(), Json),
             session = SESSION,
             snapshot = OfflineLibrarySnapshot(
                 visibleDownloads = listOf(missing),

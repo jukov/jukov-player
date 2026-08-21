@@ -73,7 +73,54 @@ class DownloadReconciliationTest {
         assertNull(decision.update)
     }
 
+    @Test
+    fun mixedTrackBatchReconcilesFailuresAndMissingFilesAndRequestsRecovery() {
+        val decisions = reconcileTrackStates(
+            tracks = listOf(
+                track(
+                    id = "legacy-network",
+                    state = DownloadState.Failed,
+                    error = "Connection reset",
+                    errorKind = null,
+                    retryCount = 0,
+                ),
+                track(
+                    id = "missing-file",
+                    state = DownloadState.Completed,
+                    relativePath = "missing.mp3",
+                    error = null,
+                    errorKind = null,
+                    retryCount = 0,
+                ),
+                track(
+                    id = "queued",
+                    state = DownloadState.Queued,
+                    error = null,
+                    errorKind = null,
+                    retryCount = 0,
+                ),
+                track(
+                    id = "complete",
+                    state = DownloadState.Completed,
+                    relativePath = "complete.mp3",
+                    error = null,
+                    errorKind = null,
+                    retryCount = 0,
+                ),
+            ),
+            localFileExists = { it == "complete.mp3" },
+            nowMs = 10_000,
+        ).associate { (track, decision) -> track.trackId to decision }
+
+        assertEquals(DownloadState.Queued, decisions.getValue("legacy-network").update?.state)
+        assertEquals(DownloadErrorKind.Local, decisions.getValue("missing-file").update?.errorKind)
+        assertTrue(decisions.getValue("queued").hasPending)
+        assertNull(decisions.getValue("complete").update)
+        assertTrue(decisions.values.any(TrackReconciliationDecision::hasPending))
+    }
+
     private fun track(
+        id: String = "track",
         state: DownloadState,
         relativePath: String? = null,
         downloadedBytes: Long = 0,
@@ -82,7 +129,7 @@ class DownloadReconciliationTest {
         retryCount: Int,
     ) = OfflineTrackEntity(
         accountKey = "account",
-        trackId = "track",
+        trackId = id,
         relativePath = relativePath,
         expectedSize = 100,
         downloadedBytes = downloadedBytes,
