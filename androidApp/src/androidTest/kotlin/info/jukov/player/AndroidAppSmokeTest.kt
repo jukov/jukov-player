@@ -105,6 +105,11 @@ class AndroidAppSmokeTest {
         composeRule.onNodeWithText("Sign out").performClick()
         composeRule.onNodeWithText("Sign out?").assertIsDisplayed()
         composeRule.onNodeWithText("Sign out").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Connect to your Subsonic server")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         composeRule.onNodeWithText("Connect to your Subsonic server").assertIsDisplayed()
 
         composeRule.activityRule.scenario.onActivity {
