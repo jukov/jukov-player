@@ -88,9 +88,12 @@ private val JukovShapes = Shapes(
 )
 
 @Composable
-fun JukovTheme(content: @Composable () -> Unit) {
+fun JukovTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
+) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         typography = JukovTypography,
         shapes = JukovShapes,
         content = content,

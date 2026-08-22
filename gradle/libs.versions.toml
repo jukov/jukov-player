@@ -28,6 +28,7 @@ room3 = "3.0.1"
 sqlite = "2.7.0"
 ksp = "2.3.11"
 kover = "0.9.9"
+screenshot = "0.0.1-alpha15"
 firebase-bom = "34.16.0"
 google-services = "4.5.0"
 firebase-crashlytics-plugin = "3.0.7"
@@ -78,6 +79,7 @@ androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidx-
 androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "androidx-fragment" }
 androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version = "1.11.2" }
 androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version = "1.11.2" }
+screenshot-validation-api = { module = "com.android.tools.screenshot:screenshot-validation-api", version.ref = "screenshot" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 
@@ -95,3 +97,4 @@ kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 googleServices = { id = "com.google.gms.google-services", version.ref = "google-services" }
 firebaseCrashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebase-crashlytics-plugin" }
 gradlePlayPublisher = { id = "com.github.triplet.play", version.ref = "gradle-play-publisher" }
+screenshot = { id = "com.android.compose.screenshot", version.ref = "screenshot" }
