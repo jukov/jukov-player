@@ -20,6 +20,23 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
+    LoginScreen(
+        state = state,
+        onServerChange = viewModel::setServer,
+        onUsernameChange = viewModel::setUsername,
+        onPasswordChange = viewModel::setPassword,
+        onLogin = viewModel::login,
+    )
+}
+
+@Composable
+fun LoginScreen(
+    state: AuthUiState,
+    onServerChange: (String) -> Unit,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onLogin: () -> Unit,
+) {
     val isLoading = state.auth is LoadableState.Loading
     Box(
         modifier = Modifier.fillMaxSize().safeContentPadding().padding(Padding.large),
@@ -33,7 +50,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
             Text(stringResource(Res.string.login_subtitle), style = MaterialTheme.typography.bodyLarge)
             OutlinedTextField(
                 value = state.server,
-                onValueChange = viewModel::setServer,
+                onValueChange = onServerChange,
                 label = { Text(stringResource(Res.string.server)) },
                 placeholder = { Text("https://example.com") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
@@ -43,7 +60,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
             )
             OutlinedTextField(
                 value = state.username,
-                onValueChange = viewModel::setUsername,
+                onValueChange = onUsernameChange,
                 label = { Text(stringResource(Res.string.username)) },
                 enabled = !isLoading,
                 singleLine = true,
@@ -51,7 +68,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
             )
             OutlinedTextField(
                 value = state.password,
-                onValueChange = viewModel::setPassword,
+                onValueChange = onPasswordChange,
                 label = { Text(stringResource(Res.string.password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -63,7 +80,7 @@ fun LoginScreen(state: AuthUiState, viewModel: AuthViewModel) {
                 Text(it.localizedMessage(), color = MaterialTheme.colorScheme.error)
             }
             Button(
-                onClick = viewModel::login,
+                onClick = onLogin,
                 enabled = !isLoading,
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("login.submit"),
             ) {

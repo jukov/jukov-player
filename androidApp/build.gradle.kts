@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.googleServices)
     alias(libs.plugins.firebaseCrashlytics)
     alias(libs.plugins.gradlePlayPublisher)
+    alias(libs.plugins.screenshot)
 }
 
 kotlin {
@@ -39,6 +40,10 @@ dependencies {
     androidTestImplementation(libs.androidx.work.testing)
     androidTestImplementation(libs.ktor.client.mock)
     androidTestImplementation(libs.multiplatform.settings.test)
+    screenshotTestImplementation(libs.screenshot.validation.api)
+    screenshotTestImplementation(libs.compose.uiTooling)
+    screenshotTestImplementation(libs.compose.foundation)
+    screenshotTestImplementation(libs.compose.material3)
 }
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -74,6 +79,7 @@ val androidTestBuildType = providers.environmentVariable("JUKOV_ANDROID_TEST_BUI
     .orElse("debug")
 
 android {
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
     namespace = "info.jukov.player"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 

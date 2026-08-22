@@ -6,4 +6,5 @@ set -euo pipefail
 ./gradlew --stacktrace \
   :shared:testAndroidHostTest \
   :androidApp:assembleDebug \
+  :androidApp:validateDebugScreenshotTest \
   :androidApp:lintDebug
