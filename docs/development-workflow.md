@@ -37,10 +37,9 @@ Every PR and push to `main` runs Linux fast checks:
 macOS iOS checks run only when needed:
 
 - on PRs that touch shared common/iOS sources, `iosApp/**`, Gradle files, or build logic;
-- on nightly scheduled runs;
 - on manual `workflow_dispatch`.
 
-The iOS simulator checks start independently from Linux checks. The slower Release device build runs only in the nightly schedule and does not block pull requests.
+The iOS simulator checks start independently from Linux checks. Scheduled nightly CI runs are disabled. Release device builds can be run locally with `./scripts/check-ios.sh --release-device`.
 
 Every PR also reports a stable `Required PR checks` gate. Branch protection for `main`
 requires this gate and an up-to-date branch before merge. The gate requires Linux fast
@@ -48,7 +47,7 @@ checks on every PR and macOS iOS checks whenever the changed paths make them rel
 Changes to `main` must go through a pull request; no approving GitHub review is required
 by branch protection because independent AI review is tracked separately in the PR.
 
-Android device smoke checks run nightly on API 28 and API 36 and can be started manually with
+Android device smoke checks run on API 28 and API 36 only when started manually with
 `workflow_dispatch`. They use deterministic in-process HTTP responses and do not contact a real
 Navidrome server. Device checks do not block pull requests.
 
@@ -58,7 +57,7 @@ Room, and resource code is excluded.
 
 ## Minutes Strategy
 
-Prefer Linux for fast feedback. macOS runners are reserved for iOS-relevant changes, nightly checks, or manual verification. CI cancels superseded runs for the same ref. Artifact retention should stay short when artifacts are added later.
+Prefer Linux for fast feedback. macOS runners are reserved for iOS-relevant changes or manual verification. CI cancels superseded runs for the same ref. Artifact retention should stay short when artifacts are added later.
 
 ## Caching
 
